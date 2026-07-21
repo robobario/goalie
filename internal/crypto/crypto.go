@@ -1,0 +1,107 @@
+package crypto
+
+import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/hex"
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+var errCiphertextTooShort = errors.New("ciphertext too short")
+
+func GenerateKey() ([]byte, error) {
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		return nil, err
+	}
+	return key, nil
+}
+
+func Encrypt(key, plaintext []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := rand.Read(nonce); err != nil {
+		return nil, err
+	}
+
+	ciphertext := gcm.Seal(nonce, nonce, plaintext, nil)
+	encoded := base64.StdEncoding.EncodeToString(ciphertext)
+	return []byte(encoded), nil
+}
+
+func Decrypt(key, ciphertext []byte) ([]byte, error) {
+	raw, err := base64.StdEncoding.DecodeString(string(ciphertext))
+	if err != nil {
+		return nil, err
+	}
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	nonceSize := gcm.NonceSize()
+	if len(raw) < nonceSize {
+		return nil, errCiphertextTooShort
+	}
+
+	nonce, raw := raw[:nonceSize], raw[nonceSize:]
+	return gcm.Open(nil, nonce, raw, nil)
+}
+
+func defaultKeyPath() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".goalie", "encryption.key"), nil
+}
+
+func LoadKey() ([]byte, error) {
+	path, err := defaultKeyPath()
+	if err != nil {
+		return nil, err
+	}
+	return LoadKeyFrom(path)
+}
+
+func LoadKeyFrom(path string) ([]byte, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return hex.DecodeString(strings.TrimSpace(string(data)))
+}
+
+func SaveKey(key []byte) error {
+	path, err := defaultKeyPath()
+	if err != nil {
+		return err
+	}
+	return SaveKeyTo(path, key)
+}
+
+func SaveKeyTo(path string, key []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return err
+	}
+	encoded := hex.EncodeToString(key)
+	return os.WriteFile(path, []byte(encoded), 0600)
+}

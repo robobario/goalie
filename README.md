@@ -31,7 +31,19 @@ Then initialise goalie, pointing it at a shared repository:
 goalie init https://github.com/your-org/your-repo.git
 ```
 
-This clones (or connects to) the `data` branch of the repo into `~/.goalie/data` and prompts you for your name.
+This clones (or connects to) the `data` branch of the repo into `~/.goalie/data`, prompts for your name, and — on a new branch — asks whether to enable client-side encryption.
+
+**Encryption** is optional. Use it when the repository is public or semi-public and you don't want goal descriptions or journal entries readable without a key. On a private enterprise repository the repo itself provides access control, so you can skip encryption. The choice is stored in the data branch so all team members share the same setting.
+
+If you enable encryption, each team member needs a key before they can read or write data:
+
+```sh
+# Generate a new key (prints the hex value — share it securely with teammates)
+goalie key init
+
+# Or import an existing key shared by a teammate
+goalie key import <hex-key>
+```
 
 To keep goalie up to date, replace the binary with a newer build.
 
@@ -39,7 +51,7 @@ To keep goalie up to date, replace the binary with a newer build.
 
 ```
 goalie                              # Open the TUI (activity view + guided update)
-goalie init <repo-url>              # Clone or create the data branch in ~/.goalie/data
+goalie init <repo-url>              # Clone or create the data branch; prompts for name and encryption
 goalie goal add <ID> <DESCRIPTION>  # Create a new open goal
 goalie goal close <ID>              # Mark a goal as closed
 goalie goal list                    # List all goals with their state

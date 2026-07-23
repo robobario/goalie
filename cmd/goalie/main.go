@@ -12,6 +12,7 @@ import (
 	"goalie/internal/cli"
 	"goalie/internal/crypto"
 	"goalie/internal/git"
+	"goalie/internal/meta"
 	"goalie/internal/tui"
 )
 
@@ -46,6 +47,19 @@ func main() {
 	key, keyErr := crypto.LoadKey()
 	ctx.EncryptionKey = key
 
+	// If the data dir exists and meta says plaintext mode, no key is required.
+	if _, statErr := os.Stat(ctx.DataDir); statErr == nil {
+		m, metaErr := meta.Load(ctx.DataDir)
+		if metaErr != nil {
+			fmt.Fprintln(os.Stderr, metaErr)
+			os.Exit(1)
+		}
+		if !m.Encrypt {
+			keyErr = nil
+			ctx.EncryptionKey = nil
+		}
+	}
+
 	var logGoal string
 	var logBlocked bool
 	var logThread string
@@ -59,7 +73,7 @@ func main() {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if ctx.EncryptionKey == nil {
+			if keyErr != nil {
 				fmt.Fprintln(os.Stderr, "No encryption key found. Generate one with: goalie key init")
 				fmt.Fprintln(os.Stderr, "Or import an existing key with: goalie key import <hex-key>")
 				os.Exit(1)

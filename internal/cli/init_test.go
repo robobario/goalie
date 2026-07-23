@@ -9,6 +9,7 @@ import (
 
 	"goalie/internal/config"
 	"goalie/internal/git"
+	"goalie/internal/meta"
 )
 
 func TestInit_NoKeyPrintsGuidance(t *testing.T) {
@@ -112,7 +113,7 @@ func TestInit_DataBranchDoesNotExist(t *testing.T) {
 		},
 	}
 
-	if err := Init("https://example.com/repo.git", dataDir, configPath, runner, strings.NewReader(""), os.Stdout, false); err != nil {
+	if err := Init("https://example.com/repo.git", dataDir, configPath, runner, strings.NewReader("n\n"), os.Stdout, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -123,7 +124,7 @@ func TestInit_DataBranchDoesNotExist(t *testing.T) {
 		{"git init", []string{"init", dataDir}},
 		{"set data branch", []string{"symbolic-ref", "HEAD", "refs/heads/data"}},
 		{"remote add", []string{"remote", "add", "origin", "https://example.com/repo.git"}},
-		{"add gitkeep files", []string{"add", "goals/.gitkeep", "journal/.gitkeep"}},
+		{"add gitkeep files and meta", []string{"add", "goals/.gitkeep", "journal/.gitkeep", "meta.json"}},
 		{"commit", []string{"commit", "-m", "chore: initialise goalie data branch"}},
 		{"push with upstream", []string{"push", "--set-upstream", "origin", "data"}},
 	}
@@ -172,6 +173,58 @@ func TestInit_ConfigWritten(t *testing.T) {
 	}
 	if cfg.Name != "Alice" {
 		t.Errorf("expected Name=Alice; got %q", cfg.Name)
+	}
+}
+
+func TestInit_NewBranch_MetaEncryptTrue(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), "data")
+	configPath := prewriteConfig(t, "Alice")
+	runner := &git.FakeRunner{Outputs: map[string][]string{"ls-remote": {""}}}
+	var out strings.Builder
+
+	if err := Init("https://example.com/repo.git", dataDir, configPath, runner, strings.NewReader("y\n"), &out, false); err != nil {
+		t.Fatal(err)
+	}
+
+	m, err := meta.Load(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !m.Encrypt {
+		t.Error("expected Encrypt=true after answering y")
+	}
+}
+
+func TestInit_NewBranch_MetaEncryptFalse(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), "data")
+	configPath := prewriteConfig(t, "Alice")
+	runner := &git.FakeRunner{Outputs: map[string][]string{"ls-remote": {""}}}
+	var out strings.Builder
+
+	if err := Init("https://example.com/repo.git", dataDir, configPath, runner, strings.NewReader("n\n"), &out, false); err != nil {
+		t.Fatal(err)
+	}
+
+	m, err := meta.Load(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.Encrypt {
+		t.Error("expected Encrypt=false after answering n")
+	}
+	if !strings.Contains(out.String(), "plaintext") {
+		t.Errorf("expected plaintext message in output; got %q", out.String())
+	}
+}
+
+func TestInit_ExistingBranch_NoEncryptionPrompt(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), "data")
+	configPath := prewriteConfig(t, "Alice")
+	runner := &git.FakeRunner{Outputs: map[string][]string{"ls-remote": {"abc123\trefs/heads/data\n"}}}
+
+	// stdin is empty — if a prompt were shown, the call would fail with EOF
+	if err := Init("https://example.com/repo.git", dataDir, configPath, runner, strings.NewReader(""), os.Stdout, false); err != nil {
+		t.Fatal(err)
 	}
 }
 

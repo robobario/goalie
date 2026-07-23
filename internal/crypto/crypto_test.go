@@ -53,6 +53,28 @@ func TestDecryptCorruptedCiphertext(t *testing.T) {
 	}
 }
 
+func TestEncryptNilKeyPassthrough(t *testing.T) {
+	plaintext := []byte("hello, goalie")
+	out, err := Encrypt(nil, plaintext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(out) != string(plaintext) {
+		t.Fatalf("got %q, want %q", out, plaintext)
+	}
+}
+
+func TestDecryptNilKeyPassthrough(t *testing.T) {
+	data := []byte(`{"note":"hello"}`)
+	out, err := Decrypt(nil, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(out) != string(data) {
+		t.Fatalf("got %q, want %q", out, data)
+	}
+}
+
 func TestDecryptWrongKey(t *testing.T) {
 	key, err := GenerateKey()
 	if err != nil {

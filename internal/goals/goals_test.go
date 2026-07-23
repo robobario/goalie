@@ -266,6 +266,56 @@ func TestClose(t *testing.T) {
 	})
 }
 
+func TestGoalFilename(t *testing.T) {
+	t.Run("nil key uses plain ID", func(t *testing.T) {
+		got := goals.GoalFilename(nil, "MY_GOAL")
+		if got != "MY_GOAL.json" {
+			t.Errorf("got %q, want MY_GOAL.json", got)
+		}
+	})
+
+	t.Run("with key produces HMAC-derived name", func(t *testing.T) {
+		key := testKey(t)
+		got := goals.GoalFilename(key, "MY_GOAL")
+		if got == "MY_GOAL.json" {
+			t.Error("keyed filename must not expose the goal ID")
+		}
+		if filepath.Ext(got) != ".json" {
+			t.Errorf("expected .json extension, got %q", got)
+		}
+	})
+
+	t.Run("with key is deterministic", func(t *testing.T) {
+		key := testKey(t)
+		a := goals.GoalFilename(key, "MY_GOAL")
+		b := goals.GoalFilename(key, "MY_GOAL")
+		if a != b {
+			t.Errorf("non-deterministic: %q vs %q", a, b)
+		}
+	})
+}
+
+func TestAddNilKey(t *testing.T) {
+	t.Run("creates plaintext file with plain ID filename", func(t *testing.T) {
+		dir := t.TempDir()
+		r := &git.FakeRunner{}
+
+		if err := goals.Add(dir, r, "PLAINGOAL", "plain goal", nil); err != nil {
+			t.Fatal(err)
+		}
+
+		path := filepath.Join(dir, "goals", "PLAINGOAL.json")
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("expected file at %s: %v", path, err)
+		}
+
+		g := readGoal(t, path, nil)
+		if g.ID != "PLAINGOAL" {
+			t.Errorf("id: got %q, want PLAINGOAL", g.ID)
+		}
+	})
+}
+
 func TestList(t *testing.T) {
 	t.Run("returns goals sorted by ID", func(t *testing.T) {
 		dir := t.TempDir()

@@ -37,9 +37,14 @@ type Goal struct {
 	Created     string `json:"created"`
 }
 
-// GoalFilename returns the HMAC-SHA256 derived filename for a goal, so the
-// goal ID is never written to disk or exposed in git history.
+// GoalFilename returns the filename for a goal. With a key the name is
+// HMAC-SHA256 derived so the goal ID is never written to disk or exposed in
+// git history. Without a key (unencrypted mode) the plain ID is used so the
+// data directory is self-explanatory.
 func GoalFilename(key []byte, id string) string {
+	if key == nil {
+		return id + ".json"
+	}
 	mac := hmac.New(sha256.New, key)
 	mac.Write([]byte(id))
 	return hex.EncodeToString(mac.Sum(nil)) + ".json"

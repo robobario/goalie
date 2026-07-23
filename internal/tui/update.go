@@ -23,7 +23,17 @@ const (
 	phaseBlockedReview             // reviewing blocked tasks one at a time
 	phaseRecentReview
 	phaseNewTask
+	phaseEditEntry // editing an existing journal entry
 	phaseDone
+)
+
+type editSub int
+
+const (
+	editPicking     editSub = iota // choosing an entry from the list
+	editNote                       // editing the note text
+	editTask                       // editing the task tag
+	editBlockedDone                // setting blocked/done state
 )
 
 type newTaskSub int
@@ -75,6 +85,15 @@ type appendDoneMsg struct {
 	err error
 }
 
+type editEntriesLoadedMsg struct {
+	entries []journal.Entry
+	err     error
+}
+
+type updateEntryDoneMsg struct {
+	err error
+}
+
 type updateModel struct {
 	ctx      *cli.AppContext
 	username string
@@ -97,6 +116,15 @@ type updateModel struct {
 	recentDone      bool
 
 	menuCursor   int
+
+	editSub      editSub
+	editEntries  []journal.Entry
+	editCursor   int
+	editEntry    journal.Entry
+	editNoteInput string
+	editTaskInput string
+	editBlocked  bool
+	editDone     bool
 
 	newSub       newTaskSub
 	goalPicker   pickerModel
@@ -191,6 +219,21 @@ func (m updateModel) Update(msg tea.Msg) (updateModel, tea.Cmd) {
 			m.err = msg.err
 		}
 
+	case editEntriesLoadedMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		m.editEntries = msg.entries
+		m.editCursor = 0
+
+	case updateEntryDoneMsg:
+		if msg.err != nil {
+			m.err = msg.err
+		} else {
+			m.phase = phaseMenu
+		}
+
 	case goalsLoadedMsg:
 		if msg.err != nil {
 			m.err = msg.err
@@ -233,6 +276,8 @@ func (m updateModel) Update(msg tea.Msg) (updateModel, tea.Cmd) {
 			return m.handleRecentReviewKey(msg)
 		case phaseNewTask:
 			return m.handleNewTaskKey(msg)
+		case phaseEditEntry:
+			return m.handleEditKey(msg)
 		}
 	}
 	return m, nil
@@ -260,6 +305,10 @@ func (m updateModel) menuOptions() []menuOption {
 	opts = append(opts, menuOption{
 		label: "Log progress on a new task",
 		phase: phaseNewTask,
+	})
+	opts = append(opts, menuOption{
+		label: "Edit a recent entry",
+		phase: phaseEditEntry,
 	})
 	return opts
 }
@@ -296,6 +345,11 @@ func (m updateModel) handleMenuKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 			m.recentSub = recentList
 		case phaseNewTask:
 			return m.enterPhaseNewTask()
+		case phaseEditEntry:
+			m.phase = phaseEditEntry
+			m.editSub = editPicking
+			m.editCursor = 0
+			return m, m.loadEditEntriesCmd()
 		}
 	}
 	return m, nil
@@ -520,6 +574,8 @@ func (m updateModel) View() string {
 		return m.viewRecentReview()
 	case phaseNewTask:
 		return m.viewNewTask()
+	case phaseEditEntry:
+		return m.viewEdit()
 	case phaseDone:
 		return "All done. Press q to exit."
 	}
@@ -597,6 +653,208 @@ func (m updateModel) viewRecentReview() string {
 		}
 		return sb.String()
 	}
+}
+
+func (m updateModel) loadEditEntriesCmd() tea.Cmd {
+	ctx := m.ctx
+	username := m.username
+	return func() tea.Msg {
+		entries, err := journal.Collect(ctx.DataDir, ctx.Git, 7, username, ctx.EncryptionKey)
+		if err != nil {
+			return editEntriesLoadedMsg{err: err}
+		}
+		// Reverse so newest entries appear first.
+		for i, j := 0, len(entries)-1; i < j; i, j = i+1, j-1 {
+			entries[i], entries[j] = entries[j], entries[i]
+		}
+		return editEntriesLoadedMsg{entries: entries}
+	}
+}
+
+func (m updateModel) handleEditKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
+	switch m.editSub {
+	case editPicking:
+		return m.handleEditPickingKey(msg)
+	case editNote:
+		return m.handleEditNoteKey(msg)
+	case editTask:
+		return m.handleEditTaskKey(msg)
+	case editBlockedDone:
+		return m.handleEditBlockedDoneKey(msg)
+	}
+	return m, nil
+}
+
+func (m updateModel) handleEditPickingKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
+	switch msg.String() {
+	case "q", "ctrl+c":
+		return m, tea.Quit
+	case "esc":
+		m.phase = phaseMenu
+	case "up":
+		if m.editCursor > 0 {
+			m.editCursor--
+		}
+	case "down":
+		if m.editCursor < len(m.editEntries)-1 {
+			m.editCursor++
+		}
+	case "enter":
+		if len(m.editEntries) > 0 {
+			m.editEntry = m.editEntries[m.editCursor]
+			m.editNoteInput = m.editEntry.Note
+			m.editTaskInput = ""
+			if m.editEntry.Task != nil {
+				m.editTaskInput = *m.editEntry.Task
+			}
+			m.editBlocked = m.editEntry.Blocked
+			m.editDone = m.editEntry.Done
+			m.editSub = editNote
+		}
+	}
+	return m, nil
+}
+
+func (m updateModel) handleEditNoteKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.phase = phaseMenu
+	case "enter":
+		m.editSub = editTask
+	case "backspace":
+		if len(m.editNoteInput) > 0 {
+			m.editNoteInput = m.editNoteInput[:len(m.editNoteInput)-1]
+		}
+	default:
+		if len(msg.Runes) == 1 {
+			m.editNoteInput += string(msg.Runes)
+		}
+	}
+	return m, nil
+}
+
+func (m updateModel) handleEditTaskKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.phase = phaseMenu
+	case "enter":
+		if goals.ValidTaskTag(m.editTaskInput) {
+			m.editSub = editBlockedDone
+		}
+	case "backspace":
+		if len(m.editTaskInput) > 0 {
+			m.editTaskInput = m.editTaskInput[:len(m.editTaskInput)-1]
+		}
+	default:
+		if len(msg.Runes) == 1 {
+			m.editTaskInput += string(msg.Runes)
+		}
+	}
+	return m, nil
+}
+
+func (m updateModel) handleEditBlockedDoneKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.phase = phaseMenu
+	case "y":
+		m.editBlocked = true
+		m.editDone = false
+		return m.submitEdit()
+	case "n":
+		m.editBlocked = false
+		m.editDone = false
+		return m.submitEdit()
+	case "d":
+		m.editBlocked = false
+		m.editDone = true
+		return m.submitEdit()
+	}
+	return m, nil
+}
+
+func (m updateModel) submitEdit() (updateModel, tea.Cmd) {
+	updated := m.editEntry
+	updated.Note = strings.TrimSpace(m.editNoteInput)
+	updated.Blocked = m.editBlocked
+	updated.Done = m.editDone
+	task := m.editTaskInput
+	updated.Task = &task
+
+	original := m.editEntry
+	ctx := m.ctx
+	username := m.username
+	cmd := func() tea.Msg {
+		err := journal.UpdateEntry(ctx.DataDir, ctx.Git, username, original, updated, ctx.EncryptionKey)
+		return updateEntryDoneMsg{err: err}
+	}
+	return m, cmd
+}
+
+func (m updateModel) viewEdit() string {
+	switch m.editSub {
+	case editPicking:
+		return m.viewEditPicking()
+	case editNote:
+		return m.viewEditNote()
+	case editTask:
+		return m.viewEditTask()
+	case editBlockedDone:
+		return m.viewEditBlockedDone()
+	}
+	return ""
+}
+
+func (m updateModel) viewEditPicking() string {
+	if len(m.editEntries) == 0 {
+		return "No entries in the last 7 days.\n\nPress Esc to go back."
+	}
+	var sb strings.Builder
+	sb.WriteString("Select an entry to edit (↑/↓, Enter to select, Esc to go back)\n\n")
+	now := time.Now().UTC()
+	for i, e := range m.editEntries {
+		cursor := "  "
+		if i == m.editCursor {
+			cursor = "> "
+		}
+		task := ""
+		if e.Task != nil {
+			task = *e.Task + " "
+		}
+		goalPart := ""
+		if e.Goal != nil {
+			goalPart = "(" + *e.Goal + ") "
+		}
+		age := ageString(e.TS, now)
+		note := e.Note
+		if len(note) > 40 {
+			note = note[:37] + "..."
+		}
+		fmt.Fprintf(&sb, "%s%s%s%s — %s\n", cursor, task, goalPart, note, age)
+	}
+	return sb.String()
+}
+
+func (m updateModel) viewEditNote() string {
+	task := ""
+	if m.editEntry.Task != nil {
+		task = *m.editEntry.Task
+	}
+	header := "Editing entry"
+	if task != "" {
+		header = "Editing: " + task
+	}
+	return fmt.Sprintf("%s\n\nNote: %s_\n\nEnter to continue, Esc to cancel", header, m.editNoteInput)
+}
+
+func (m updateModel) viewEditTask() string {
+	return fmt.Sprintf("Note: %s\n\nTask tag: %s_\n\nEnter to confirm (#hashtag required), Esc to cancel",
+		strings.TrimSpace(m.editNoteInput), m.editTaskInput)
+}
+
+func (m updateModel) viewEditBlockedDone() string {
+	return fmt.Sprintf("Note: %s\nTask: %s\n\nBlocked? [y]  Not blocked? [n]  Done? [d]  (Esc to cancel)",
+		strings.TrimSpace(m.editNoteInput), m.editTaskInput)
 }
 
 func goalIDs(gs []goals.Goal) []string {

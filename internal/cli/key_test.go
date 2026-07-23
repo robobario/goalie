@@ -11,7 +11,7 @@ import (
 )
 
 func TestKeyInit_outputsHex(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	t.Setenv("GOALIE_HOME", t.TempDir())
 	var stdout bytes.Buffer
 	ctx := AppContext{Stdout: &stdout, Stderr: &bytes.Buffer{}}
 
@@ -29,7 +29,7 @@ func TestKeyInit_outputsHex(t *testing.T) {
 }
 
 func TestKeyImport_valid(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	t.Setenv("GOALIE_HOME", t.TempDir())
 	ctx := AppContext{Stdout: &bytes.Buffer{}, Stderr: &bytes.Buffer{}}
 
 	if err := KeyImport(ctx, strings.Repeat("ab", 32)); err != nil {
@@ -78,7 +78,7 @@ func TestKeyImport_nonHex(t *testing.T) {
 
 func TestKeyInit_ExistingKey_Declined(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	t.Setenv("GOALIE_HOME", home)
 	writeExistingKey(t, home, strings.Repeat("aa", 32))
 
 	var stdout bytes.Buffer
@@ -89,7 +89,7 @@ func TestKeyInit_ExistingKey_Declined(t *testing.T) {
 	}
 
 	// Key file should remain unchanged
-	data, err := os.ReadFile(filepath.Join(home, ".goalie", "encryption.key"))
+	data, err := os.ReadFile(filepath.Join(home, "encryption.key"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestKeyInit_ExistingKey_Declined(t *testing.T) {
 
 func TestKeyInit_ExistingKey_Confirmed(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	t.Setenv("GOALIE_HOME", home)
 	writeExistingKey(t, home, strings.Repeat("aa", 32))
 
 	var stdout bytes.Buffer
@@ -111,7 +111,7 @@ func TestKeyInit_ExistingKey_Confirmed(t *testing.T) {
 	}
 
 	// Key should have been replaced
-	data, err := os.ReadFile(filepath.Join(home, ".goalie", "encryption.key"))
+	data, err := os.ReadFile(filepath.Join(home, "encryption.key"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +122,7 @@ func TestKeyInit_ExistingKey_Confirmed(t *testing.T) {
 
 func TestKeyImport_ExistingKey_Declined(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	t.Setenv("GOALIE_HOME", home)
 	oldKey := strings.Repeat("aa", 32)
 	writeExistingKey(t, home, oldKey)
 
@@ -133,7 +133,7 @@ func TestKeyImport_ExistingKey_Declined(t *testing.T) {
 		t.Fatalf("KeyImport returned error: %v", err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(home, ".goalie", "encryption.key"))
+	data, err := os.ReadFile(filepath.Join(home, "encryption.key"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +144,7 @@ func TestKeyImport_ExistingKey_Declined(t *testing.T) {
 
 func TestKeyImport_ExistingKey_Confirmed(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	t.Setenv("GOALIE_HOME", home)
 	writeExistingKey(t, home, strings.Repeat("aa", 32))
 
 	newKey := strings.Repeat("bb", 32)
@@ -154,7 +154,7 @@ func TestKeyImport_ExistingKey_Confirmed(t *testing.T) {
 		t.Fatalf("KeyImport returned error: %v", err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(home, ".goalie", "encryption.key"))
+	data, err := os.ReadFile(filepath.Join(home, "encryption.key"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,13 +163,12 @@ func TestKeyImport_ExistingKey_Confirmed(t *testing.T) {
 	}
 }
 
-func writeExistingKey(t *testing.T, home, keyHex string) {
+func writeExistingKey(t *testing.T, goalieHome, keyHex string) {
 	t.Helper()
-	keyDir := filepath.Join(home, ".goalie")
-	if err := os.MkdirAll(keyDir, 0700); err != nil {
+	if err := os.MkdirAll(goalieHome, 0700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(keyDir, "encryption.key"), []byte(keyHex), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(goalieHome, "encryption.key"), []byte(keyHex), 0600); err != nil {
 		t.Fatal(err)
 	}
 }

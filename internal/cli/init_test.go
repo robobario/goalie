@@ -16,7 +16,7 @@ import (
 
 func TestInit_NoKeyPromptsForKey(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	t.Setenv("GOALIE_HOME", home)
 
 	dataDir := t.TempDir()
 	configPath := prewriteConfig(t, "Alice")
@@ -35,15 +35,11 @@ func TestInit_NoKeyPromptsForKey(t *testing.T) {
 
 func TestInit_KeyExistsNoGuidance(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	t.Setenv("GOALIE_HOME", home)
 
-	keyDir := filepath.Join(home, ".goalie")
-	if err := os.MkdirAll(keyDir, 0700); err != nil {
-		t.Fatal(err)
-	}
 	// 64 hex chars = 32 bytes
 	keyHex := strings.Repeat("a1", 32)
-	if err := os.WriteFile(filepath.Join(keyDir, "encryption.key"), []byte(keyHex), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(home, "encryption.key"), []byte(keyHex), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -90,6 +86,7 @@ func prewriteConfig(t *testing.T, name string) string {
 }
 
 func TestInit_DataBranchExists(t *testing.T) {
+	t.Setenv("GOALIE_HOME", t.TempDir())
 	dataDir := filepath.Join(t.TempDir(), "data")
 	configPath := prewriteConfig(t, "existing")
 	runner := &git.FakeRunner{
@@ -108,6 +105,7 @@ func TestInit_DataBranchExists(t *testing.T) {
 }
 
 func TestInit_DataBranchDoesNotExist(t *testing.T) {
+	t.Setenv("GOALIE_HOME", t.TempDir())
 	dataDir := filepath.Join(t.TempDir(), "data")
 	configPath := prewriteConfig(t, "existing")
 	runner := &git.FakeRunner{
@@ -144,6 +142,7 @@ func TestInit_DataBranchDoesNotExist(t *testing.T) {
 }
 
 func TestInit_DataDirAlreadyExists(t *testing.T) {
+	t.Setenv("GOALIE_HOME", t.TempDir())
 	dataDir := t.TempDir()
 	configPath := prewriteConfig(t, "existing")
 	runner := &git.FakeRunner{}
@@ -162,6 +161,7 @@ func TestInit_DataDirAlreadyExists(t *testing.T) {
 }
 
 func TestInit_ConfigWritten(t *testing.T) {
+	t.Setenv("GOALIE_HOME", t.TempDir())
 	dataDir := t.TempDir()
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	runner := &git.FakeRunner{}
@@ -180,7 +180,7 @@ func TestInit_ConfigWritten(t *testing.T) {
 }
 
 func TestInit_NewBranch_MetaEncryptTrue(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	t.Setenv("GOALIE_HOME", t.TempDir())
 	dataDir := filepath.Join(t.TempDir(), "data")
 	configPath := prewriteConfig(t, "Alice")
 	runner := &git.FakeRunner{Outputs: map[string][]string{"ls-remote": {""}}}
@@ -200,6 +200,7 @@ func TestInit_NewBranch_MetaEncryptTrue(t *testing.T) {
 }
 
 func TestInit_NewBranch_MetaEncryptFalse(t *testing.T) {
+	t.Setenv("GOALIE_HOME", t.TempDir())
 	dataDir := filepath.Join(t.TempDir(), "data")
 	configPath := prewriteConfig(t, "Alice")
 	runner := &git.FakeRunner{Outputs: map[string][]string{"ls-remote": {""}}}
@@ -222,6 +223,7 @@ func TestInit_NewBranch_MetaEncryptFalse(t *testing.T) {
 }
 
 func TestInit_ExistingBranch_NoEncryptionPrompt(t *testing.T) {
+	t.Setenv("GOALIE_HOME", t.TempDir())
 	dataDir := filepath.Join(t.TempDir(), "data")
 	configPath := prewriteConfig(t, "Alice")
 	runner := &git.FakeRunner{Outputs: map[string][]string{"ls-remote": {"abc123\trefs/heads/data\n"}}}
@@ -233,7 +235,7 @@ func TestInit_ExistingBranch_NoEncryptionPrompt(t *testing.T) {
 }
 
 func TestInit_NewBranch_Encrypt_KeyCheckCommitted(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	t.Setenv("GOALIE_HOME", t.TempDir())
 	dataDir := filepath.Join(t.TempDir(), "data")
 	configPath := prewriteConfig(t, "Alice")
 	runner := &git.FakeRunner{Outputs: map[string][]string{"ls-remote": {""}}}
@@ -251,7 +253,7 @@ func TestInit_NewBranch_Encrypt_KeyCheckCommitted(t *testing.T) {
 }
 
 func TestInit_NewBranch_Encrypt_PrintsKeyHex(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	t.Setenv("GOALIE_HOME", t.TempDir())
 	dataDir := filepath.Join(t.TempDir(), "data")
 	configPath := prewriteConfig(t, "Alice")
 	runner := &git.FakeRunner{Outputs: map[string][]string{"ls-remote": {""}}}
@@ -271,13 +273,9 @@ func TestInit_NewBranch_Encrypt_PrintsKeyHex(t *testing.T) {
 
 func TestInit_NewBranch_Encrypt_ExistingKey_Reuse(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
-	keyDir := filepath.Join(home, ".goalie")
-	if err := os.MkdirAll(keyDir, 0700); err != nil {
-		t.Fatal(err)
-	}
+	t.Setenv("GOALIE_HOME", home)
 	keyHex := strings.Repeat("ab", 32)
-	if err := os.WriteFile(filepath.Join(keyDir, "encryption.key"), []byte(keyHex), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(home, "encryption.key"), []byte(keyHex), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -292,7 +290,7 @@ func TestInit_NewBranch_Encrypt_ExistingKey_Reuse(t *testing.T) {
 	}
 
 	// key file should still hold the original key
-	data, err := os.ReadFile(filepath.Join(keyDir, "encryption.key"))
+	data, err := os.ReadFile(filepath.Join(home, "encryption.key"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,13 +301,9 @@ func TestInit_NewBranch_Encrypt_ExistingKey_Reuse(t *testing.T) {
 
 func TestInit_NewBranch_Encrypt_ExistingKey_Regenerate(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
-	keyDir := filepath.Join(home, ".goalie")
-	if err := os.MkdirAll(keyDir, 0700); err != nil {
-		t.Fatal(err)
-	}
+	t.Setenv("GOALIE_HOME", home)
 	oldKeyHex := strings.Repeat("ab", 32)
-	if err := os.WriteFile(filepath.Join(keyDir, "encryption.key"), []byte(oldKeyHex), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(home, "encryption.key"), []byte(oldKeyHex), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -322,7 +316,7 @@ func TestInit_NewBranch_Encrypt_ExistingKey_Regenerate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(keyDir, "encryption.key"))
+	data, err := os.ReadFile(filepath.Join(home, "encryption.key"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -333,7 +327,7 @@ func TestInit_NewBranch_Encrypt_ExistingKey_Regenerate(t *testing.T) {
 
 func TestInit_KeyMismatch_ShowsWarning(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	t.Setenv("GOALIE_HOME", home)
 
 	// Set up a data dir that already exists with a key-check.enc encrypted under keyA
 	dataDir := t.TempDir()
@@ -351,12 +345,8 @@ func TestInit_KeyMismatch_ShowsWarning(t *testing.T) {
 	}
 
 	// Save a different key (keyB) as the user's local key
-	keyBDir := filepath.Join(home, ".goalie")
-	if err := os.MkdirAll(keyBDir, 0700); err != nil {
-		t.Fatal(err)
-	}
 	keyB := strings.Repeat("bb", 32)
-	if err := os.WriteFile(filepath.Join(keyBDir, "encryption.key"), []byte(keyB), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(home, "encryption.key"), []byte(keyB), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -390,7 +380,7 @@ func encryptedDataDir(t *testing.T, keyHex string) (dataDir string, keyBytes []b
 }
 
 func TestInit_PromptForKey_Skip(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	t.Setenv("GOALIE_HOME", t.TempDir())
 	dataDir, _ := encryptedDataDir(t, strings.Repeat("aa", 32))
 	configPath := prewriteConfig(t, "Alice")
 	var out strings.Builder
@@ -406,7 +396,7 @@ func TestInit_PromptForKey_Skip(t *testing.T) {
 
 func TestInit_PromptForKey_ValidKey(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	t.Setenv("GOALIE_HOME", home)
 	keyHex := strings.Repeat("aa", 32)
 	dataDir, _ := encryptedDataDir(t, keyHex)
 	configPath := prewriteConfig(t, "Alice")
@@ -419,7 +409,7 @@ func TestInit_PromptForKey_ValidKey(t *testing.T) {
 	if !strings.Contains(out.String(), "Encryption key verified") {
 		t.Errorf("expected verification success; got %q", out.String())
 	}
-	savedKey, err := os.ReadFile(filepath.Join(home, ".goalie", "encryption.key"))
+	savedKey, err := os.ReadFile(filepath.Join(home, "encryption.key"))
 	if err != nil {
 		t.Fatalf("expected key to be saved: %v", err)
 	}
@@ -430,7 +420,7 @@ func TestInit_PromptForKey_ValidKey(t *testing.T) {
 
 func TestInit_PromptForKey_InvalidThenValid(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	t.Setenv("GOALIE_HOME", home)
 	keyHex := strings.Repeat("aa", 32)
 	dataDir, _ := encryptedDataDir(t, keyHex)
 	configPath := prewriteConfig(t, "Alice")
@@ -450,7 +440,7 @@ func TestInit_PromptForKey_InvalidThenValid(t *testing.T) {
 }
 
 func TestInit_PromptForKey_WrongKeyThenSkip(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	t.Setenv("GOALIE_HOME", t.TempDir())
 	keyHex := strings.Repeat("aa", 32)
 	dataDir, _ := encryptedDataDir(t, keyHex)
 	configPath := prewriteConfig(t, "Alice")
@@ -471,6 +461,7 @@ func TestInit_PromptForKey_WrongKeyThenSkip(t *testing.T) {
 }
 
 func TestInit_ConfigNotOverwritten(t *testing.T) {
+	t.Setenv("GOALIE_HOME", t.TempDir())
 	dataDir := t.TempDir()
 	configPath := prewriteConfig(t, "OriginalName")
 	runner := &git.FakeRunner{}

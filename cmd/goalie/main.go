@@ -12,6 +12,7 @@ import (
 	"goalie/internal/cli"
 	"goalie/internal/crypto"
 	"goalie/internal/git"
+	"goalie/internal/goalieenv"
 	"goalie/internal/meta"
 	"goalie/internal/tui"
 )
@@ -29,14 +30,14 @@ func requireKey(keyErr error, fn func(*cobra.Command, []string) error) func(*cob
 }
 
 func main() {
-	home, err := os.UserHomeDir()
+	goalieHome, err := goalieenv.Home()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
 	ctx := cli.AppContext{
-		DataDir: home + "/.goalie/data",
+		DataDir: filepath.Join(goalieHome, "data"),
 		Git:     &git.RealRunner{},
 		Stdin:   os.Stdin,
 		Stdout:  os.Stdout,
@@ -82,7 +83,7 @@ func main() {
 		},
 	}
 
-	configPath := filepath.Join(home, ".goalie", "config.json")
+	configPath := filepath.Join(goalieHome, "config.json")
 
 	initCmd := &cobra.Command{
 		Use:   "init <repo-url>",

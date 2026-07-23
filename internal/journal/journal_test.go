@@ -273,6 +273,9 @@ func TestAppend(t *testing.T) {
 		if _, err := time.Parse(time.RFC3339, got.TS); err != nil {
 			t.Errorf("TS is not valid RFC3339: %v", err)
 		}
+		if len(got.ID) != 36 {
+			t.Errorf("expected UUID-format ID (36 chars), got %q", got.ID)
+		}
 	})
 
 	t.Run("pull happens before file write", func(t *testing.T) {
@@ -611,7 +614,7 @@ func TestUpdateEntry(t *testing.T) {
 		dir := t.TempDir()
 		r := &git.FakeRunner{}
 		key := testKey()
-		original := journal.Entry{TS: relTS(-1), Note: "tpyo", Task: strPtr("#impl"), Blocked: false}
+		original := journal.Entry{ID: "id-1", TS: relTS(-1), Note: "tpyo", Task: strPtr("#impl")}
 		writeEntries(t, dir, currentWeekFile("alice"), []journal.Entry{original}, key)
 
 		updated := original
@@ -638,12 +641,12 @@ func TestUpdateEntry(t *testing.T) {
 		key := testKey()
 		ts1, ts2, ts3 := relTS(-3), relTS(-2), relTS(-1)
 		writeEntries(t, dir, currentWeekFile("alice"), []journal.Entry{
-			{TS: ts1, Note: "entry one", Task: strPtr("#impl")},
-			{TS: ts2, Note: "entry two", Task: strPtr("#impl")},
-			{TS: ts3, Note: "entry three", Task: strPtr("#impl")},
+			{ID: "id-a", TS: ts1, Note: "entry one", Task: strPtr("#impl")},
+			{ID: "id-b", TS: ts2, Note: "entry two", Task: strPtr("#impl")},
+			{ID: "id-c", TS: ts3, Note: "entry three", Task: strPtr("#impl")},
 		}, key)
 
-		original := journal.Entry{TS: ts2, Note: "entry two", Task: strPtr("#impl")}
+		original := journal.Entry{ID: "id-b", TS: ts2, Note: "entry two", Task: strPtr("#impl")}
 		updated := original
 		updated.Note = "entry two corrected"
 		if err := journal.UpdateEntry(dir, r, "alice", original, updated, key); err != nil {
@@ -674,13 +677,24 @@ func TestUpdateEntry(t *testing.T) {
 		r := &git.FakeRunner{}
 		key := testKey()
 		writeEntries(t, dir, currentWeekFile("alice"), []journal.Entry{
-			{TS: relTS(-1), Note: "something", Task: strPtr("#impl")},
+			{ID: "id-real", TS: relTS(-1), Note: "something", Task: strPtr("#impl")},
 		}, key)
 
-		bogus := journal.Entry{TS: relTS(-2), Note: "ghost"}
+		bogus := journal.Entry{ID: "id-ghost", TS: relTS(-1), Note: "ghost"}
 		err := journal.UpdateEntry(dir, r, "alice", bogus, bogus, key)
 		if err == nil {
-			t.Error("expected error for missing entry, got nil")
+			t.Error("expected error for missing ID, got nil")
+		}
+	})
+
+	t.Run("returns error when original has no ID", func(t *testing.T) {
+		dir := t.TempDir()
+		r := &git.FakeRunner{}
+		key := testKey()
+		noID := journal.Entry{TS: relTS(-1), Note: "old entry"}
+		err := journal.UpdateEntry(dir, r, "alice", noID, noID, key)
+		if err == nil {
+			t.Error("expected error for entry with empty ID, got nil")
 		}
 	})
 }

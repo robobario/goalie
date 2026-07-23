@@ -111,11 +111,14 @@ func makeLoadedModel(entries []journal.Entry) activityModel {
 	return m
 }
 
-func TestUpdateSlashEntersSearchMode(t *testing.T) {
+func TestUpdateAnyRuneEntersSearchMode(t *testing.T) {
 	m := activityModel{loaded: true}
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
 	if !m.searchMode {
-		t.Error("expected searchMode=true after '/' key")
+		t.Error("expected searchMode=true after typing a character")
+	}
+	if m.search != "a" {
+		t.Errorf("expected search=%q, got %q", "a", m.search)
 	}
 }
 
@@ -130,17 +133,23 @@ func TestUpdateEscapeClearsSearchAndExitsSearchMode(t *testing.T) {
 	}
 }
 
-func TestUpdateAfterLoadSlashThenCharFiltersEntries(t *testing.T) {
+func TestUpdateBackspaceToEmptyExitsSearchMode(t *testing.T) {
+	m := activityModel{loaded: true, searchMode: true, search: "a"}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	if m.searchMode {
+		t.Error("expected searchMode=false after backspacing to empty")
+	}
+	if m.search != "" {
+		t.Errorf("expected empty search, got %q", m.search)
+	}
+}
+
+func TestUpdateTypingFiltersEntries(t *testing.T) {
 	entries := []journal.Entry{
 		{Note: "deploy service", TS: time.Now().Format(time.RFC3339)},
 		{Note: "write docs", TS: time.Now().Format(time.RFC3339)},
 	}
 	m := makeLoadedModel(entries)
-
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
-	if !m.searchMode {
-		t.Fatal("expected searchMode=true after '/'")
-	}
 
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})

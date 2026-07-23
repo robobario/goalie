@@ -69,28 +69,26 @@ func (m activityModel) Update(msg tea.Msg) (activityModel, tea.Cmd) {
 		m.entries = msg.entries
 		m.filtered = FilterEntries(m.entries, m.search)
 	case tea.KeyMsg:
-		if !m.searchMode {
-			if msg.String() == "/" {
-				m.searchMode = true
+		switch msg.String() {
+		case "esc":
+			m.search = ""
+			m.searchMode = false
+			m.filtered = m.entries
+		case "enter":
+			m.searchMode = false
+		case "backspace":
+			if len(m.search) > 0 {
+				m.search = m.search[:len(m.search)-1]
+				m.filtered = FilterEntries(m.entries, m.search)
 			}
-		} else {
-			switch msg.String() {
-			case "esc":
-				m.search = ""
+			if m.search == "" {
 				m.searchMode = false
-				m.filtered = m.entries
-			case "enter":
-				m.searchMode = false
-			case "backspace":
-				if len(m.search) > 0 {
-					m.search = m.search[:len(m.search)-1]
-					m.filtered = FilterEntries(m.entries, m.search)
-				}
-			default:
-				if len(msg.Runes) == 1 {
-					m.search += string(msg.Runes)
-					m.filtered = FilterEntries(m.entries, m.search)
-				}
+			}
+		default:
+			if len(msg.Runes) == 1 {
+				m.searchMode = true
+				m.search += string(msg.Runes)
+				m.filtered = FilterEntries(m.entries, m.search)
 			}
 		}
 	}
@@ -107,12 +105,14 @@ func (m activityModel) View() string {
 
 	var sb strings.Builder
 
-	searchLabel := "Search: " + m.search
 	if m.searchMode {
+		searchLabel := "Search: " + m.search
 		sb.WriteString(lipgloss.NewStyle().Bold(true).Underline(true).Render(searchLabel))
 		sb.WriteString("_")
+	} else if m.search != "" {
+		sb.WriteString("Search: " + m.search)
 	} else {
-		sb.WriteString(searchLabel)
+		sb.WriteString(lipgloss.NewStyle().Faint(true).Render("start typing to filter"))
 	}
 	sb.WriteString("\n\n")
 

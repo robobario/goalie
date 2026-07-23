@@ -45,7 +45,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if m.activeTab == updateTab && (m.update.inputMode || m.update.phase == phaseNewTask) {
+		if m.activeTab == updateTab && m.update.phase != phaseLoading {
 			var cmd tea.Cmd
 			m.update, cmd = m.update.Update(msg)
 			cmds = append(cmds, cmd)

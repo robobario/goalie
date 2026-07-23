@@ -19,9 +19,10 @@ type updatePhase int
 
 const (
 	phaseLoading       updatePhase = iota
+	phaseMenu                      // top-level action menu
 	phaseBlockedReview             // reviewing blocked tasks one at a time
-	phaseRecentReview              // Task 5 — stub
-	phaseNewTask                 // Task 6 — stub
+	phaseRecentReview
+	phaseNewTask
 	phaseDone
 )
 
@@ -93,6 +94,8 @@ type updateModel struct {
 	updatedTags     map[string]bool
 	recentNotes     string
 	recentUnblocked bool
+
+	menuCursor   int
 
 	newSub       newTaskSub
 	goalPicker   pickerModel
@@ -179,11 +182,8 @@ func (m updateModel) Update(msg tea.Msg) (updateModel, tea.Cmd) {
 		m.recentTasks = msg.recent
 		m.recentCursor = 0
 		m.updatedTags = make(map[string]bool)
-		if len(m.blockedTasks) == 0 {
-			m.phase = phaseRecentReview
-		} else {
-			m.phase = phaseBlockedReview
-		}
+		m.phase = phaseMenu
+		m.menuCursor = 0
 
 	case appendDoneMsg:
 		if msg.err != nil {
@@ -218,6 +218,8 @@ func (m updateModel) Update(msg tea.Msg) (updateModel, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch m.phase {
+		case phaseMenu:
+			return m.handleMenuKey(msg)
 		case phaseBlockedReview:
 			if m.inputMode {
 				return m.handleInputKey(msg)
@@ -233,6 +235,87 @@ func (m updateModel) Update(msg tea.Msg) (updateModel, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+type menuOption struct {
+	label string
+	phase updatePhase
+}
+
+func (m updateModel) menuOptions() []menuOption {
+	var opts []menuOption
+	if len(m.blockedTasks) > 0 {
+		opts = append(opts, menuOption{
+			label: fmt.Sprintf("Review blocked tasks (%d pending)", len(m.blockedTasks)),
+			phase: phaseBlockedReview,
+		})
+	}
+	if len(m.recentTasks) > 0 {
+		opts = append(opts, menuOption{
+			label: "Log progress on a recent task",
+			phase: phaseRecentReview,
+		})
+	}
+	opts = append(opts, menuOption{
+		label: "Log progress on a new task",
+		phase: phaseNewTask,
+	})
+	return opts
+}
+
+func (m updateModel) handleMenuKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
+	opts := m.menuOptions()
+	switch msg.String() {
+	case "q", "ctrl+c":
+		return m, tea.Quit
+	case "up":
+		if m.menuCursor > 0 {
+			m.menuCursor--
+		}
+	case "down":
+		if m.menuCursor < len(opts)-1 {
+			m.menuCursor++
+		}
+	case "enter":
+		if len(opts) == 0 {
+			return m, tea.Quit
+		}
+		if m.menuCursor >= len(opts) {
+			m.menuCursor = len(opts) - 1
+		}
+		switch opts[m.menuCursor].phase {
+		case phaseBlockedReview:
+			m.phase = phaseBlockedReview
+			m.blockedIdx = 0
+			m.inputMode = false
+			m.awaitingUnblock = false
+		case phaseRecentReview:
+			m.phase = phaseRecentReview
+			m.recentCursor = 0
+			m.recentSub = recentList
+		case phaseNewTask:
+			return m.enterPhaseNewTask()
+		}
+	}
+	return m, nil
+}
+
+func (m updateModel) viewMenu() string {
+	opts := m.menuOptions()
+	if len(opts) == 0 {
+		return "Nothing to do. Press q to quit."
+	}
+	var sb strings.Builder
+	sb.WriteString("What would you like to do?\n\n")
+	for i, opt := range opts {
+		cursor := "  "
+		if i == m.menuCursor {
+			cursor = "> "
+		}
+		sb.WriteString(cursor + opt.label + "\n")
+	}
+	sb.WriteString("\n↑/↓ to select, Enter to confirm, q to quit")
+	return sb.String()
 }
 
 func (m updateModel) handleInputKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
@@ -265,7 +348,7 @@ func (m updateModel) handleInputKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 		m.nowUnblocked = false
 		m.blockedIdx++
 		if m.blockedIdx >= len(m.blockedTasks) {
-			m.phase = phaseRecentReview
+			m.phase = phaseMenu
 		}
 		return m, cmd
 	case "backspace":
@@ -290,6 +373,9 @@ func (m updateModel) handleUnblockKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 		m.nowUnblocked = false
 		m.awaitingUnblock = false
 		m.inputMode = true
+	case "esc":
+		m.awaitingUnblock = false
+		m.phase = phaseMenu
 	}
 	return m, nil
 }
@@ -301,8 +387,10 @@ func (m updateModel) handleBlockedReviewKey(msg tea.KeyMsg) (updateModel, tea.Cm
 	case "n":
 		m.blockedIdx++
 		if m.blockedIdx >= len(m.blockedTasks) {
-			m.phase = phaseRecentReview
+			m.phase = phaseMenu
 		}
+	case "esc":
+		m.phase = phaseMenu
 	}
 	return m, nil
 }
@@ -323,8 +411,9 @@ func (m updateModel) handleRecentListKey(msg tea.KeyMsg) (updateModel, tea.Cmd) 
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
-	case "s":
-		return m.enterPhaseNewTask()
+	case "s", "esc":
+		m.phase = phaseMenu
+		return m, nil
 	case "up":
 		if m.recentCursor > 0 {
 			m.recentCursor--
@@ -401,8 +490,8 @@ func (m updateModel) submitRecentEntry() (updateModel, tea.Cmd) {
 	m.recentSub = recentList
 
 	if len(m.recentTasks) == 0 {
-		m2, goalsCmd := m.enterPhaseNewTask()
-		return m2, tea.Batch(cmd, goalsCmd)
+		m.phase = phaseMenu
+		return m, cmd
 	}
 	return m, cmd
 }
@@ -414,6 +503,8 @@ func (m updateModel) View() string {
 	switch m.phase {
 	case phaseLoading:
 		return "Loading..."
+	case phaseMenu:
+		return m.viewMenu()
 	case phaseBlockedReview:
 		return m.viewBlockedReview()
 	case phaseRecentReview:
@@ -525,8 +616,12 @@ func (m updateModel) enterPhaseNewTask() (updateModel, tea.Cmd) {
 }
 
 func (m updateModel) handleNewTaskKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
-	if msg.String() == "ctrl+c" {
+	switch msg.String() {
+	case "ctrl+c":
 		return m, tea.Quit
+	case "esc":
+		m.phase = phaseMenu
+		return m, nil
 	}
 	switch m.newSub {
 	case newGoalPick:
@@ -617,8 +712,8 @@ func (m updateModel) handleNewTaskKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 			m.newNoteInput = ""
 			m.tagError = ""
 			m.newUnblocked = false
-		case "n":
-			m.phase = phaseDone
+		case "n", "esc":
+			m.phase = phaseMenu
 		}
 	}
 	return m, nil

@@ -41,6 +41,26 @@ func Section(title string, w io.Writer, tty bool) {
 	fmt.Fprintf(w, "\n%s\n", Bold(line, tty))
 }
 
+// FormatSummaryHeader returns the group header for a summary story block.
+// goal is empty or "(no goal)"; task is the #hashtag; username is the slugified name.
+func FormatSummaryHeader(goal, task, username string, tty bool) string {
+	return Bold("= "+goal+task+"@"+username, tty)
+}
+
+// FormatSummaryEntry formats a single entry line within a summary story block.
+// prevBlocked is the blocked state of the preceding entry (false for the first entry).
+// A label is shown only when the blocked state differs from prevBlocked.
+func FormatSummaryEntry(e journal.Entry, prevBlocked bool, now time.Time, tty bool) string {
+	age := ageString(e.TS, now)
+	if e.Blocked != prevBlocked {
+		if e.Blocked {
+			return "- " + Red("[Blocked]", tty) + " " + e.Note + " — " + age
+		}
+		return "- " + Green("[Unblocked]", tty) + " " + e.Note + " — " + age
+	}
+	return "- " + e.Note + " — " + age
+}
+
 func FormatEntry(e journal.Entry, now time.Time, tty bool) string {
 	age := ageString(e.TS, now)
 	taskPart := ""

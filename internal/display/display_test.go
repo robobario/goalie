@@ -146,6 +146,56 @@ func TestFormatStatusEntryBlockedWithGoal(t *testing.T) {
 	}
 }
 
+func TestFormatSummaryHeader(t *testing.T) {
+	got := FormatSummaryHeader("ROUTING", "#impl", "alice", false)
+	want := "= ROUTING#impl@alice"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestFormatSummaryHeaderNoGoal(t *testing.T) {
+	got := FormatSummaryHeader("(no goal)", "#refactor", "bob", false)
+	if !strings.Contains(got, "(no goal)") || !strings.Contains(got, "@bob") {
+		t.Errorf("unexpected header: %q", got)
+	}
+}
+
+func TestFormatSummaryEntryNoStateChange(t *testing.T) {
+	e := journal.Entry{TS: fixedTS, Note: "steady progress", Blocked: false}
+	got := FormatSummaryEntry(e, false, fixedNow, false)
+	if got != "- steady progress — 1d ago" {
+		t.Errorf("got %q", got)
+	}
+}
+
+func TestFormatSummaryEntryBlockedStateChange(t *testing.T) {
+	e := journal.Entry{TS: fixedTS, Note: "hit a wall", Blocked: true}
+	got := FormatSummaryEntry(e, false, fixedNow, false)
+	if !strings.HasPrefix(got, "- [Blocked]") {
+		t.Errorf("expected [Blocked] prefix, got %q", got)
+	}
+}
+
+func TestFormatSummaryEntryUnblockedStateChange(t *testing.T) {
+	e := journal.Entry{TS: fixedTS, Note: "resolved", Blocked: false}
+	got := FormatSummaryEntry(e, true, fixedNow, false)
+	if !strings.HasPrefix(got, "- [Unblocked]") {
+		t.Errorf("expected [Unblocked] prefix, got %q", got)
+	}
+}
+
+func TestFormatSummaryEntryBlockedNoChange(t *testing.T) {
+	e := journal.Entry{TS: fixedTS, Note: "still stuck", Blocked: true}
+	got := FormatSummaryEntry(e, true, fixedNow, false)
+	if strings.Contains(got, "[Blocked]") || strings.Contains(got, "[Unblocked]") {
+		t.Errorf("expected no label when state unchanged, got %q", got)
+	}
+	if !strings.Contains(got, "still stuck") {
+		t.Errorf("expected note in output, got %q", got)
+	}
+}
+
 func TestFormatStatusEntryNoGoalNoThread(t *testing.T) {
 	e := journal.Entry{
 		TS:      fixedTS,

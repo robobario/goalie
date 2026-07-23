@@ -208,6 +208,81 @@ func TestSummaryEntriesWithinWindowAreShown(t *testing.T) {
 	}
 }
 
+func TestSummaryGroupsEntriesByGoalAndTask(t *testing.T) {
+	ctx, stdout, _ := newCtx(t)
+
+	journalDir := filepath.Join(ctx.DataDir, "journal")
+	os.MkdirAll(journalDir, 0o755)
+	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("alice")), []jsonlEntry{
+		{"ts": ts(-3), "note": "started", "goal": "ROUTING", "task": "#impl", "blocked": false},
+		{"ts": ts(-2), "note": "blocked on review", "goal": "ROUTING", "task": "#impl", "blocked": true},
+		{"ts": ts(-1), "note": "unblocked", "goal": "ROUTING", "task": "#impl", "blocked": false},
+	}, ctx.EncryptionKey)
+
+	if err := cli.Summary(ctx, 7, "*"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := stdout.String()
+
+	if !strings.Contains(out, "ROUTING#impl@alice") {
+		t.Errorf("expected group header; got:\n%s", out)
+	}
+	if !strings.Contains(out, "started") {
+		t.Errorf("expected first note; got:\n%s", out)
+	}
+	if !strings.Contains(out, "[Blocked]") {
+		t.Errorf("expected [Blocked] label; got:\n%s", out)
+	}
+	if !strings.Contains(out, "[Unblocked]") {
+		t.Errorf("expected [Unblocked] label; got:\n%s", out)
+	}
+}
+
+func TestSummaryNoGoalUsesPlaceholder(t *testing.T) {
+	ctx, stdout, _ := newCtx(t)
+
+	journalDir := filepath.Join(ctx.DataDir, "journal")
+	os.MkdirAll(journalDir, 0o755)
+	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("alice")), []jsonlEntry{
+		{"ts": ts(-1), "note": "some work", "goal": nil, "task": "#refactor", "blocked": false},
+	}, ctx.EncryptionKey)
+
+	if err := cli.Summary(ctx, 7, "*"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "(no goal)") {
+		t.Errorf("expected '(no goal)' placeholder in header; got:\n%s", out)
+	}
+}
+
+func TestSummaryStateChangeOnlyShowsLabel(t *testing.T) {
+	ctx, stdout, _ := newCtx(t)
+
+	journalDir := filepath.Join(ctx.DataDir, "journal")
+	os.MkdirAll(journalDir, 0o755)
+	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("alice")), []jsonlEntry{
+		{"ts": ts(-4), "note": "steady progress", "goal": "GOAL", "task": "#impl", "blocked": false},
+		{"ts": ts(-3), "note": "still going", "goal": "GOAL", "task": "#impl", "blocked": false},
+		{"ts": ts(-2), "note": "hit a wall", "goal": "GOAL", "task": "#impl", "blocked": true},
+		{"ts": ts(-1), "note": "resolved", "goal": "GOAL", "task": "#impl", "blocked": false},
+	}, ctx.EncryptionKey)
+
+	if err := cli.Summary(ctx, 7, "*"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := stdout.String()
+
+	blockedCount := strings.Count(out, "[Blocked]")
+	unblockedCount := strings.Count(out, "[Unblocked]")
+	if blockedCount != 1 {
+		t.Errorf("expected exactly 1 [Blocked] label, got %d; output:\n%s", blockedCount, out)
+	}
+	if unblockedCount != 1 {
+		t.Errorf("expected exactly 1 [Unblocked] label, got %d; output:\n%s", unblockedCount, out)
+	}
+}
+
 func TestSummaryUserArgFiltersByName(t *testing.T) {
 	ctx, stdout, _ := newCtx(t)
 

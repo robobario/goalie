@@ -62,8 +62,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "tab":
 			m.activeTab = (m.activeTab + 1) % 2
+			if m.activeTab == activityTab {
+				m.activity.loaded = false
+				cmds = append(cmds, loadActivityCmd(m.ctx))
+			}
 		case "shift+tab":
 			m.activeTab = (m.activeTab - 1 + 2) % 2
+			if m.activeTab == activityTab {
+				m.activity.loaded = false
+				cmds = append(cmds, loadActivityCmd(m.ctx))
+			}
 		default:
 			if m.activeTab == activityTab {
 				var cmd tea.Cmd

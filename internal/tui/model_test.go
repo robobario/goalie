@@ -85,6 +85,52 @@ func TestWindowSizeMsgStoresWidthAndHeight(t *testing.T) {
 	}
 }
 
+func TestTabToActivityTabTriggersRefresh(t *testing.T) {
+	m := newModel()
+	m.activeTab = updateTab
+	m.activity.loaded = true
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	got := next.(Model)
+	if got.activeTab != activityTab {
+		t.Fatalf("expected activityTab, got %v", got.activeTab)
+	}
+	if got.activity.loaded {
+		t.Error("expected activity.loaded=false after switching to activity tab")
+	}
+	if cmd == nil {
+		t.Error("expected a refresh command when switching to activity tab")
+	}
+}
+
+func TestShiftTabToActivityTabTriggersRefresh(t *testing.T) {
+	m := newModel()
+	m.activity.loaded = true
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+	got := next.(Model)
+	if got.activeTab != updateTab {
+		t.Fatalf("expected updateTab, got %v", got.activeTab)
+	}
+	// shift+tab from activityTab goes to updateTab, not activityTab — no refresh
+	if cmd != nil {
+		msg := cmd()
+		if _, ok := msg.(tea.QuitMsg); ok {
+			t.Error("unexpected quit command")
+		}
+	}
+	// now tab back to activityTab
+	next2, cmd2 := got.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+	got2 := next2.(Model)
+	if got2.activeTab != activityTab {
+		t.Fatalf("expected activityTab, got %v", got2.activeTab)
+	}
+	if got2.activity.loaded {
+		t.Error("expected activity.loaded=false after switching to activity tab")
+	}
+	if cmd2 == nil {
+		t.Error("expected a refresh command when switching to activity tab")
+	}
+}
+
 func TestWindowSizeMsgNotForwardedToActivityChild(t *testing.T) {
 	// activityModel has no width/height field; this test documents that
 	// WindowSizeMsg is stored on the top-level Model only and is not

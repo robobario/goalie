@@ -10,10 +10,10 @@ import (
 	"goalie/internal/journal"
 )
 
-func makeBlockedThread(tag string, goal *string, note string) blockedThread {
-	return blockedThread{
+func makeBlockedThread(tag string, goal *string, note string) blockedTask {
+	return blockedTask{
 		tag: tag,
-		state: journal.ThreadState{
+		state: journal.TaskState{
 			Goal:    goal,
 			Note:    note,
 			Blocked: true,
@@ -22,11 +22,11 @@ func makeBlockedThread(tag string, goal *string, note string) blockedThread {
 	}
 }
 
-func makeRecentThread(tag string, goal *string, note string, hoursAgo int) recentThread {
+func makeRecentThread(tag string, goal *string, note string, hoursAgo int) recentTask {
 	ts := time.Now().Add(-time.Duration(hoursAgo) * time.Hour).Format(time.RFC3339)
-	return recentThread{
+	return recentTask{
 		tag: tag,
-		state: journal.ThreadState{
+		state: journal.TaskState{
 			Goal:    goal,
 			Note:    note,
 			Blocked: false,
@@ -53,8 +53,8 @@ func TestUpdateInitialPhaseIsLoading(t *testing.T) {
 
 func TestUpdateThreadStatesLoadedSetsBlockedReview(t *testing.T) {
 	m := updateModel{}
-	msg := threadStatesLoadedMsg{
-		blocked: []blockedThread{
+	msg := taskStatesLoadedMsg{
+		blocked: []blockedTask{
 			makeBlockedThread("#thread1", nil, "waiting on infra"),
 			makeBlockedThread("#thread2", nil, "pending review"),
 		},
@@ -71,7 +71,7 @@ func TestUpdateThreadStatesLoadedSetsBlockedReview(t *testing.T) {
 func TestUpdateSkipBlockedThreadAdvancesIdx(t *testing.T) {
 	m := updateModel{
 		phase: phaseBlockedReview,
-		blockedThreads: []blockedThread{
+		blockedTasks: []blockedTask{
 			makeBlockedThread("#thread1", nil, "waiting"),
 			makeBlockedThread("#thread2", nil, "waiting"),
 		},
@@ -85,7 +85,7 @@ func TestUpdateSkipBlockedThreadAdvancesIdx(t *testing.T) {
 func TestUpdateYesNotUnblockedWithNotesAdvancesIdx(t *testing.T) {
 	m := updateModel{
 		phase: phaseBlockedReview,
-		blockedThreads: []blockedThread{
+		blockedTasks: []blockedTask{
 			makeBlockedThread("#thread1", nil, "waiting"),
 			makeBlockedThread("#thread2", nil, "waiting"),
 		},
@@ -117,7 +117,7 @@ func TestUpdateYesNotUnblockedWithNotesAdvancesIdx(t *testing.T) {
 func TestUpdateAllSkippedTransitionsToRecentReview(t *testing.T) {
 	m := updateModel{
 		phase: phaseBlockedReview,
-		blockedThreads: []blockedThread{
+		blockedTasks: []blockedTask{
 			makeBlockedThread("#thread1", nil, "waiting"),
 			makeBlockedThread("#thread2", nil, "waiting"),
 		},
@@ -132,7 +132,7 @@ func TestUpdateAllSkippedTransitionsToRecentReview(t *testing.T) {
 func TestUpdateLastThreadSubmittedTransitionsToRecentReview(t *testing.T) {
 	m := updateModel{
 		phase: phaseBlockedReview,
-		blockedThreads: []blockedThread{
+		blockedTasks: []blockedTask{
 			makeBlockedThread("#thread1", nil, "waiting"),
 		},
 	}
@@ -149,9 +149,9 @@ func TestUpdateLastThreadSubmittedTransitionsToRecentReview(t *testing.T) {
 
 func TestUpdateNoBlockedThreadsTransitionsToRecentReview(t *testing.T) {
 	m := updateModel{}
-	msg := threadStatesLoadedMsg{
-		blocked: []blockedThread{},
-		recent: []recentThread{
+	msg := taskStatesLoadedMsg{
+		blocked: []blockedTask{},
+		recent: []recentTask{
 			makeRecentThread("#onboarding", nil, "Drafted outline", 24),
 		},
 		username: "alice",
@@ -160,8 +160,8 @@ func TestUpdateNoBlockedThreadsTransitionsToRecentReview(t *testing.T) {
 	if m.phase != phaseRecentReview {
 		t.Errorf("expected phaseRecentReview when no blocked threads, got %v", m.phase)
 	}
-	if len(m.recentThreads) != 1 {
-		t.Errorf("expected 1 recent thread, got %d", len(m.recentThreads))
+	if len(m.recentTasks) != 1 {
+		t.Errorf("expected 1 recent thread, got %d", len(m.recentTasks))
 	}
 }
 
@@ -169,7 +169,7 @@ func TestUpdateRecentListDownMovescursor(t *testing.T) {
 	m := updateModel{
 		phase: phaseRecentReview,
 		recentSub: recentList,
-		recentThreads: []recentThread{
+		recentTasks: []recentTask{
 			makeRecentThread("#alpha", nil, "in progress", 24),
 			makeRecentThread("#beta", nil, "started", 48),
 		},
@@ -190,7 +190,7 @@ func TestUpdateRecentListEnterSelectsThread(t *testing.T) {
 	m := updateModel{
 		phase: phaseRecentReview,
 		recentSub: recentList,
-		recentThreads: []recentThread{
+		recentTasks: []recentTask{
 			makeRecentThread("#onboarding", nil, "Drafted outline", 24),
 		},
 		recentCursor: 0,
@@ -206,7 +206,7 @@ func TestUpdateRecentNotesEnterMovesToBlocked(t *testing.T) {
 	m := updateModel{
 		phase: phaseRecentReview,
 		recentSub: recentNotes,
-		recentThreads: []recentThread{
+		recentTasks: []recentTask{
 			makeRecentThread("#onboarding", nil, "Drafted outline", 24),
 		},
 		recentCursor: 0,
@@ -240,7 +240,7 @@ func TestPickerFuzzyFilterAndSelect(t *testing.T) {
 
 func TestNewAnotherYesResetsToGoalPick(t *testing.T) {
 	m := updateModel{
-		phase:    phaseNewThread,
+		phase:    phaseNewTask,
 		newSub:   newAnother,
 		allGoals: []goals.Goal{{ID: "PROJ", State: "open"}},
 	}
@@ -252,7 +252,7 @@ func TestNewAnotherYesResetsToGoalPick(t *testing.T) {
 
 func TestNewAnotherNoTransitionsToDone(t *testing.T) {
 	m := updateModel{
-		phase:  phaseNewThread,
+		phase:  phaseNewTask,
 		newSub: newAnother,
 	}
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
@@ -263,9 +263,9 @@ func TestNewAnotherNoTransitionsToDone(t *testing.T) {
 
 func TestInvalidThreadTagSetsTagError(t *testing.T) {
 	m := updateModel{
-		phase:  phaseNewThread,
+		phase:  phaseNewTask,
 		newSub: newTagPick,
-		threadPicker: pickerModel{
+		taskPicker: pickerModel{
 			items:   []string{},
 			matches: []string{},
 			prefix:  "#",
@@ -285,7 +285,7 @@ func TestUpdateRecentBlockedAnswerRemovesThread(t *testing.T) {
 	m := updateModel{
 		phase: phaseRecentReview,
 		recentSub: recentBlocked,
-		recentThreads: []recentThread{
+		recentTasks: []recentTask{
 			makeRecentThread("#onboarding", nil, "Drafted outline", 24),
 			makeRecentThread("#docs", nil, "Writing", 48),
 		},
@@ -294,8 +294,8 @@ func TestUpdateRecentBlockedAnswerRemovesThread(t *testing.T) {
 		updatedTags:  make(map[string]bool),
 	}
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
-	if len(m.recentThreads) != 1 {
-		t.Errorf("expected 1 thread remaining, got %d", len(m.recentThreads))
+	if len(m.recentTasks) != 1 {
+		t.Errorf("expected 1 thread remaining, got %d", len(m.recentTasks))
 	}
 	if m.recentSub != recentList {
 		t.Errorf("expected recentSub=recentList after answering blocked, got %v", m.recentSub)

@@ -39,14 +39,14 @@ func Section(title string, w io.Writer, tty bool) {
 
 func FormatEntry(e journal.Entry, now time.Time, tty bool) string {
 	age := ageString(e.TS, now)
-	threadPart := ""
-	if e.Thread != nil {
-		threadPart = *e.Thread + " "
+	taskPart := ""
+	if e.Task != nil {
+		taskPart = *e.Task + " "
 	}
 	if e.Blocked {
-		return Red("[BLOCKED]", tty) + " " + e.Username + " " + threadPart + e.Note + " - " + age
+		return Red("[BLOCKED]", tty) + " " + e.Username + " " + taskPart + e.Note + " - " + age
 	}
-	return e.Username + " " + threadPart + e.Note + " - " + age
+	return e.Username + " " + taskPart + e.Note + " - " + age
 }
 
 func FormatStatusEntry(e journal.Entry, now time.Time, tty bool) string {
@@ -55,17 +55,17 @@ func FormatStatusEntry(e journal.Entry, now time.Time, tty bool) string {
 	if e.Goal != nil {
 		goalPart = "(" + *e.Goal + ")"
 	}
-	threadPart := ""
-	if e.Thread != nil {
-		threadPart = *e.Thread + " "
+	taskPart := ""
+	if e.Task != nil {
+		taskPart = *e.Task + " "
 	}
 	if e.Blocked {
-		return Red("[BLOCKED]", tty) + goalPart + " " + threadPart + e.Note + " - " + age
+		return Red("[BLOCKED]", tty) + goalPart + " " + taskPart + e.Note + " - " + age
 	}
 	if goalPart != "" {
-		return goalPart + " " + threadPart + e.Note + " - " + age
+		return goalPart + " " + taskPart + e.Note + " - " + age
 	}
-	return threadPart + e.Note + " - " + age
+	return taskPart + e.Note + " - " + age
 }
 
 func ageString(ts string, now time.Time) string {

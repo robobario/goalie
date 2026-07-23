@@ -98,8 +98,8 @@ func SelectGoal(dataDir string, key []byte, r io.Reader, w io.Writer, tty bool) 
 	}
 }
 
-// InteractiveLog ports _interactive_log: prompts for goal, thread, blocked, note.
-func InteractiveLog(ctx *AppContext) (note, goalID, thread string, blocked bool, err error) {
+// InteractiveLog ports _interactive_log: prompts for goal, task, blocked, note.
+func InteractiveLog(ctx *AppContext) (note, goalID, task string, blocked bool, err error) {
 	r := bufio.NewReader(ctx.Stdin)
 
 	goalID, err = SelectGoal(ctx.DataDir, ctx.EncryptionKey, r, ctx.Stdout, ctx.IsTTY)
@@ -109,7 +109,7 @@ func InteractiveLog(ctx *AppContext) (note, goalID, thread string, blocked bool,
 
 	if goalID != "" {
 		var existing []string
-		existing, err = journal.CollectThreads(ctx.DataDir, goalID, ctx.EncryptionKey)
+		existing, err = journal.CollectTasks(ctx.DataDir, goalID, ctx.EncryptionKey)
 		if err != nil {
 			return
 		}
@@ -118,9 +118,9 @@ func InteractiveLog(ctx *AppContext) (note, goalID, thread string, blocked bool,
 				for i, t := range existing {
 					fmt.Fprintf(ctx.Stdout, "  %d. %s\n", i+1, t)
 				}
-				fmt.Fprint(ctx.Stdout, display.Bold("Thread? (number, new #hashtag, or blank) ", ctx.IsTTY))
+				fmt.Fprint(ctx.Stdout, display.Bold("Task? (number, new #hashtag, or blank) ", ctx.IsTTY))
 			} else {
-				fmt.Fprint(ctx.Stdout, display.Bold("Thread? (#hashtag or blank) ", ctx.IsTTY))
+				fmt.Fprint(ctx.Stdout, display.Bold("Task? (#hashtag or blank) ", ctx.IsTTY))
 			}
 			var line string
 			line, err = readLine(r)
@@ -134,12 +134,12 @@ func InteractiveLog(ctx *AppContext) (note, goalID, thread string, blocked bool,
 			if len(existing) > 0 {
 				n, numErr := strconv.Atoi(answer)
 				if numErr == nil && n >= 1 && n <= len(existing) {
-					thread = existing[n-1]
+					task = existing[n-1]
 					break
 				}
 			}
-			if goals.ValidThreadTag(answer) {
-				thread = answer
+			if goals.ValidTaskTag(answer) {
+				task = answer
 				break
 			}
 			fmt.Fprint(ctx.Stdout, "Enter a number, a #hashtag, or leave blank.\n")

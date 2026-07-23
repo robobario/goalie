@@ -87,7 +87,7 @@ func TestFormatEntryWithThread(t *testing.T) {
 		TS:       fixedTS,
 		Note:     "note",
 		Blocked:  false,
-		Thread:   ptr("feat-x"),
+		Task:   ptr("feat-x"),
 		Username: "carol",
 	}
 	got := FormatEntry(e, fixedNow, false)

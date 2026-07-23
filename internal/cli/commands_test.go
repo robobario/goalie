@@ -147,7 +147,7 @@ func TestStatusEntriesWithinWindowAreShown(t *testing.T) {
 	journalDir := filepath.Join(ctx.DataDir, "journal")
 	os.MkdirAll(journalDir, 0o755)
 	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("alice")), []jsonlEntry{
-		{"ts": ts(-1), "note": "recent work", "goal": nil, "blocked": false, "thread": nil},
+		{"ts": ts(-1), "note": "recent work", "goal": nil, "blocked": false, "task": nil},
 	}, ctx.EncryptionKey)
 
 	if err := cli.Status(ctx); err != nil {
@@ -164,7 +164,7 @@ func TestStatusBlockedEntryShowsBlockedPrefix(t *testing.T) {
 	journalDir := filepath.Join(ctx.DataDir, "journal")
 	os.MkdirAll(journalDir, 0o755)
 	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("alice")), []jsonlEntry{
-		{"ts": ts(-1), "note": "stalled", "goal": nil, "blocked": true, "thread": nil},
+		{"ts": ts(-1), "note": "stalled", "goal": nil, "blocked": true, "task": nil},
 	}, ctx.EncryptionKey)
 
 	if err := cli.Status(ctx); err != nil {

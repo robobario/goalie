@@ -66,7 +66,7 @@ func writeEncryptedEntries(t *testing.T, path string, entries []journal.Entry, k
 func TestCurrentThreadStates(t *testing.T) {
 	t.Run("empty when file doesn't exist", func(t *testing.T) {
 		dir := t.TempDir()
-		states, err := journal.CurrentThreadStates(dir, "nonexistent", testKey())
+		states, err := journal.CurrentTaskStates(dir, "nonexistent", testKey())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -83,7 +83,7 @@ func TestCurrentThreadStates(t *testing.T) {
 			{TS: "2026-01-01T00:00:00Z", Note: "some work"},
 		}, key)
 
-		states, err := journal.CurrentThreadStates(dir, "alice", key)
+		states, err := journal.CurrentTaskStates(dir, "alice", key)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -97,10 +97,10 @@ func TestCurrentThreadStates(t *testing.T) {
 		key := testKey()
 		path := filepath.Join(dir, currentWeekFile("alice"))
 		writeEncryptedEntries(t, path, []journal.Entry{
-			{TS: "2026-01-01T00:00:00Z", Goal: strPtr("GOAL_A"), Note: "some work", Blocked: true, Thread: strPtr("#foo")},
+			{TS: "2026-01-01T00:00:00Z", Goal: strPtr("GOAL_A"), Note: "some work", Blocked: true, Task: strPtr("#foo")},
 		}, key)
 
-		states, err := journal.CurrentThreadStates(dir, "alice", key)
+		states, err := journal.CurrentTaskStates(dir, "alice", key)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -124,11 +124,11 @@ func TestCurrentThreadStates(t *testing.T) {
 		key := testKey()
 		path := filepath.Join(dir, currentWeekFile("alice"))
 		writeEncryptedEntries(t, path, []journal.Entry{
-			{TS: "2026-01-01T00:00:00Z", Goal: strPtr("GOAL_A"), Note: "first work", Blocked: true, Thread: strPtr("#foo")},
-			{TS: "2026-01-02T00:00:00Z", Goal: strPtr("GOAL_A"), Note: "second work", Blocked: false, Thread: strPtr("#foo")},
+			{TS: "2026-01-01T00:00:00Z", Goal: strPtr("GOAL_A"), Note: "first work", Blocked: true, Task: strPtr("#foo")},
+			{TS: "2026-01-02T00:00:00Z", Goal: strPtr("GOAL_A"), Note: "second work", Blocked: false, Task: strPtr("#foo")},
 		}, key)
 
-		states, err := journal.CurrentThreadStates(dir, "alice", key)
+		states, err := journal.CurrentTaskStates(dir, "alice", key)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -146,11 +146,11 @@ func TestCurrentThreadStates(t *testing.T) {
 		key := testKey()
 		path := filepath.Join(dir, currentWeekFile("alice"))
 		writeEncryptedEntries(t, path, []journal.Entry{
-			{TS: "2026-01-01T00:00:00Z", Goal: strPtr("GOAL_A"), Note: "foo work", Blocked: false, Thread: strPtr("#foo")},
-			{TS: "2026-01-02T00:00:00Z", Goal: strPtr("GOAL_B"), Note: "bar work", Blocked: true, Thread: strPtr("#bar")},
+			{TS: "2026-01-01T00:00:00Z", Goal: strPtr("GOAL_A"), Note: "foo work", Blocked: false, Task: strPtr("#foo")},
+			{TS: "2026-01-02T00:00:00Z", Goal: strPtr("GOAL_B"), Note: "bar work", Blocked: true, Task: strPtr("#bar")},
 		}, key)
 
-		states, err := journal.CurrentThreadStates(dir, "alice", key)
+		states, err := journal.CurrentTaskStates(dir, "alice", key)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -177,10 +177,10 @@ func TestCurrentThreadStates(t *testing.T) {
 		path := filepath.Join(dir, currentWeekFile("alice"))
 		writeEncryptedEntries(t, path, []journal.Entry{
 			{TS: "2026-01-01T00:00:00Z", Note: "unthreaded"},
-			{TS: "2026-01-02T00:00:00Z", Goal: strPtr("GOAL_A"), Note: "threaded", Thread: strPtr("#foo")},
+			{TS: "2026-01-02T00:00:00Z", Goal: strPtr("GOAL_A"), Note: "threaded", Task: strPtr("#foo")},
 		}, key)
 
-		states, err := journal.CurrentThreadStates(dir, "alice", key)
+		states, err := journal.CurrentTaskStates(dir, "alice", key)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -228,8 +228,8 @@ func TestAppend(t *testing.T) {
 		if got.Blocked {
 			t.Error("expected blocked=false")
 		}
-		if got.Thread != nil {
-			t.Errorf("expected nil thread, got %v", got.Thread)
+		if got.Task != nil {
+			t.Errorf("expected nil thread, got %v", got.Task)
 		}
 		if got.TS == "" {
 			t.Error("expected non-empty TS")
@@ -470,8 +470,8 @@ func TestCollectLatest(t *testing.T) {
 		r := &git.FakeRunner{}
 		key := testKey()
 		writeEntries(t, dir, currentWeekFile("alice"), []journal.Entry{
-			{TS: relTS(-3), Note: "earlier note", Goal: strPtr("ROUTING"), Thread: strPtr("#impl")},
-			{TS: relTS(-1), Note: "later note", Goal: strPtr("ROUTING"), Thread: strPtr("#impl")},
+			{TS: relTS(-3), Note: "earlier note", Goal: strPtr("ROUTING"), Task: strPtr("#impl")},
+			{TS: relTS(-1), Note: "later note", Goal: strPtr("ROUTING"), Task: strPtr("#impl")},
 		}, key)
 
 		entries, err := journal.CollectLatest(dir, r, 7, key)
@@ -491,10 +491,10 @@ func TestCollectLatest(t *testing.T) {
 		r := &git.FakeRunner{}
 		key := testKey()
 		writeEntries(t, dir, currentWeekFile("alice"), []journal.Entry{
-			{TS: relTS(-1), Note: "alice note", Goal: strPtr("ROUTING"), Thread: strPtr("#impl")},
+			{TS: relTS(-1), Note: "alice note", Goal: strPtr("ROUTING"), Task: strPtr("#impl")},
 		}, key)
 		writeEntries(t, dir, currentWeekFile("bob"), []journal.Entry{
-			{TS: relTS(-1), Note: "bob note", Goal: strPtr("ROUTING"), Thread: strPtr("#impl")},
+			{TS: relTS(-1), Note: "bob note", Goal: strPtr("ROUTING"), Task: strPtr("#impl")},
 		}, key)
 
 		entries, err := journal.CollectLatest(dir, r, 7, key)

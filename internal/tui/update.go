@@ -19,16 +19,16 @@ type updatePhase int
 
 const (
 	phaseLoading       updatePhase = iota
-	phaseBlockedReview             // reviewing blocked threads one at a time
+	phaseBlockedReview             // reviewing blocked tasks one at a time
 	phaseRecentReview              // Task 5 — stub
-	phaseNewThread                 // Task 6 — stub
+	phaseNewTask                 // Task 6 — stub
 	phaseDone
 )
 
-type newThreadSub int
+type newTaskSub int
 
 const (
-	newGoalPick newThreadSub = iota
+	newGoalPick newTaskSub = iota
 	newTagPick
 	newNotes
 	newBlocked
@@ -40,32 +40,32 @@ type goalsLoadedMsg struct {
 	err   error
 }
 
-type threadTagsLoadedMsg struct {
+type taskTagsLoadedMsg struct {
 	tags []string
 	err  error
 }
 
-type blockedThread struct {
+type blockedTask struct {
 	tag   string
-	state journal.ThreadState
+	state journal.TaskState
 }
 
 type recentSub int
 
 const (
 	recentList    recentSub = iota // list shown, cursor moving
-	recentNotes                    // capturing notes for selected thread
+	recentNotes                    // capturing notes for selected task
 	recentBlocked                  // y/n for blocked
 )
 
-type recentThread struct {
+type recentTask struct {
 	tag   string
-	state journal.ThreadState
+	state journal.TaskState
 }
 
-type threadStatesLoadedMsg struct {
-	blocked  []blockedThread
-	recent   []recentThread
+type taskStatesLoadedMsg struct {
+	blocked  []blockedTask
+	recent   []recentTask
 	username string
 	err      error
 }
@@ -80,23 +80,23 @@ type updateModel struct {
 	phase    updatePhase
 	err      error
 
-	blockedThreads  []blockedThread
+	blockedTasks    []blockedTask
 	blockedIdx      int
 	awaitingUnblock bool // showing "Is it now unblocked?" prompt
 	inputMode       bool // capturing notes text
 	notesInput      string
 	nowUnblocked    bool
 
-	recentThreads   []recentThread
+	recentTasks     []recentTask
 	recentCursor    int
 	recentSub       recentSub
 	updatedTags     map[string]bool
 	recentNotes     string
 	recentUnblocked bool
 
-	newSub       newThreadSub
+	newSub       newTaskSub
 	goalPicker   pickerModel
-	threadPicker pickerModel
+	taskPicker   pickerModel
 	selectedGoal string
 	selectedTag  string
 	allGoals     []goals.Goal
@@ -114,19 +114,19 @@ func (m updateModel) Init() tea.Cmd {
 		if username == "" {
 			cfg, err := config.Load()
 			if err != nil {
-				return threadStatesLoadedMsg{err: err}
+				return taskStatesLoadedMsg{err: err}
 			}
 			username = slugify.Slugify(cfg.Name)
 		}
 		journalDir := filepath.Join(m.ctx.DataDir, "journal")
-		states, err := journal.CurrentThreadStates(journalDir, username, m.ctx.EncryptionKey)
+		states, err := journal.CurrentTaskStates(journalDir, username, m.ctx.EncryptionKey)
 		if err != nil {
-			return threadStatesLoadedMsg{err: err}
+			return taskStatesLoadedMsg{err: err}
 		}
-		var blocked []blockedThread
+		var blocked []blockedTask
 		for tag, state := range states {
 			if state.Blocked {
-				blocked = append(blocked, blockedThread{tag: tag, state: state})
+				blocked = append(blocked, blockedTask{tag: tag, state: state})
 			}
 		}
 		sort.Slice(blocked, func(i, j int) bool {
@@ -144,7 +144,7 @@ func (m updateModel) Init() tea.Cmd {
 		})
 
 		cutoff := time.Now().UTC().Add(-7 * 24 * time.Hour)
-		var recent []recentThread
+		var recent []recentTask
 		for tag, state := range states {
 			if state.Blocked || state.TS == "" {
 				continue
@@ -156,30 +156,30 @@ func (m updateModel) Init() tea.Cmd {
 			if ts.Before(cutoff) {
 				continue
 			}
-			recent = append(recent, recentThread{tag: tag, state: state})
+			recent = append(recent, recentTask{tag: tag, state: state})
 		}
 		sort.Slice(recent, func(i, j int) bool {
 			return recent[i].state.TS > recent[j].state.TS
 		})
 
-		return threadStatesLoadedMsg{blocked: blocked, recent: recent, username: username}
+		return taskStatesLoadedMsg{blocked: blocked, recent: recent, username: username}
 	}
 }
 
 func (m updateModel) Update(msg tea.Msg) (updateModel, tea.Cmd) {
 	switch msg := msg.(type) {
-	case threadStatesLoadedMsg:
+	case taskStatesLoadedMsg:
 		if msg.err != nil {
 			m.err = msg.err
 			return m, nil
 		}
 		m.username = msg.username
-		m.blockedThreads = msg.blocked
+		m.blockedTasks = msg.blocked
 		m.blockedIdx = 0
-		m.recentThreads = msg.recent
+		m.recentTasks = msg.recent
 		m.recentCursor = 0
 		m.updatedTags = make(map[string]bool)
-		if len(m.blockedThreads) == 0 {
+		if len(m.blockedTasks) == 0 {
 			m.phase = phaseRecentReview
 		} else {
 			m.phase = phaseBlockedReview
@@ -209,12 +209,12 @@ func (m updateModel) Update(msg tea.Msg) (updateModel, tea.Cmd) {
 		m.goalPicker = newPicker(goalIDs(open))
 		m.newSub = newGoalPick
 
-	case threadTagsLoadedMsg:
+	case taskTagsLoadedMsg:
 		if msg.err != nil {
 			m.err = msg.err
 			return m, nil
 		}
-		m.threadPicker = newPicker(msg.tags).withPrefix("#")
+		m.taskPicker = newPicker(msg.tags).withPrefix("#")
 
 	case tea.KeyMsg:
 		switch m.phase {
@@ -228,8 +228,8 @@ func (m updateModel) Update(msg tea.Msg) (updateModel, tea.Cmd) {
 			return m.handleBlockedReviewKey(msg)
 		case phaseRecentReview:
 			return m.handleRecentReviewKey(msg)
-		case phaseNewThread:
-			return m.handleNewThreadKey(msg)
+		case phaseNewTask:
+			return m.handleNewTaskKey(msg)
 		}
 	}
 	return m, nil
@@ -245,13 +245,13 @@ func (m updateModel) handleInputKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 			if entryNote == "" {
 				entryNote = "unblocked"
 			}
-			tag := m.blockedThreads[m.blockedIdx].tag
-			item := m.blockedThreads[m.blockedIdx]
+			tag := m.blockedTasks[m.blockedIdx].tag
+			item := m.blockedTasks[m.blockedIdx]
 			entry := journal.Entry{
 				Goal:    item.state.Goal,
 				Note:    entryNote,
 				Blocked: !m.nowUnblocked,
-				Thread:  &tag,
+				Task:    &tag,
 			}
 			ctx := m.ctx
 			username := m.username
@@ -264,7 +264,7 @@ func (m updateModel) handleInputKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 		m.notesInput = ""
 		m.nowUnblocked = false
 		m.blockedIdx++
-		if m.blockedIdx >= len(m.blockedThreads) {
+		if m.blockedIdx >= len(m.blockedTasks) {
 			m.phase = phaseRecentReview
 		}
 		return m, cmd
@@ -300,7 +300,7 @@ func (m updateModel) handleBlockedReviewKey(msg tea.KeyMsg) (updateModel, tea.Cm
 		m.awaitingUnblock = true
 	case "n":
 		m.blockedIdx++
-		if m.blockedIdx >= len(m.blockedThreads) {
+		if m.blockedIdx >= len(m.blockedTasks) {
 			m.phase = phaseRecentReview
 		}
 	}
@@ -324,17 +324,17 @@ func (m updateModel) handleRecentListKey(msg tea.KeyMsg) (updateModel, tea.Cmd) 
 	case "q", "ctrl+c":
 		return m, tea.Quit
 	case "s":
-		return m.enterPhaseNewThread()
+		return m.enterPhaseNewTask()
 	case "up":
 		if m.recentCursor > 0 {
 			m.recentCursor--
 		}
 	case "down":
-		if m.recentCursor < len(m.recentThreads)-1 {
+		if m.recentCursor < len(m.recentTasks)-1 {
 			m.recentCursor++
 		}
 	case "enter":
-		if len(m.recentThreads) > 0 {
+		if len(m.recentTasks) > 0 {
 			m.recentNotes = ""
 			m.recentSub = recentNotes
 		}
@@ -371,7 +371,7 @@ func (m updateModel) handleRecentBlockedKey(msg tea.KeyMsg) (updateModel, tea.Cm
 }
 
 func (m updateModel) submitRecentEntry() (updateModel, tea.Cmd) {
-	item := m.recentThreads[m.recentCursor]
+	item := m.recentTasks[m.recentCursor]
 	note := strings.TrimSpace(m.recentNotes)
 	isBlocked := !m.recentUnblocked
 
@@ -379,7 +379,7 @@ func (m updateModel) submitRecentEntry() (updateModel, tea.Cmd) {
 		Goal:    item.state.Goal,
 		Note:    note,
 		Blocked: isBlocked,
-		Thread:  &item.tag,
+		Task:    &item.tag,
 	}
 	ctx := m.ctx
 	username := m.username
@@ -392,16 +392,16 @@ func (m updateModel) submitRecentEntry() (updateModel, tea.Cmd) {
 	}
 
 	m.updatedTags[item.tag] = true
-	m.recentThreads = append(m.recentThreads[:m.recentCursor], m.recentThreads[m.recentCursor+1:]...)
-	if m.recentCursor >= len(m.recentThreads) && m.recentCursor > 0 {
-		m.recentCursor = len(m.recentThreads) - 1
+	m.recentTasks = append(m.recentTasks[:m.recentCursor], m.recentTasks[m.recentCursor+1:]...)
+	if m.recentCursor >= len(m.recentTasks) && m.recentCursor > 0 {
+		m.recentCursor = len(m.recentTasks) - 1
 	}
 	m.recentNotes = ""
 	m.recentUnblocked = false
 	m.recentSub = recentList
 
-	if len(m.recentThreads) == 0 {
-		m2, goalsCmd := m.enterPhaseNewThread()
+	if len(m.recentTasks) == 0 {
+		m2, goalsCmd := m.enterPhaseNewTask()
 		return m2, tea.Batch(cmd, goalsCmd)
 	}
 	return m, cmd
@@ -418,8 +418,8 @@ func (m updateModel) View() string {
 		return m.viewBlockedReview()
 	case phaseRecentReview:
 		return m.viewRecentReview()
-	case phaseNewThread:
-		return m.viewNewThread()
+	case phaseNewTask:
+		return m.viewNewTask()
 	case phaseDone:
 		return "All done. Press q to exit."
 	}
@@ -427,11 +427,11 @@ func (m updateModel) View() string {
 }
 
 func (m updateModel) viewBlockedReview() string {
-	if m.blockedIdx >= len(m.blockedThreads) {
+	if m.blockedIdx >= len(m.blockedTasks) {
 		return ""
 	}
-	item := m.blockedThreads[m.blockedIdx]
-	remaining := len(m.blockedThreads) - m.blockedIdx
+	item := m.blockedTasks[m.blockedIdx]
+	remaining := len(m.blockedTasks) - m.blockedIdx
 
 	if m.inputMode {
 		return fmt.Sprintf("Notes: %s_", m.notesInput)
@@ -442,11 +442,11 @@ func (m updateModel) viewBlockedReview() string {
 	}
 
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "Reviewing blocked threads (%d remaining)\n\n", remaining)
+	fmt.Fprintf(&sb, "Reviewing blocked tasks (%d remaining)\n\n", remaining)
 	if item.state.Goal != nil {
 		fmt.Fprintf(&sb, "Goal:    %s\n", *item.state.Goal)
 	}
-	fmt.Fprintf(&sb, "Thread:  %s\n", item.tag)
+	fmt.Fprintf(&sb, "Task:    %s\n", item.tag)
 	fmt.Fprintf(&sb, "Note:    %s\n", item.state.Note)
 	fmt.Fprintf(&sb, "Since:   %s\n", ageString(item.state.TS, time.Now().UTC()))
 	sb.WriteString("\n[y] Report changes   [n] Skip   [q] Quit")
@@ -456,10 +456,10 @@ func (m updateModel) viewBlockedReview() string {
 func (m updateModel) viewRecentReview() string {
 	switch m.recentSub {
 	case recentNotes:
-		if len(m.recentThreads) == 0 {
+		if len(m.recentTasks) == 0 {
 			return ""
 		}
-		item := m.recentThreads[m.recentCursor]
+		item := m.recentTasks[m.recentCursor]
 		goal := ""
 		if item.state.Goal != nil {
 			goal = *item.state.Goal
@@ -473,9 +473,9 @@ func (m updateModel) viewRecentReview() string {
 		return "Blocked? [y/n]"
 	default:
 		var sb strings.Builder
-		sb.WriteString("Recent threads — select one to update (↑/↓, Enter to select, s to skip all)\n\n")
+		sb.WriteString("Recent tasks — select one to update (↑/↓, Enter to select, s to skip all)\n\n")
 		now := time.Now().UTC()
-		for i, item := range m.recentThreads {
+		for i, item := range m.recentTasks {
 			cursor := "  "
 			if i == m.recentCursor {
 				cursor = "> "
@@ -511,11 +511,11 @@ func (m updateModel) loadGoalsCmd() tea.Cmd {
 	}
 }
 
-func (m updateModel) enterPhaseNewThread() (updateModel, tea.Cmd) {
-	m.phase = phaseNewThread
+func (m updateModel) enterPhaseNewTask() (updateModel, tea.Cmd) {
+	m.phase = phaseNewTask
 	m.newSub = newGoalPick
 	m.goalPicker = pickerModel{}
-	m.threadPicker = pickerModel{prefix: "#"}
+	m.taskPicker = pickerModel{prefix: "#"}
 	m.selectedGoal = ""
 	m.selectedTag = ""
 	m.newNoteInput = ""
@@ -524,7 +524,7 @@ func (m updateModel) enterPhaseNewThread() (updateModel, tea.Cmd) {
 	return m, m.loadGoalsCmd()
 }
 
-func (m updateModel) handleNewThreadKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
+func (m updateModel) handleNewTaskKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 	if msg.String() == "ctrl+c" {
 		return m, tea.Quit
 	}
@@ -543,12 +543,12 @@ func (m updateModel) handleNewThreadKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 			if validGoal {
 				m.selectedGoal = selected
 				m.newSub = newTagPick
-				m.threadPicker = newPicker([]string{}).withPrefix("#")
+				m.taskPicker = newPicker([]string{}).withPrefix("#")
 				ctx := m.ctx
 				goalID := selected
 				loadTags := func() tea.Msg {
-					tags, err := journal.CollectThreads(ctx.DataDir, goalID, ctx.EncryptionKey)
-					return threadTagsLoadedMsg{tags: tags, err: err}
+					tags, err := journal.CollectTasks(ctx.DataDir, goalID, ctx.EncryptionKey)
+					return taskTagsLoadedMsg{tags: tags, err: err}
 				}
 				return m, tea.Batch(cmd, loadTags)
 			}
@@ -556,11 +556,11 @@ func (m updateModel) handleNewThreadKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 		return m, cmd
 
 	case newTagPick:
-		updated, cmd, selected, wasSelected := m.threadPicker.Update(msg)
-		m.threadPicker = updated
+		updated, cmd, selected, wasSelected := m.taskPicker.Update(msg)
+		m.taskPicker = updated
 		if wasSelected && selected != "" {
 			inList := false
-			for _, item := range m.threadPicker.items {
+			for _, item := range m.taskPicker.items {
 				if item == selected {
 					inList = true
 					break
@@ -571,8 +571,8 @@ func (m updateModel) handleNewThreadKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 				m.tagError = ""
 				m.newSub = newNotes
 			} else {
-				if !goals.ValidThreadTag(selected) {
-					m.tagError = "Tag must start with a lowercase letter, e.g. my-thread"
+				if !goals.ValidTaskTag(selected) {
+					m.tagError = "Tag must start with a lowercase letter, e.g. my-task"
 				} else {
 					m.selectedTag = selected
 					m.tagError = ""
@@ -600,10 +600,10 @@ func (m updateModel) handleNewThreadKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 		switch msg.String() {
 		case "y":
 			m.newUnblocked = false
-			return m.submitNewThread()
+			return m.submitNewTask()
 		case "n":
 			m.newUnblocked = true
-			return m.submitNewThread()
+			return m.submitNewTask()
 		}
 
 	case newAnother:
@@ -611,7 +611,7 @@ func (m updateModel) handleNewThreadKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 		case "y":
 			m.newSub = newGoalPick
 			m.goalPicker = newPicker(goalIDs(m.allGoals))
-			m.threadPicker = pickerModel{prefix: "#"}
+			m.taskPicker = pickerModel{prefix: "#"}
 			m.selectedGoal = ""
 			m.selectedTag = ""
 			m.newNoteInput = ""
@@ -624,7 +624,7 @@ func (m updateModel) handleNewThreadKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 	return m, nil
 }
 
-func (m updateModel) submitNewThread() (updateModel, tea.Cmd) {
+func (m updateModel) submitNewTask() (updateModel, tea.Cmd) {
 	note := strings.TrimSpace(m.newNoteInput)
 	isBlocked := !m.newUnblocked
 	tag := m.selectedTag
@@ -637,7 +637,7 @@ func (m updateModel) submitNewThread() (updateModel, tea.Cmd) {
 		Goal:    goalPtr,
 		Note:    note,
 		Blocked: isBlocked,
-		Thread:  &tag,
+		Task:    &tag,
 	}
 	ctx := m.ctx
 	username := m.username
@@ -649,25 +649,25 @@ func (m updateModel) submitNewThread() (updateModel, tea.Cmd) {
 	return m, cmd
 }
 
-func (m updateModel) viewNewThread() string {
+func (m updateModel) viewNewTask() string {
 	switch m.newSub {
 	case newGoalPick:
 		return "Select a goal:\n\n" + m.goalPicker.View()
 	case newTagPick:
 		var sb strings.Builder
 		fmt.Fprintf(&sb, "Goal: %s\n\n", m.selectedGoal)
-		sb.WriteString("Select or type a thread tag:\n\n")
-		sb.WriteString(m.threadPicker.View())
+		sb.WriteString("Select or type a task tag:\n\n")
+		sb.WriteString(m.taskPicker.View())
 		if m.tagError != "" {
 			sb.WriteString("\n" + m.tagError)
 		}
 		return sb.String()
 	case newNotes:
-		return fmt.Sprintf("Thread: %s\n\nNotes: %s_", m.selectedTag, m.newNoteInput)
+		return fmt.Sprintf("Task: %s\n\nNotes: %s_", m.selectedTag, m.newNoteInput)
 	case newBlocked:
 		return "Blocked? [y/n]"
 	case newAnother:
-		return "Log another new thread? [y/n]"
+		return "Log another new task? [y/n]"
 	}
 	return ""
 }

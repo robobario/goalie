@@ -83,19 +83,19 @@ func GoalList(ctx AppContext) error {
 	return nil
 }
 
-func Log(ctx AppContext, note, goalID string, blocked bool, thread string) error {
+func Log(ctx AppContext, note, goalID string, blocked bool, task string) error {
 	if err := requireDataDir(ctx); err != nil {
 		return err
 	}
 	if note == "" {
 		var err error
-		note, goalID, thread, blocked, err = InteractiveLog(&ctx)
+		note, goalID, task, blocked, err = InteractiveLog(&ctx)
 		if err != nil {
 			return err
 		}
 	}
-	if thread != "" && !goals.ValidThreadTag(thread) {
-		fmt.Fprintf(ctx.Stderr, "Thread tag '%s' is invalid — use #lowercase, e.g. #impl\n", thread)
+	if task != "" && !goals.ValidTaskTag(task) {
+		fmt.Fprintf(ctx.Stderr, "Task tag '%s' is invalid — use #lowercase, e.g. #impl\n", task)
 		return &ExitError{Code: 1}
 	}
 	if goalID != "" && !goals.Exists(ctx.DataDir, goalID, ctx.EncryptionKey) {
@@ -110,15 +110,15 @@ func Log(ctx AppContext, note, goalID string, blocked bool, thread string) error
 	if goalID != "" {
 		goalPtr = &goalID
 	}
-	var threadPtr *string
-	if thread != "" {
-		threadPtr = &thread
+	var taskPtr *string
+	if task != "" {
+		taskPtr = &task
 	}
 	return journal.Append(ctx.DataDir, ctx.Git, username, journal.Entry{
 		Goal:    goalPtr,
 		Note:    note,
 		Blocked: blocked,
-		Thread:  threadPtr,
+		Task:    taskPtr,
 	}, ctx.EncryptionKey)
 }
 

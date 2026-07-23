@@ -14,6 +14,7 @@ import (
 )
 
 var blockedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+var usernameStyle = lipgloss.NewStyle().Bold(true)
 
 type entriesLoadedMsg struct {
 	entries []journal.Entry
@@ -137,7 +138,7 @@ func (m activityModel) View() string {
 			return entries[i].TS > entries[j].TS
 		})
 
-		sb.WriteString(username + ":\n")
+		sb.WriteString(usernameStyle.Render("@"+username) + ":\n")
 		for _, e := range entries {
 			sb.WriteString("  " + formatActivityEntry(e, now) + "\n")
 		}

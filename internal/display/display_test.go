@@ -55,6 +55,27 @@ func TestSection(t *testing.T) {
 	}
 }
 
+func TestUsernamePlainText(t *testing.T) {
+	if got := Username("alice", false); got != "@alice" {
+		t.Errorf("got %q, want %q", got, "@alice")
+	}
+}
+
+func TestUsernameBoldTTY(t *testing.T) {
+	got := Username("alice", true)
+	if !strings.HasPrefix(got, "\033[1m") || !strings.Contains(got, "@alice") {
+		t.Errorf("expected bold @alice, got %q", got)
+	}
+}
+
+func TestFormatEntryIncludesAtPrefix(t *testing.T) {
+	e := journal.Entry{TS: fixedTS, Note: "work", Username: "alice"}
+	got := FormatEntry(e, fixedNow, false)
+	if !strings.HasPrefix(got, "@alice") {
+		t.Errorf("expected @alice prefix, got %q", got)
+	}
+}
+
 func TestFormatEntryUnblockedNoThread(t *testing.T) {
 	e := journal.Entry{
 		TS:       fixedTS,
@@ -63,7 +84,7 @@ func TestFormatEntryUnblockedNoThread(t *testing.T) {
 		Username: "alice",
 	}
 	got := FormatEntry(e, fixedNow, false)
-	want := "alice work - 1d ago"
+	want := "@alice work - 1d ago"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -91,7 +112,7 @@ func TestFormatEntryWithThread(t *testing.T) {
 		Username: "carol",
 	}
 	got := FormatEntry(e, fixedNow, false)
-	want := "carol feat-x note - 1d ago"
+	want := "@carol feat-x note - 1d ago"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}

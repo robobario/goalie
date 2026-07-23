@@ -24,7 +24,10 @@ func Init(repoURL string, dataDir string, configPath string, r git.Runner, stdin
 				return err
 			}
 		} else {
-			if err := r.Run([]string{"init", "--initial-branch=data", dataDir}, ""); err != nil {
+			if err := r.Run([]string{"init", dataDir}, ""); err != nil {
+				return err
+			}
+			if err := r.Run([]string{"symbolic-ref", "HEAD", "refs/heads/data"}, dataDir); err != nil {
 				return err
 			}
 			if err := r.Run([]string{"remote", "add", "origin", repoURL}, dataDir); err != nil {

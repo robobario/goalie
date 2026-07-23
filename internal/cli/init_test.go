@@ -120,7 +120,8 @@ func TestInit_DataBranchDoesNotExist(t *testing.T) {
 		desc string
 		args []string
 	}{
-		{"git init", []string{"init", "--initial-branch=data", dataDir}},
+		{"git init", []string{"init", dataDir}},
+		{"set data branch", []string{"symbolic-ref", "HEAD", "refs/heads/data"}},
 		{"remote add", []string{"remote", "add", "origin", "https://example.com/repo.git"}},
 		{"add gitkeep files", []string{"add", "goals/.gitkeep", "journal/.gitkeep"}},
 		{"commit", []string{"commit", "-m", "chore: initialise goalie data branch"}},

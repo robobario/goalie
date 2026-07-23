@@ -22,6 +22,7 @@ type Entry struct {
 	Goal     *string `json:"goal"`
 	Note     string  `json:"note"`
 	Blocked  bool    `json:"blocked"`
+	Done     bool    `json:"done,omitempty"`
 	Task     *string `json:"task"`
 	Username string  `json:"-"`
 }
@@ -30,6 +31,7 @@ type TaskState struct {
 	Goal    *string
 	Note    string
 	Blocked bool
+	Done    bool
 	TS      string
 }
 
@@ -290,6 +292,7 @@ func CurrentTaskStates(journalDir, username string, key []byte) (map[string]Task
 				Goal:    e.Goal,
 				Note:    e.Note,
 				Blocked: e.Blocked,
+				Done:    e.Done,
 				TS:      e.TS,
 			}
 		}

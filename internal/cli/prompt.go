@@ -107,43 +107,40 @@ func InteractiveLog(ctx *AppContext) (note, goalID, task string, blocked bool, e
 		return
 	}
 
+	var existing []string
 	if goalID != "" {
-		var existing []string
 		existing, err = journal.CollectTasks(ctx.DataDir, goalID, ctx.EncryptionKey)
 		if err != nil {
 			return
 		}
-		for {
-			if len(existing) > 0 {
-				for i, t := range existing {
-					fmt.Fprintf(ctx.Stdout, "  %d. %s\n", i+1, t)
-				}
-				fmt.Fprint(ctx.Stdout, display.Bold("Task? (number, new #hashtag, or blank) ", ctx.IsTTY))
-			} else {
-				fmt.Fprint(ctx.Stdout, display.Bold("Task? (#hashtag or blank) ", ctx.IsTTY))
+	}
+	for {
+		if len(existing) > 0 {
+			for i, t := range existing {
+				fmt.Fprintf(ctx.Stdout, "  %d. %s\n", i+1, t)
 			}
-			var line string
-			line, err = readLine(r)
-			if err != nil {
-				return
-			}
-			answer := strings.TrimSpace(line)
-			if answer == "" {
-				break
-			}
-			if len(existing) > 0 {
-				n, numErr := strconv.Atoi(answer)
-				if numErr == nil && n >= 1 && n <= len(existing) {
-					task = existing[n-1]
-					break
-				}
-			}
-			if goals.ValidTaskTag(answer) {
-				task = answer
-				break
-			}
-			fmt.Fprint(ctx.Stdout, "Enter a number, a #hashtag, or leave blank.\n")
+			fmt.Fprint(ctx.Stdout, display.Bold("Task? (number or new #hashtag): ", ctx.IsTTY))
+		} else {
+			fmt.Fprint(ctx.Stdout, display.Bold("Task? (#hashtag): ", ctx.IsTTY))
 		}
+		var line string
+		line, err = readLine(r)
+		if err != nil {
+			return
+		}
+		answer := strings.TrimSpace(line)
+		if len(existing) > 0 {
+			n, numErr := strconv.Atoi(answer)
+			if numErr == nil && n >= 1 && n <= len(existing) {
+				task = existing[n-1]
+				break
+			}
+		}
+		if goals.ValidTaskTag(answer) {
+			task = answer
+			break
+		}
+		fmt.Fprint(ctx.Stdout, "Enter a number or a #hashtag.\n")
 	}
 
 	blocked, err = ynPrompt("Are you blocked? (y/n) ", r, ctx.Stdout, ctx.IsTTY)

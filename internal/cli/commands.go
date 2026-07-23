@@ -94,7 +94,11 @@ func Log(ctx AppContext, note, goalID string, blocked bool, task string) error {
 			return err
 		}
 	}
-	if task != "" && !goals.ValidTaskTag(task) {
+	if task == "" {
+		fmt.Fprintln(ctx.Stderr, "Task tag is required — use --task #impl or pick one interactively")
+		return &ExitError{Code: 1}
+	}
+	if !goals.ValidTaskTag(task) {
 		fmt.Fprintf(ctx.Stderr, "Task tag '%s' is invalid — use #lowercase, e.g. #impl\n", task)
 		return &ExitError{Code: 1}
 	}

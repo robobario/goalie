@@ -113,7 +113,7 @@ func appendJournalEntries(t *testing.T, dataDir, username string, entries []map[
 }
 
 func TestInteractiveNoGoalsNotBlocked(t *testing.T) {
-	ctx, _, _ := newInteractiveCtx(t, "n\nRefactoring auth\n")
+	ctx, _, _ := newInteractiveCtx(t, "#refactor\nn\nRefactoring auth\n")
 
 	if err := cli.Log(ctx, "", "", false, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -126,13 +126,16 @@ func TestInteractiveNoGoalsNotBlocked(t *testing.T) {
 	if entry["goal"] != nil {
 		t.Errorf("expected nil goal, got %v", entry["goal"])
 	}
+	if entry["task"] != "#refactor" {
+		t.Errorf("expected task '#refactor', got %v", entry["task"])
+	}
 	if entry["blocked"] != false {
 		t.Errorf("expected blocked false, got %v", entry["blocked"])
 	}
 }
 
 func TestInteractiveWithGoalAndBlocked(t *testing.T) {
-	ctx, _, _ := newInteractiveCtx(t, "1\n\ny\nRefactoring auth\n")
+	ctx, _, _ := newInteractiveCtx(t, "1\n#impl\ny\nRefactoring auth\n")
 	addOpenGoal(t, ctx.DataDir, "AUTH_REWORK", ctx.EncryptionKey)
 
 	if err := cli.Log(ctx, "", "", false, ""); err != nil {
@@ -152,7 +155,7 @@ func TestInteractiveWithGoalAndBlocked(t *testing.T) {
 }
 
 func TestInteractiveClosedGoalsNotOffered(t *testing.T) {
-	ctx, _, _ := newInteractiveCtx(t, "n\nSome work\n")
+	ctx, _, _ := newInteractiveCtx(t, "#mytask\nn\nSome work\n")
 	addClosedGoal(t, ctx.DataDir, "CLOSED_GOAL", ctx.EncryptionKey)
 
 	if err := cli.Log(ctx, "", "", false, ""); err != nil {
@@ -166,7 +169,7 @@ func TestInteractiveClosedGoalsNotOffered(t *testing.T) {
 }
 
 func TestInteractiveGoalBlankSkip(t *testing.T) {
-	ctx, _, _ := newInteractiveCtx(t, "\nn\nSome work\n")
+	ctx, _, _ := newInteractiveCtx(t, "\n#mytask\nn\nSome work\n")
 	addOpenGoal(t, ctx.DataDir, "SOME_GOAL", ctx.EncryptionKey)
 
 	if err := cli.Log(ctx, "", "", false, ""); err != nil {
@@ -221,8 +224,9 @@ func TestInteractiveNewHashtag(t *testing.T) {
 	}
 }
 
-func TestInteractiveBlankThreadStoresNull(t *testing.T) {
-	ctx, _, _ := newInteractiveCtx(t, "1\n\nn\nSome work\n")
+func TestInteractiveTaskRequired(t *testing.T) {
+	// blank is not accepted; the prompt loops until a valid tag is given
+	ctx, _, _ := newInteractiveCtx(t, "1\n\n#impl\nn\nSome work\n")
 	addOpenGoal(t, ctx.DataDir, "AUTH_REWORK", ctx.EncryptionKey)
 
 	if err := cli.Log(ctx, "", "", false, ""); err != nil {
@@ -230,8 +234,8 @@ func TestInteractiveBlankThreadStoresNull(t *testing.T) {
 	}
 
 	entry := lastJournalEntry(t, ctx.DataDir, ctx.EncryptionKey)
-	if entry["task"] != nil {
-		t.Errorf("expected nil thread, got %v", entry["task"])
+	if entry["task"] != "#impl" {
+		t.Errorf("expected task '#impl' after blank was rejected, got %v", entry["task"])
 	}
 }
 

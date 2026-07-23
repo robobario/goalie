@@ -128,6 +128,10 @@ func promptForKey(r io.Reader, w io.Writer, dataDir string, tty bool) error {
 	for {
 		fmt.Fprint(w, display.Bold("Encryption key (paste hex or press Enter to skip): ", tty))
 		line, err := readLine(r)
+		if err == io.EOF {
+			fmt.Fprint(w, "No key imported. Run: goalie key import <hex-key> when ready.\n")
+			return nil
+		}
 		if err != nil {
 			return err
 		}

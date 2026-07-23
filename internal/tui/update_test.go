@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -31,6 +32,15 @@ func makeRecentThread(tag string, goal *string, note string, hoursAgo int) recen
 			Blocked: false,
 			TS:      ts,
 		},
+	}
+}
+
+func TestUpdateViewMultiLineErrorPreserved(t *testing.T) {
+	m := updateModel{err: errors.New("push rejected\nhint: fetch first")}
+	got := m.View()
+	want := "Error: push rejected\nhint: fetch first"
+	if got != want {
+		t.Errorf("expected %q, got %q", want, got)
 	}
 }
 

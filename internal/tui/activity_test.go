@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -9,6 +10,15 @@ import (
 )
 
 func strPtr(s string) *string { return &s }
+
+func TestActivityViewMultiLineErrorPreserved(t *testing.T) {
+	m := activityModel{err: errors.New("line one\nline two\nline three")}
+	got := m.View()
+	want := "Error: line one\nline two\nline three"
+	if got != want {
+		t.Errorf("expected %q, got %q", want, got)
+	}
+}
 
 func TestFilterEntriesEmptyQueryReturnsAll(t *testing.T) {
 	entries := []journal.Entry{

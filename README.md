@@ -1,13 +1,8 @@
-This repository is intended to help a remote team of Open Source Software Developers achieve their shared Goals!
+Goalie helps a remote team of open source developers share their goals and surface blockers.
 
-## Goalie
+## How it works
 
-Goalie is a way of sharing what is blocking you. We add shared Goals, then create Threads of work using hashtags. We update the threads to show if we are blocked or unblocked.
-
-`goalie update` is an interactive way to record your status at the end of the day
-`goalie status` is how you find out whether your team is blocked
-`goalie summary` is how you get a summary of your week, handy for that blimmin report
-
+Add shared goals, then create threads of work using hashtags. Log updates to show whether you are blocked or making progress. Run `goalie` with no arguments to open the TUI — a two-tab interface showing team activity and a guided end-of-day update flow.
 
 ## Installation
 
@@ -30,10 +25,10 @@ cp goalie-darwin-amd64 ~/bin/goalie
 chmod +x ~/bin/goalie
 ```
 
-Then initialise goalie, pointing it at the repo over SSH:
+Then initialise goalie, pointing it at a shared repository:
 
 ```sh
-goalie init git@github.com:robobario/goalie.git
+goalie init https://github.com/your-org/your-repo.git
 ```
 
 This clones (or connects to) the `data` branch of the repo into `~/.goalie/data` and prompts you for your name.
@@ -43,6 +38,7 @@ To keep goalie up to date, replace the binary with a newer build.
 ## Usage
 
 ```
+goalie                              # Open the TUI (activity view + guided update)
 goalie init <repo-url>              # Clone or create the data branch in ~/.goalie/data
 goalie goal add <ID> <DESCRIPTION>  # Create a new open goal
 goalie goal close <ID>              # Mark a goal as closed
@@ -55,3 +51,10 @@ goalie status                       # Morning standup view: latest entry per use
 goalie update                       # Interactive end-of-day review: update threads, log new activity
 goalie --version                    # Print version and exit
 ```
+
+## TUI
+
+Running `goalie` opens a terminal interface with two tabs (switch with Tab / Shift-Tab):
+
+- **Activity** — shows the latest entry per person per thread across the last 30 days. Start typing to filter by note, goal, or thread tag.
+- **Update** — walks you through blocked threads, recent threads, and lets you log new activity. Press `q` to quit.

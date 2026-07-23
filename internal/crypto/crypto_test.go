@@ -75,6 +75,65 @@ func TestDecryptNilKeyPassthrough(t *testing.T) {
 	}
 }
 
+func TestWriteVerifyKeyCheck_roundtrip(t *testing.T) {
+	key, err := GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := t.TempDir() + "/key-check.enc"
+
+	if err := WriteKeyCheck(path, key); err != nil {
+		t.Fatal(err)
+	}
+
+	ok, err := VerifyKeyCheck(path, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Error("expected verify to return true for correct key")
+	}
+}
+
+func TestVerifyKeyCheck_wrongKey(t *testing.T) {
+	key, err := GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := t.TempDir() + "/key-check.enc"
+
+	if err := WriteKeyCheck(path, key); err != nil {
+		t.Fatal(err)
+	}
+
+	wrongKey, err := GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ok, err := VerifyKeyCheck(path, wrongKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ok {
+		t.Error("expected verify to return false for wrong key")
+	}
+}
+
+func TestVerifyKeyCheck_missingFile(t *testing.T) {
+	key, err := GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ok, err := VerifyKeyCheck(t.TempDir()+"/nonexistent.enc", key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Error("expected verify to return true when file is absent")
+	}
+}
+
 func TestDecryptWrongKey(t *testing.T) {
 	key, err := GenerateKey()
 	if err != nil {

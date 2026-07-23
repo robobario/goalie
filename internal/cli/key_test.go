@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -71,5 +73,103 @@ func TestKeyImport_nonHex(t *testing.T) {
 	var exitErr *ExitError
 	if !errors.As(err, &exitErr) || exitErr.Code != 1 {
 		t.Fatalf("expected ExitError{Code:1}, got %v", err)
+	}
+}
+
+func TestKeyInit_ExistingKey_Declined(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeExistingKey(t, home, strings.Repeat("aa", 32))
+
+	var stdout bytes.Buffer
+	ctx := AppContext{Stdin: strings.NewReader("n\n"), Stdout: &stdout, Stderr: &bytes.Buffer{}}
+
+	if err := KeyInit(ctx); err != nil {
+		t.Fatalf("KeyInit returned error: %v", err)
+	}
+
+	// Key file should remain unchanged
+	data, err := os.ReadFile(filepath.Join(home, ".goalie", "encryption.key"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(data)) != strings.Repeat("aa", 32) {
+		t.Errorf("expected key unchanged after declining; got %q", string(data))
+	}
+}
+
+func TestKeyInit_ExistingKey_Confirmed(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeExistingKey(t, home, strings.Repeat("aa", 32))
+
+	var stdout bytes.Buffer
+	ctx := AppContext{Stdin: strings.NewReader("y\n"), Stdout: &stdout, Stderr: &bytes.Buffer{}}
+
+	if err := KeyInit(ctx); err != nil {
+		t.Fatalf("KeyInit returned error: %v", err)
+	}
+
+	// Key should have been replaced
+	data, err := os.ReadFile(filepath.Join(home, ".goalie", "encryption.key"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(data)) == strings.Repeat("aa", 32) {
+		t.Error("expected key to be replaced after confirming")
+	}
+}
+
+func TestKeyImport_ExistingKey_Declined(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	oldKey := strings.Repeat("aa", 32)
+	writeExistingKey(t, home, oldKey)
+
+	newKey := strings.Repeat("bb", 32)
+	ctx := AppContext{Stdin: strings.NewReader("n\n"), Stdout: &bytes.Buffer{}, Stderr: &bytes.Buffer{}}
+
+	if err := KeyImport(ctx, newKey); err != nil {
+		t.Fatalf("KeyImport returned error: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(home, ".goalie", "encryption.key"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(data)) != oldKey {
+		t.Errorf("expected key unchanged after declining; got %q", string(data))
+	}
+}
+
+func TestKeyImport_ExistingKey_Confirmed(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeExistingKey(t, home, strings.Repeat("aa", 32))
+
+	newKey := strings.Repeat("bb", 32)
+	ctx := AppContext{Stdin: strings.NewReader("y\n"), Stdout: &bytes.Buffer{}, Stderr: &bytes.Buffer{}}
+
+	if err := KeyImport(ctx, newKey); err != nil {
+		t.Fatalf("KeyImport returned error: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(home, ".goalie", "encryption.key"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(data)) != newKey {
+		t.Errorf("expected key to be replaced; got %q", string(data))
+	}
+}
+
+func writeExistingKey(t *testing.T, home, keyHex string) {
+	t.Helper()
+	keyDir := filepath.Join(home, ".goalie")
+	if err := os.MkdirAll(keyDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(keyDir, "encryption.key"), []byte(keyHex), 0600); err != nil {
+		t.Fatal(err)
 	}
 }

@@ -23,6 +23,13 @@ func Red(s string, tty bool) string {
 	return "\033[31m" + s + "\033[0m"
 }
 
+func Green(s string, tty bool) string {
+	if !tty {
+		return s
+	}
+	return "\033[32m" + s + "\033[0m"
+}
+
 func Section(title string, w io.Writer, tty bool) {
 	const width = 44
 	dashes := strings.Repeat("─", max(0, width-len(title)-4))

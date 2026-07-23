@@ -72,7 +72,36 @@ func Decrypt(key, ciphertext []byte) ([]byte, error) {
 	return gcm.Open(nil, nonce, raw, nil)
 }
 
-func defaultKeyPath() (string, error) {
+const keyCheckSentinel = "goalie-key-check-v1"
+
+// WriteKeyCheck encrypts the sentinel and writes it to path.
+func WriteKeyCheck(path string, key []byte) error {
+	ciphertext, err := Encrypt(key, []byte(keyCheckSentinel))
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, ciphertext, 0644)
+}
+
+// VerifyKeyCheck reads the check file at path and attempts to decrypt it with key.
+// Returns (true, nil) if the key is correct or the file does not exist.
+// Returns (false, nil) if the key is wrong.
+func VerifyKeyCheck(path string, key []byte) (bool, error) {
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	plaintext, err := Decrypt(key, data)
+	if err != nil {
+		return false, nil
+	}
+	return string(plaintext) == keyCheckSentinel, nil
+}
+
+func DefaultKeyPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
@@ -81,7 +110,7 @@ func defaultKeyPath() (string, error) {
 }
 
 func LoadKey() ([]byte, error) {
-	path, err := defaultKeyPath()
+	path, err := DefaultKeyPath()
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +126,7 @@ func LoadKeyFrom(path string) ([]byte, error) {
 }
 
 func SaveKey(key []byte) error {
-	path, err := defaultKeyPath()
+	path, err := DefaultKeyPath()
 	if err != nil {
 		return err
 	}

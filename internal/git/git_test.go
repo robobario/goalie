@@ -82,6 +82,34 @@ func TestRealRunner_Output_CapturesStderr(t *testing.T) {
 	}
 }
 
+func TestRealRunner_Run_Succeeds(t *testing.T) {
+	dir := t.TempDir()
+	if err := exec.Command("git", "init", dir).Run(); err != nil {
+		t.Fatalf("git init: %v", err)
+	}
+
+	r := &RealRunner{}
+	if err := r.Run([]string{"status"}, dir); err != nil {
+		t.Errorf("expected nil, got %v", err)
+	}
+}
+
+func TestRealRunner_Output_Succeeds(t *testing.T) {
+	dir := t.TempDir()
+	if err := exec.Command("git", "init", dir).Run(); err != nil {
+		t.Fatalf("git init: %v", err)
+	}
+
+	r := &RealRunner{}
+	out, err := r.Output([]string{"rev-parse", "--show-toplevel"}, dir)
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if out != dir {
+		t.Errorf("expected %q, got %q", dir, out)
+	}
+}
+
 func expectArgs(t *testing.T, got, want []string) {
 	t.Helper()
 	if len(got) != len(want) {

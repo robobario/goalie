@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 1.2.3)'
+        required: true
+      bump_to_dev:
+        description: 'Bump to next dev version after release'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version format
+        run: |
+          echo "${{ inputs.version }}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || \
+            { echo "version must be X.Y.Z"; exit 1; }
+
+      - name: Configure git
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Stamp VERSION
+        run: echo "${{ inputs.version }}" > VERSION
+
+      - name: Build binaries
+        run: ./build.sh
+
+      - name: Commit version bump
+        run: |
+          git add VERSION
+          git commit -m "chore: release v${{ inputs.version }}"
+
+      - name: Tag release
+        run: git tag "v${{ inputs.version }}"
+
+      - name: Push commit and tag
+        run: git push origin main "v${{ inputs.version }}"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ inputs.version }}" \
+            dist/goalie-linux-amd64 \
+            dist/goalie-darwin-amd64 \
+            dist/goalie-darwin-arm64 \
+            --title "v${{ inputs.version }}" \
+            --generate-notes
+
+      - name: Bump to dev version
+        if: inputs.bump_to_dev
+        run: |
+          PATCH=$(echo "${{ inputs.version }}" | cut -d. -f3)
+          NEXT_PATCH=$((PATCH + 1))
+          PREFIX=$(echo "${{ inputs.version }}" | cut -d. -f1-2)
+          DEV_VERSION="${PREFIX}.${NEXT_PATCH}-dev"
+          echo "${DEV_VERSION}" > VERSION
+          git add VERSION
+          git commit -m "chore: begin development of v${DEV_VERSION}"
+          git push origin main

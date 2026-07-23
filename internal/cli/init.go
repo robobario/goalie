@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"goalie/internal/config"
 	"goalie/internal/crypto"
@@ -106,7 +107,9 @@ func Init(repoURL string, dataDir string, configPath string, r git.Runner, stdin
 	if m.Encrypt {
 		key, loadErr := crypto.LoadKey()
 		if loadErr != nil {
-			fmt.Fprint(stdout, "No encryption key found. Import the team key with: goalie key import <hex-key>\n")
+			if err := promptForKey(sr, stdout, dataDir, tty); err != nil {
+				return err
+			}
 		} else {
 			keyCheckPath := filepath.Join(dataDir, "key-check.enc")
 			if ok, _ := crypto.VerifyKeyCheck(keyCheckPath, key); ok {
@@ -118,6 +121,41 @@ func Init(repoURL string, dataDir string, configPath string, r git.Runner, stdin
 	}
 
 	return nil
+}
+
+// promptForKey loops until the user pastes a valid, verified hex key or presses Enter to skip.
+func promptForKey(r io.Reader, w io.Writer, dataDir string, tty bool) error {
+	for {
+		fmt.Fprint(w, display.Bold("Encryption key (paste hex or press Enter to skip): ", tty))
+		line, err := readLine(r)
+		if err != nil {
+			return err
+		}
+		hexKey := strings.TrimSpace(line)
+		if hexKey == "" {
+			fmt.Fprint(w, "No key imported. Run: goalie key import <hex-key> when ready.\n")
+			return nil
+		}
+		decoded, decodeErr := hex.DecodeString(hexKey)
+		if decodeErr != nil || len(decoded) != 32 {
+			fmt.Fprint(w, "Invalid key: must be 64 hex characters (32 bytes). Try again, or press Enter to skip.\n")
+			continue
+		}
+		keyCheckPath := filepath.Join(dataDir, "key-check.enc")
+		ok, err := crypto.VerifyKeyCheck(keyCheckPath, decoded)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			fmt.Fprint(w, "Key does not match the team key-check. Try again, or press Enter to skip.\n")
+			continue
+		}
+		if err := crypto.SaveKey(decoded); err != nil {
+			return err
+		}
+		fmt.Fprint(w, display.Green("Encryption key verified.", tty)+"\n")
+		return nil
+	}
 }
 
 // setupEncryptionKey resolves the key for a fresh encrypted repo.

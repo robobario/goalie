@@ -31,8 +31,16 @@ func (r *RealRunner) Run(args []string, cwd string) error {
 func (r *RealRunner) Output(args []string, cwd string) (string, error) {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = cwd
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 	out, err := cmd.Output()
-	return strings.TrimSpace(string(out)), err
+	if err != nil {
+		if msg := strings.TrimSpace(stderr.String()); msg != "" {
+			return "", fmt.Errorf("%w\n%s", err, msg)
+		}
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 type FakeRunner struct {

@@ -22,11 +22,11 @@ type Entry struct {
 	Goal     *string `json:"goal"`
 	Note     string  `json:"note"`
 	Blocked  bool    `json:"blocked"`
-	Thread   *string `json:"thread"`
+	Task     *string `json:"task"`
 	Username string  `json:"-"`
 }
 
-type ThreadState struct {
+type TaskState struct {
 	Goal    *string
 	Note    string
 	Blocked bool
@@ -190,7 +190,7 @@ func Collect(dataDir string, r git.Runner, days int, userPattern string, key []b
 	return entries, nil
 }
 
-// CollectLatest returns the latest entry per (username, goal, thread) key
+// CollectLatest returns the latest entry per (username, goal, task) key
 // within the last `days` days.
 func CollectLatest(dataDir string, r git.Runner, days int, key []byte) ([]Entry, error) {
 	if err := r.Run([]string{"pull"}, dataDir); err != nil {
@@ -224,7 +224,7 @@ func CollectLatest(dataDir string, r git.Runner, days int, key []byte) ([]Entry,
 	type dedupKey struct {
 		username string
 		goal     string
-		thread   string
+		task     string
 	}
 	latest := make(map[dedupKey]Entry)
 
@@ -246,11 +246,11 @@ func CollectLatest(dataDir string, r git.Runner, days int, key []byte) ([]Entry,
 				if e.Goal != nil {
 					goalStr = *e.Goal
 				}
-				threadStr := ""
-				if e.Thread != nil {
-					threadStr = *e.Thread
+				taskStr := ""
+				if e.Task != nil {
+					taskStr = *e.Task
 				}
-				k := dedupKey{username, goalStr, threadStr}
+				k := dedupKey{username, goalStr, taskStr}
 				if prev, ok := latest[k]; !ok || e.TS > prev.TS {
 					latest[k] = e
 				}
@@ -268,25 +268,25 @@ func CollectLatest(dataDir string, r git.Runner, days int, key []byte) ([]Entry,
 	return result, nil
 }
 
-// CurrentThreadStates returns the latest state for each thread tag found in
+// CurrentTaskStates returns the latest state for each task tag found in
 // weekly journal files for the given username over the past 4 weeks.
-// Entries with nil Thread are ignored. Returns an empty map if no files exist.
-func CurrentThreadStates(journalDir, username string, key []byte) (map[string]ThreadState, error) {
+// Entries with nil Task are ignored. Returns an empty map if no files exist.
+func CurrentTaskStates(journalDir, username string, key []byte) (map[string]TaskState, error) {
 	now := time.Now().UTC()
 	from := now.Add(-4 * 7 * 24 * time.Hour)
 	files := weekFilesForRange(journalDir, username, from, now)
 
-	states := make(map[string]ThreadState)
+	states := make(map[string]TaskState)
 	for _, path := range files {
 		entries, err := readEntries(path, username, key)
 		if err != nil {
 			return nil, err
 		}
 		for _, e := range entries {
-			if e.Thread == nil {
+			if e.Task == nil {
 				continue
 			}
-			states[*e.Thread] = ThreadState{
+			states[*e.Task] = TaskState{
 				Goal:    e.Goal,
 				Note:    e.Note,
 				Blocked: e.Blocked,
@@ -297,8 +297,8 @@ func CurrentThreadStates(journalDir, username string, key []byte) (map[string]Th
 	return states, nil
 }
 
-// CollectThreads returns all distinct thread tags used for a given goalID across all users.
-func CollectThreads(dataDir, goalID string, key []byte) ([]string, error) {
+// CollectTasks returns all distinct task tags used for a given goalID across all users.
+func CollectTasks(dataDir, goalID string, key []byte) ([]string, error) {
 	journalDir := filepath.Join(dataDir, "journal")
 	files, err := filepath.Glob(filepath.Join(journalDir, "*.jsonl"))
 	if err != nil {
@@ -312,18 +312,18 @@ func CollectThreads(dataDir, goalID string, key []byte) ([]string, error) {
 			return nil, err
 		}
 		for _, e := range fileEntries {
-			if e.Goal != nil && *e.Goal == goalID && e.Thread != nil {
-				seen[*e.Thread] = true
+			if e.Goal != nil && *e.Goal == goalID && e.Task != nil {
+				seen[*e.Task] = true
 			}
 		}
 	}
 
-	threads := make([]string, 0, len(seen))
+	tasks := make([]string, 0, len(seen))
 	for t := range seen {
-		threads = append(threads, t)
+		tasks = append(tasks, t)
 	}
-	sort.Strings(threads)
-	return threads, nil
+	sort.Strings(tasks)
+	return tasks, nil
 }
 
 func readEntries(path, username string, key []byte) ([]Entry, error) {

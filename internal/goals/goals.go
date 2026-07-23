@@ -18,11 +18,11 @@ import (
 
 var (
 	GoalIDRe    = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
-	ThreadTagRe = regexp.MustCompile(`^#[a-z][a-z0-9_-]*$`)
+	TaskTagRe = regexp.MustCompile(`^#[a-z][a-z0-9_-]*$`)
 )
 
 func ValidGoalID(id string) bool    { return GoalIDRe.MatchString(id) }
-func ValidThreadTag(tag string) bool { return ThreadTagRe.MatchString(tag) }
+func ValidTaskTag(tag string) bool { return TaskTagRe.MatchString(tag) }
 
 var (
 	ErrGoalExists   = errors.New("goal already exists")

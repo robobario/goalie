@@ -183,8 +183,8 @@ func TestInteractiveExistingThreadsOffered(t *testing.T) {
 	ctx, stdout, _ := newInteractiveCtx(t, "1\n1\nn\nSome work\n")
 	addOpenGoal(t, ctx.DataDir, "AUTH_REWORK", ctx.EncryptionKey)
 	appendJournalEntries(t, ctx.DataDir, "testuser", []map[string]any{
-		{"ts": "2026-01-01T00:00:00+00:00", "goal": "AUTH_REWORK", "note": "a", "blocked": false, "thread": "#impl"},
-		{"ts": "2026-01-01T00:00:01+00:00", "goal": "AUTH_REWORK", "note": "b", "blocked": false, "thread": "#tests"},
+		{"ts": "2026-01-01T00:00:00+00:00", "goal": "AUTH_REWORK", "note": "a", "blocked": false, "task": "#impl"},
+		{"ts": "2026-01-01T00:00:01+00:00", "goal": "AUTH_REWORK", "note": "b", "blocked": false, "task": "#tests"},
 	}, ctx.EncryptionKey)
 
 	if err := cli.Log(ctx, "", "", false, ""); err != nil {
@@ -192,8 +192,8 @@ func TestInteractiveExistingThreadsOffered(t *testing.T) {
 	}
 
 	entry := lastJournalEntry(t, ctx.DataDir, ctx.EncryptionKey)
-	if entry["thread"] != "#impl" {
-		t.Errorf("expected thread '#impl', got %v", entry["thread"])
+	if entry["task"] != "#impl" {
+		t.Errorf("expected thread '#impl', got %v", entry["task"])
 	}
 	if entry["blocked"] != false {
 		t.Errorf("expected blocked false, got %v", entry["blocked"])
@@ -216,8 +216,8 @@ func TestInteractiveNewHashtag(t *testing.T) {
 	}
 
 	entry := lastJournalEntry(t, ctx.DataDir, ctx.EncryptionKey)
-	if entry["thread"] != "#new-thing" {
-		t.Errorf("expected thread '#new-thing', got %v", entry["thread"])
+	if entry["task"] != "#new-thing" {
+		t.Errorf("expected thread '#new-thing', got %v", entry["task"])
 	}
 }
 
@@ -230,8 +230,8 @@ func TestInteractiveBlankThreadStoresNull(t *testing.T) {
 	}
 
 	entry := lastJournalEntry(t, ctx.DataDir, ctx.EncryptionKey)
-	if entry["thread"] != nil {
-		t.Errorf("expected nil thread, got %v", entry["thread"])
+	if entry["task"] != nil {
+		t.Errorf("expected nil thread, got %v", entry["task"])
 	}
 }
 
@@ -240,8 +240,8 @@ func TestInteractiveThreadsFromOtherGoalsNotOffered(t *testing.T) {
 	addOpenGoal(t, ctx.DataDir, "GOAL_A", ctx.EncryptionKey)
 	addOpenGoal(t, ctx.DataDir, "GOAL_B", ctx.EncryptionKey)
 	appendJournalEntries(t, ctx.DataDir, "testuser", []map[string]any{
-		{"ts": "2026-01-01T00:00:00+00:00", "goal": "GOAL_A", "note": "a", "blocked": false, "thread": "#impl"},
-		{"ts": "2026-01-01T00:00:01+00:00", "goal": "GOAL_B", "note": "b", "blocked": false, "thread": "#docs"},
+		{"ts": "2026-01-01T00:00:00+00:00", "goal": "GOAL_A", "note": "a", "blocked": false, "task": "#impl"},
+		{"ts": "2026-01-01T00:00:01+00:00", "goal": "GOAL_B", "note": "b", "blocked": false, "task": "#docs"},
 	}, ctx.EncryptionKey)
 
 	if err := cli.Log(ctx, "", "", false, ""); err != nil {
@@ -249,8 +249,8 @@ func TestInteractiveThreadsFromOtherGoalsNotOffered(t *testing.T) {
 	}
 
 	entry := lastJournalEntry(t, ctx.DataDir, ctx.EncryptionKey)
-	if entry["thread"] != "#impl" {
-		t.Errorf("expected thread '#impl', got %v", entry["thread"])
+	if entry["task"] != "#impl" {
+		t.Errorf("expected thread '#impl', got %v", entry["task"])
 	}
 	out := stdout.String()
 	if strings.Contains(out, "#docs") {

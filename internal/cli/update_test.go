@@ -20,7 +20,7 @@ func blockedEntry(goal *string, thread, note string) map[string]any {
 		"goal":    goal,
 		"note":    note,
 		"blocked": true,
-		"thread":  thread,
+		"task":    thread,
 	}
 	return e
 }
@@ -32,7 +32,7 @@ func recentEntry(thread string, goal *string, note string, daysAgo float64) map[
 		"goal":    goal,
 		"note":    note,
 		"blocked": false,
-		"thread":  thread,
+		"task":    thread,
 	}
 }
 
@@ -124,7 +124,7 @@ func TestInteractiveUpdateGreeting(t *testing.T) {
 
 func TestInteractiveUpdateNoBlockedThreads(t *testing.T) {
 	out, _ := runUpdate(t, "n\n", nil)
-	if !strings.Contains(out, "No blocked threads.") {
+	if !strings.Contains(out, "No blocked tasks.") {
 		t.Errorf("expected 'No blocked threads.' in output:\n%s", out)
 	}
 }
@@ -135,7 +135,7 @@ func TestInteractiveUpdateBlockedCountShown(t *testing.T) {
 			blockedEntry(nil, "#foo", "waiting on infra"),
 		}, key)
 	})
-	if !strings.Contains(out, "1 blocked thread(s).") {
+	if !strings.Contains(out, "1 blocked task(s).") {
 		t.Errorf("expected blocked count in output:\n%s", out)
 	}
 }
@@ -190,8 +190,8 @@ func TestInteractiveUpdateBlockedUnblockedNoNotes(t *testing.T) {
 	if e["note"] != "unblocked" {
 		t.Errorf("expected note='unblocked', got %v", e["note"])
 	}
-	if e["thread"] != "#work" {
-		t.Errorf("expected thread='#work', got %v", e["thread"])
+	if e["task"] != "#work" {
+		t.Errorf("expected thread='#work', got %v", e["task"])
 	}
 }
 
@@ -253,7 +253,7 @@ func TestInteractiveUpdateRecentThreadShown(t *testing.T) {
 			recentEntry("#mythread", nil, "some work", 1),
 		}, key)
 	})
-	if !strings.Contains(out, "Your other recently active threads (last 7d):") {
+	if !strings.Contains(out, "Your other recently active tasks (last 7d):") {
 		t.Errorf("recent threads header not in output:\n%s", out)
 	}
 	if !strings.Contains(out, "#mythread") {
@@ -267,7 +267,7 @@ func TestInteractiveUpdateOldThreadNotShown(t *testing.T) {
 			recentEntry("#oldthread", nil, "old work", 10),
 		}, key)
 	})
-	if strings.Contains(out, "Your other recently active threads (last 7d):") {
+	if strings.Contains(out, "Your other recently active tasks (last 7d):") {
 		t.Errorf("old thread should not appear in recent section:\n%s", out)
 	}
 }
@@ -278,7 +278,7 @@ func TestInteractiveUpdateBlockedThreadNotInRecentList(t *testing.T) {
 			blockedEntry(nil, "#blocked", "some blocker"),
 		}, key)
 	})
-	if strings.Contains(out, "Your other recently active threads (last 7d):") {
+	if strings.Contains(out, "Your other recently active tasks (last 7d):") {
 		t.Errorf("blocked thread should not appear in recent section:\n%s", out)
 	}
 }
@@ -294,8 +294,8 @@ func TestInteractiveUpdateRecentThreadUpdateLogged(t *testing.T) {
 		t.Fatalf("expected 2 journal entries, got %d", len(entries))
 	}
 	e := entries[1]
-	if e["thread"] != "#work" {
-		t.Errorf("expected thread='#work', got %v", e["thread"])
+	if e["task"] != "#work" {
+		t.Errorf("expected thread='#work', got %v", e["task"])
 	}
 	if e["note"] != "review done" {
 		t.Errorf("expected note='review done', got %v", e["note"])
@@ -364,8 +364,8 @@ func TestInteractiveUpdateNewThreadLogged(t *testing.T) {
 		t.Fatalf("expected 1 journal entry, got %d", len(entries))
 	}
 	e := entries[0]
-	if e["thread"] != "#new-work" {
-		t.Errorf("expected thread='#new-work', got %v", e["thread"])
+	if e["task"] != "#new-work" {
+		t.Errorf("expected thread='#new-work', got %v", e["task"])
 	}
 	if e["goal"] != "ROUTING" {
 		t.Errorf("expected goal='ROUTING', got %v", e["goal"])
@@ -403,8 +403,8 @@ func TestInteractiveUpdateNewThreadWithNoGoal(t *testing.T) {
 	if e["goal"] != nil {
 		t.Errorf("expected goal=nil, got %v", e["goal"])
 	}
-	if e["thread"] != "#new-work" {
-		t.Errorf("expected thread='#new-work', got %v", e["thread"])
+	if e["task"] != "#new-work" {
+		t.Errorf("expected thread='#new-work', got %v", e["task"])
 	}
 }
 
@@ -423,8 +423,8 @@ func TestInteractiveUpdateExistingThreadsShownInNewPhase(t *testing.T) {
 		t.Fatalf("expected 2 journal entries, got %d", len(entries))
 	}
 	e := entries[1]
-	if e["thread"] != "#routing-impl" {
-		t.Errorf("expected thread='#routing-impl', got %v", e["thread"])
+	if e["task"] != "#routing-impl" {
+		t.Errorf("expected thread='#routing-impl', got %v", e["task"])
 	}
 	if e["note"] != "what I worked on" {
 		t.Errorf("expected note='what I worked on', got %v", e["note"])
@@ -437,8 +437,8 @@ func TestInteractiveUpdateInvalidHashtagLoops(t *testing.T) {
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 journal entry, got %d", len(entries))
 	}
-	if entries[0]["thread"] != "#valid" {
-		t.Errorf("expected thread='#valid', got %v", entries[0]["thread"])
+	if entries[0]["task"] != "#valid" {
+		t.Errorf("expected thread='#valid', got %v", entries[0]["task"])
 	}
 }
 

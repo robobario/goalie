@@ -45,7 +45,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if m.activeTab == updateTab && (m.update.inputMode || m.update.phase == phaseNewThread) {
+		if m.activeTab == updateTab && (m.update.inputMode || m.update.phase == phaseNewTask) {
 			var cmd tea.Cmd
 			m.update, cmd = m.update.Update(msg)
 			cmds = append(cmds, cmd)
@@ -90,7 +90,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.activity, cmd = m.activity.Update(msg)
 		cmds = append(cmds, cmd)
-	case threadStatesLoadedMsg:
+	case taskStatesLoadedMsg:
 		var cmd tea.Cmd
 		m.update, cmd = m.update.Update(msg)
 		cmds = append(cmds, cmd)
@@ -102,7 +102,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.update, cmd = m.update.Update(msg)
 		cmds = append(cmds, cmd)
-	case threadTagsLoadedMsg:
+	case taskTagsLoadedMsg:
 		var cmd tea.Cmd
 		m.update, cmd = m.update.Update(msg)
 		cmds = append(cmds, cmd)

@@ -62,15 +62,15 @@ func TestFilterEntriesMatchesGoalID(t *testing.T) {
 
 func TestFilterEntriesMatchesThread(t *testing.T) {
 	entries := []journal.Entry{
-		{Note: "status update", Thread: strPtr("#backend")},
-		{Note: "status update", Thread: strPtr("#frontend")},
+		{Note: "status update", Task: strPtr("#backend")},
+		{Note: "status update", Task: strPtr("#frontend")},
 	}
 	result := FilterEntries(entries, "#backend")
 	if len(result) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(result))
 	}
-	if result[0].Thread == nil || *result[0].Thread != "#backend" {
-		t.Errorf("unexpected thread: %v", result[0].Thread)
+	if result[0].Task == nil || *result[0].Task != "#backend" {
+		t.Errorf("unexpected thread: %v", result[0].Task)
 	}
 }
 
@@ -88,7 +88,7 @@ func TestFilterEntriesNoMatchReturnsEmpty(t *testing.T) {
 func TestFilterEntriesFuzzyTolerance(t *testing.T) {
 	entries := []journal.Entry{
 		{Note: "unrelated task"},
-		{Note: "bug fix for login", Thread: strPtr("#bug-fix")},
+		{Note: "bug fix for login", Task: strPtr("#bug-fix")},
 	}
 	result := FilterEntries(entries, "bugfix")
 	if len(result) == 0 {
@@ -96,7 +96,7 @@ func TestFilterEntriesFuzzyTolerance(t *testing.T) {
 	}
 	matched := false
 	for _, e := range result {
-		if e.Thread != nil && *e.Thread == "#bug-fix" {
+		if e.Task != nil && *e.Task == "#bug-fix" {
 			matched = true
 		}
 	}

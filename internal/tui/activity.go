@@ -36,7 +36,7 @@ func loadActivityCmd(ctx *cli.AppContext) tea.Cmd {
 	}
 }
 
-// FilterEntries returns entries whose note+goal+thread fuzzy-match query.
+// FilterEntries returns entries whose note+goal+task fuzzy-match query.
 // Returns all entries when query is empty.
 func FilterEntries(entries []journal.Entry, query string) []journal.Entry {
 	if query == "" {
@@ -48,8 +48,8 @@ func FilterEntries(entries []journal.Entry, query string) []journal.Entry {
 		if e.Goal != nil {
 			parts = append(parts, *e.Goal)
 		}
-		if e.Thread != nil {
-			parts = append(parts, *e.Thread)
+		if e.Task != nil {
+			parts = append(parts, *e.Task)
 		}
 		searchable[i] = strings.Join(parts, " ")
 	}
@@ -151,8 +151,8 @@ func formatActivityEntry(e journal.Entry, now time.Time) string {
 	if e.Blocked {
 		parts = append(parts, blockedStyle.Render("[BLOCKED]"))
 	}
-	if e.Thread != nil {
-		parts = append(parts, *e.Thread)
+	if e.Task != nil {
+		parts = append(parts, *e.Task)
 	}
 	if e.Goal != nil {
 		parts = append(parts, "("+*e.Goal+")")

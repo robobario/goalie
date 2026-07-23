@@ -63,7 +63,7 @@ func main() {
 
 	var logGoal string
 	var logBlocked bool
-	var logThread string
+	var logTask string
 	var summaryDays int
 	var summaryUser string
 
@@ -103,16 +103,16 @@ func main() {
 			if len(args) > 0 {
 				note = args[0]
 			}
-			return cli.Log(ctx, note, logGoal, logBlocked, logThread)
+			return cli.Log(ctx, note, logGoal, logBlocked, logTask)
 		}),
 	}
 	logCmd.Flags().StringVar(&logGoal, "goal", "", "Goal ID to associate with this entry")
 	logCmd.Flags().BoolVar(&logBlocked, "blocked", false, "Mark this entry as blocked")
-	logCmd.Flags().StringVar(&logThread, "thread", "", "Thread tag to associate with this entry")
+	logCmd.Flags().StringVar(&logTask, "task", "", "Task tag to associate with this entry")
 
 	statusCmd := &cobra.Command{
 		Use:   "status",
-		Short: "Morning standup view: latest entry per user×goal×thread, last 7 days",
+		Short: "Morning standup view: latest entry per user×goal×task, last 7 days",
 		Args:  cobra.NoArgs,
 		RunE: requireKey(keyErr, func(cmd *cobra.Command, args []string) error {
 			return cli.Status(ctx)
@@ -132,7 +132,7 @@ func main() {
 
 	updateCmd := &cobra.Command{
 		Use:   "update",
-		Short: "Interactive end-of-day review: update threads, log new activity",
+		Short: "Interactive end-of-day review: update tasks, log new activity",
 		Args:  cobra.NoArgs,
 		RunE: requireKey(keyErr, func(cmd *cobra.Command, args []string) error {
 			if err := ctx.Git.Run([]string{"pull"}, ctx.DataDir); err != nil {

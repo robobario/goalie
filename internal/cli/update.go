@@ -16,14 +16,14 @@ import (
 	"goalie/internal/slugify"
 )
 
-type blockedThread struct {
+type blockedTask struct {
 	tag   string
-	state journal.ThreadState
+	state journal.TaskState
 }
 
-type recentThread struct {
+type recentTask struct {
 	tag   string
-	state journal.ThreadState
+	state journal.TaskState
 }
 
 func InteractiveUpdate(ctx *AppContext) error {
@@ -42,28 +42,28 @@ func InteractiveUpdate(ctx *AppContext) error {
 
 	r := bufio.NewReader(ctx.Stdin)
 
-	fmt.Fprintf(ctx.Stdout, "Hi %s, let's review your threads.\n", name)
+	fmt.Fprintf(ctx.Stdout, "Hi %s, let's review your tasks.\n", name)
 
 	journalDir := filepath.Join(ctx.DataDir, "journal")
-	states, err := journal.CurrentThreadStates(journalDir, username, ctx.EncryptionKey)
+	states, err := journal.CurrentTaskStates(journalDir, username, ctx.EncryptionKey)
 	if err != nil {
 		return err
 	}
 
-	var blocked []blockedThread
+	var blocked []blockedTask
 	for tag, state := range states {
 		if state.Blocked {
-			blocked = append(blocked, blockedThread{tag: tag, state: state})
+			blocked = append(blocked, blockedTask{tag: tag, state: state})
 		}
 	}
 
 	if len(blocked) > 0 {
-		fmt.Fprintf(ctx.Stdout, "%d blocked thread(s).\n", len(blocked))
+		fmt.Fprintf(ctx.Stdout, "%d blocked task(s).\n", len(blocked))
 	} else {
-		fmt.Fprint(ctx.Stdout, "No blocked threads.\n")
+		fmt.Fprint(ctx.Stdout, "No blocked tasks.\n")
 	}
 
-	display.Section("Blocked threads", ctx.Stdout, ctx.IsTTY)
+	display.Section("Blocked tasks", ctx.Stdout, ctx.IsTTY)
 
 	sort.Slice(blocked, func(i, j int) bool {
 		gi, gj := "", ""
@@ -120,14 +120,14 @@ func InteractiveUpdate(ctx *AppContext) error {
 			Goal:    item.state.Goal,
 			Note:    entryNote,
 			Blocked: !unblocked,
-			Thread:  &tag,
+			Task:    &tag,
 		}, ctx.EncryptionKey); err != nil {
 			return err
 		}
 	}
 
 	cutoff := time.Now().UTC().Add(-7 * 24 * time.Hour)
-	var recent []recentThread
+	var recent []recentTask
 	for tag, state := range states {
 		if state.Blocked || state.TS == "" {
 			continue
@@ -139,17 +139,17 @@ func InteractiveUpdate(ctx *AppContext) error {
 		if ts.Before(cutoff) {
 			continue
 		}
-		recent = append(recent, recentThread{tag: tag, state: state})
+		recent = append(recent, recentTask{tag: tag, state: state})
 	}
 
 	sort.Slice(recent, func(i, j int) bool {
 		return recent[i].state.TS > recent[j].state.TS
 	})
 
-	display.Section("Recent threads (last 7d)", ctx.Stdout, ctx.IsTTY)
+	display.Section("Recent tasks (last 7d)", ctx.Stdout, ctx.IsTTY)
 
 	if len(recent) > 0 {
-		fmt.Fprint(ctx.Stdout, "Your other recently active threads (last 7d):\n")
+		fmt.Fprint(ctx.Stdout, "Your other recently active tasks (last 7d):\n")
 		for i, item := range recent {
 			if item.state.Goal != nil {
 				fmt.Fprintf(ctx.Stdout, "  %d. %s - %s - %s\n", i+1, *item.state.Goal, item.tag, item.state.Note)
@@ -197,7 +197,7 @@ func InteractiveUpdate(ctx *AppContext) error {
 					Goal:    item.state.Goal,
 					Note:    note,
 					Blocked: isBlocked,
-					Thread:  &tag,
+					Task:    &tag,
 				}, ctx.EncryptionKey); err != nil {
 					return err
 				}
@@ -205,9 +205,9 @@ func InteractiveUpdate(ctx *AppContext) error {
 		}
 	}
 
-	display.Section("New threads", ctx.Stdout, ctx.IsTTY)
+	display.Section("New tasks", ctx.Stdout, ctx.IsTTY)
 
-	wantNew, err := ynPrompt("Have you started any new threads you want to log? (y/n) ", r, ctx.Stdout, ctx.IsTTY)
+	wantNew, err := ynPrompt("Have you started any new tasks you want to log? (y/n) ", r, ctx.Stdout, ctx.IsTTY)
 	if err != nil {
 		return err
 	}
@@ -223,7 +223,7 @@ func InteractiveUpdate(ctx *AppContext) error {
 
 		var existing []string
 		if goalID != "" {
-			existing, err = journal.CollectThreads(ctx.DataDir, goalID, ctx.EncryptionKey)
+			existing, err = journal.CollectTasks(ctx.DataDir, goalID, ctx.EncryptionKey)
 			if err != nil {
 				return err
 			}
@@ -235,9 +235,9 @@ func InteractiveUpdate(ctx *AppContext) error {
 				for i, t := range existing {
 					fmt.Fprintf(ctx.Stdout, "  %d. %s\n", i+1, t)
 				}
-				fmt.Fprint(ctx.Stdout, display.Bold("Thread? (number to continue, new #hashtag, or blank to skip) ", ctx.IsTTY))
+				fmt.Fprint(ctx.Stdout, display.Bold("Task? (number to continue, new #hashtag, or blank to skip) ", ctx.IsTTY))
 			} else {
-				fmt.Fprint(ctx.Stdout, display.Bold("Thread? (#hashtag or blank to skip) ", ctx.IsTTY))
+				fmt.Fprint(ctx.Stdout, display.Bold("Task? (#hashtag or blank to skip) ", ctx.IsTTY))
 			}
 
 			answer, err := readLine(r)
@@ -256,7 +256,7 @@ func InteractiveUpdate(ctx *AppContext) error {
 					break
 				}
 			}
-			if goals.ValidThreadTag(answer) {
+			if goals.ValidTaskTag(answer) {
 				tag = answer
 				break
 			}
@@ -284,13 +284,13 @@ func InteractiveUpdate(ctx *AppContext) error {
 				Goal:    goalPtr,
 				Note:    note,
 				Blocked: isBlocked,
-				Thread:  &tag,
+				Task:    &tag,
 			}, ctx.EncryptionKey); err != nil {
 				return err
 			}
 		}
 
-		more, err := ynPrompt("Log another new thread? (y/n) ", r, ctx.Stdout, ctx.IsTTY)
+		more, err := ynPrompt("Log another new task? (y/n) ", r, ctx.Stdout, ctx.IsTTY)
 		if err != nil {
 			return err
 		}

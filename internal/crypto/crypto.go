@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"goalie/internal/goalieenv"
 )
 
 var errCiphertextTooShort = errors.New("ciphertext too short")
@@ -102,11 +104,11 @@ func VerifyKeyCheck(path string, key []byte) (bool, error) {
 }
 
 func DefaultKeyPath() (string, error) {
-	home, err := os.UserHomeDir()
+	home, err := goalieenv.Home()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".goalie", "encryption.key"), nil
+	return filepath.Join(home, "encryption.key"), nil
 }
 
 func LoadKey() ([]byte, error) {

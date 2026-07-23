@@ -5,6 +5,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+
+	"goalie/internal/goalieenv"
 )
 
 type Config struct {
@@ -14,11 +16,11 @@ type Config struct {
 var ErrNotInitialised = errors.New("goalie not initialised: run 'goalie init <repo-url>' first")
 
 func Load() (*Config, error) {
-	home, err := os.UserHomeDir()
+	home, err := goalieenv.Home()
 	if err != nil {
 		return nil, err
 	}
-	return LoadFrom(filepath.Join(home, ".goalie", "config.json"))
+	return LoadFrom(filepath.Join(home, "config.json"))
 }
 
 func LoadFrom(path string) (*Config, error) {
@@ -37,11 +39,11 @@ func LoadFrom(path string) (*Config, error) {
 }
 
 func Save(cfg *Config) error {
-	home, err := os.UserHomeDir()
+	home, err := goalieenv.Home()
 	if err != nil {
 		return err
 	}
-	return SaveTo(filepath.Join(home, ".goalie", "config.json"), cfg)
+	return SaveTo(filepath.Join(home, "config.json"), cfg)
 }
 
 func SaveTo(path string, cfg *Config) error {

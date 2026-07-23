@@ -155,7 +155,7 @@ func Status(ctx AppContext) error {
 
 	now := time.Now().UTC()
 	for _, u := range users {
-		display.Section(u, ctx.Stdout, ctx.IsTTY)
+		display.Section("@"+u, ctx.Stdout, ctx.IsTTY)
 		ues := byUser[u]
 		sort.Slice(ues, func(i, j int) bool {
 			if ues[i].Blocked != ues[j].Blocked {

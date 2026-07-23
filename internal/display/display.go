@@ -30,6 +30,10 @@ func Green(s string, tty bool) string {
 	return "\033[32m" + s + "\033[0m"
 }
 
+func Username(name string, tty bool) string {
+	return Bold("@"+name, tty)
+}
+
 func Section(title string, w io.Writer, tty bool) {
 	const width = 44
 	dashes := strings.Repeat("─", max(0, width-len(title)-4))
@@ -44,9 +48,9 @@ func FormatEntry(e journal.Entry, now time.Time, tty bool) string {
 		taskPart = *e.Task + " "
 	}
 	if e.Blocked {
-		return Red("[BLOCKED]", tty) + " " + e.Username + " " + taskPart + e.Note + " - " + age
+		return Red("[BLOCKED]", tty) + " " + Username(e.Username, tty) + " " + taskPart + e.Note + " - " + age
 	}
-	return e.Username + " " + taskPart + e.Note + " - " + age
+	return Username(e.Username, tty) + " " + taskPart + e.Note + " - " + age
 }
 
 func FormatStatusEntry(e journal.Entry, now time.Time, tty bool) string {

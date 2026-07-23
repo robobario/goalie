@@ -53,4 +53,5 @@ goalie summary [--days N] [--user NAME|GLOB]
                                     # Your entries for the last N days (default 7); --user '*' for everyone
 goalie status                       # Morning standup view: latest entry per user×goal×thread, last 7 days
 goalie update                       # Interactive end-of-day review: update threads, log new activity
+goalie --version                    # Print version and exit
 ```

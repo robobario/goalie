@@ -15,6 +15,8 @@ import (
 	"goalie/internal/tui"
 )
 
+var version = "dev"
+
 func requireKey(keyErr error, fn func(*cobra.Command, []string) error) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		if keyErr != nil {
@@ -53,6 +55,7 @@ func main() {
 	root := &cobra.Command{
 		Use:           "goalie",
 		Short:         "Team goal and blocker tracker",
+		Version:       version,
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {

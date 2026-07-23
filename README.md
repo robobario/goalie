@@ -54,6 +54,8 @@ The key is verified against `key-check.enc` before being saved. Invalid format o
 
 To replace a key, use `goalie key init` (generates a new key) or `goalie key import <hex>` (imports an existing one). Both commands warn you if a key file already exists, since replacing it will prevent you from decrypting data written under the old key.
 
+By default goalie stores all data under `~/.goalie`. Set the `GOALIE_HOME` environment variable to use a different directory.
+
 To keep goalie up to date, replace the binary with a newer build.
 
 ## Usage

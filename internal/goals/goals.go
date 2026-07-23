@@ -1,6 +1,9 @@
 package goals
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"os"
@@ -34,8 +37,16 @@ type Goal struct {
 	Created     string `json:"created"`
 }
 
-func goalPath(dataDir, id string) string {
-	return filepath.Join(dataDir, "goals", id+".json")
+// GoalFilename returns the HMAC-SHA256 derived filename for a goal, so the
+// goal ID is never written to disk or exposed in git history.
+func GoalFilename(key []byte, id string) string {
+	mac := hmac.New(sha256.New, key)
+	mac.Write([]byte(id))
+	return hex.EncodeToString(mac.Sum(nil)) + ".json"
+}
+
+func goalPath(dataDir string, key []byte, id string) string {
+	return filepath.Join(dataDir, "goals", GoalFilename(key, id))
 }
 
 func Add(dataDir string, r git.Runner, id, description string, key []byte) error {
@@ -43,7 +54,7 @@ func Add(dataDir string, r git.Runner, id, description string, key []byte) error
 		return err
 	}
 
-	path := goalPath(dataDir, id)
+	path := goalPath(dataDir, key, id)
 	if _, err := os.Stat(path); err == nil {
 		return ErrGoalExists
 	}
@@ -70,11 +81,11 @@ func Add(dataDir string, r git.Runner, id, description string, key []byte) error
 		return err
 	}
 
-	rel := "goals/" + id + ".json"
+	rel := "goals/" + GoalFilename(key, id)
 	if err := r.Run([]string{"add", rel}, dataDir); err != nil {
 		return err
 	}
-	if err := r.Run([]string{"commit", "-m", "feat: add goal " + id}, dataDir); err != nil {
+	if err := r.Run([]string{"commit", "-m", "goals: add goal"}, dataDir); err != nil {
 		return err
 	}
 	return git.Push(r, dataDir)
@@ -85,7 +96,7 @@ func Close(dataDir string, r git.Runner, id string, key []byte) error {
 		return err
 	}
 
-	path := goalPath(dataDir, id)
+	path := goalPath(dataDir, key, id)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -120,11 +131,11 @@ func Close(dataDir string, r git.Runner, id string, key []byte) error {
 		return err
 	}
 
-	rel := "goals/" + id + ".json"
+	rel := "goals/" + GoalFilename(key, id)
 	if err := r.Run([]string{"add", rel}, dataDir); err != nil {
 		return err
 	}
-	if err := r.Run([]string{"commit", "-m", "feat: close goal " + id}, dataDir); err != nil {
+	if err := r.Run([]string{"commit", "-m", "goals: close goal"}, dataDir); err != nil {
 		return err
 	}
 	return git.Push(r, dataDir)
@@ -164,10 +175,11 @@ func List(dataDir string, key []byte) ([]Goal, error) {
 		}
 		goals = append(goals, g)
 	}
+	sort.Slice(goals, func(i, j int) bool { return goals[i].ID < goals[j].ID })
 	return goals, nil
 }
 
-func Exists(dataDir, id string) bool {
-	_, err := os.Stat(goalPath(dataDir, id))
+func Exists(dataDir, id string, key []byte) bool {
+	_, err := os.Stat(goalPath(dataDir, key, id))
 	return err == nil
 }

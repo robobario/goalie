@@ -98,7 +98,7 @@ func Log(ctx AppContext, note, goalID string, blocked bool, thread string) error
 		fmt.Fprintf(ctx.Stderr, "Thread tag '%s' is invalid — use #lowercase, e.g. #impl\n", thread)
 		return &ExitError{Code: 1}
 	}
-	if goalID != "" && !goals.Exists(ctx.DataDir, goalID) {
+	if goalID != "" && !goals.Exists(ctx.DataDir, goalID, ctx.EncryptionKey) {
 		fmt.Fprintf(ctx.Stderr, "Goal '%s' does not exist\n", goalID)
 		return &ExitError{Code: 1}
 	}

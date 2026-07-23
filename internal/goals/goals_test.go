@@ -34,7 +34,7 @@ func writeGoal(t *testing.T, dir, id string, g goals.Goal, key []byte) {
 	if err := os.MkdirAll(goalsDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(goalsDir, id+".json"), encrypted, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(goalsDir, goals.GoalFilename(key, id)), encrypted, 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -66,7 +66,7 @@ func TestAdd(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		g := readGoal(t, filepath.Join(dir, "goals", "MY_GOAL.json"), key)
+		g := readGoal(t, filepath.Join(dir, "goals", goals.GoalFilename(key, "MY_GOAL")), key)
 		if g.ID != "MY_GOAL" {
 			t.Errorf("id: got %q, want %q", g.ID, "MY_GOAL")
 		}
@@ -124,6 +124,52 @@ func TestAdd(t *testing.T) {
 		}
 	})
 
+	t.Run("filename does not contain the goal ID", func(t *testing.T) {
+		dir := t.TempDir()
+		r := &git.FakeRunner{}
+		key := testKey(t)
+
+		if err := goals.Add(dir, r, "SECRET_GOAL", "sensitive", key); err != nil {
+			t.Fatal(err)
+		}
+
+		entries, err := os.ReadDir(filepath.Join(dir, "goals"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, e := range entries {
+			if e.Name() == ".gitkeep" {
+				continue
+			}
+			if filepath.Ext(e.Name()) == ".json" && len(e.Name()) > 5 {
+				name := e.Name()[:len(e.Name())-5]
+				if name == "SECRET_GOAL" {
+					t.Errorf("goal ID exposed in filename: %s", e.Name())
+				}
+			}
+		}
+	})
+
+	t.Run("commit message does not contain the goal ID", func(t *testing.T) {
+		dir := t.TempDir()
+		r := &git.FakeRunner{}
+		key := testKey(t)
+
+		if err := goals.Add(dir, r, "SECRET_GOAL", "sensitive", key); err != nil {
+			t.Fatal(err)
+		}
+
+		for _, call := range r.Calls {
+			if len(call) > 1 && call[0] == "commit" {
+				for _, arg := range call[1:] {
+					if arg == "SECRET_GOAL" {
+						t.Errorf("goal ID exposed in commit args: %v", call)
+					}
+				}
+			}
+		}
+	})
+
 	t.Run("ValidGoalID rejects lowercase", func(t *testing.T) {
 		if goals.ValidGoalID("my-goal") {
 			t.Error("expected false for my-goal")
@@ -156,7 +202,7 @@ func TestClose(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		g := readGoal(t, filepath.Join(dir, "goals", "MY_GOAL.json"), key)
+		g := readGoal(t, filepath.Join(dir, "goals", goals.GoalFilename(key, "MY_GOAL")), key)
 		if g.State != "closed" {
 			t.Errorf("state: got %q, want %q", g.State, "closed")
 		}
@@ -221,7 +267,7 @@ func TestClose(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	t.Run("returns goals sorted by filename", func(t *testing.T) {
+	t.Run("returns goals sorted by ID", func(t *testing.T) {
 		dir := t.TempDir()
 		key := testKey(t)
 		writeGoal(t, dir, "BETA", goals.Goal{ID: "BETA", Description: "Beta work", State: "closed"}, key)

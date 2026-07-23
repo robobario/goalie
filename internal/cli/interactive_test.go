@@ -13,6 +13,7 @@ import (
 	"goalie/internal/cli"
 	"goalie/internal/crypto"
 	"goalie/internal/git"
+	"goalie/internal/goals"
 )
 
 func newInteractiveCtx(t *testing.T, input string) (cli.AppContext, *bytes.Buffer, *bytes.Buffer) {
@@ -61,7 +62,7 @@ func addOpenGoal(t *testing.T, dataDir, id string, key []byte) {
 	if err := os.MkdirAll(goalsDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeGoalJSON(t, filepath.Join(goalsDir, id+".json"), map[string]any{
+	writeGoalJSON(t, filepath.Join(goalsDir, goals.GoalFilename(key, id)), map[string]any{
 		"id": id, "description": id + " desc", "state": "open", "created": "2026-01-01T00:00:00+00:00",
 	}, key)
 }
@@ -72,7 +73,7 @@ func addClosedGoal(t *testing.T, dataDir, id string, key []byte) {
 	if err := os.MkdirAll(goalsDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeGoalJSON(t, filepath.Join(goalsDir, id+".json"), map[string]any{
+	writeGoalJSON(t, filepath.Join(goalsDir, goals.GoalFilename(key, id)), map[string]any{
 		"id": id, "description": id + " desc", "state": "closed", "created": "2026-01-01T00:00:00+00:00",
 	}, key)
 }

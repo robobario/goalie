@@ -2,7 +2,7 @@ Goalie helps a remote team of open source developers share their goals and surfa
 
 ## How it works
 
-Add shared goals, then create threads of work using hashtags. Log updates to show whether you are blocked or making progress. Run `goalie` with no arguments to open the TUI — a two-tab interface showing team activity and a guided end-of-day update flow.
+Add shared goals, then create tasks using hashtags. Log updates to show whether you are blocked or making progress. Run `goalie` with no arguments to open the TUI — a two-tab interface showing team activity and a guided end-of-day update flow.
 
 ## Installation
 
@@ -66,12 +66,12 @@ goalie init <repo-url>              # Clone or create the data branch; prompts f
 goalie goal add <ID> <DESCRIPTION>  # Create a new open goal
 goalie goal close <ID>              # Mark a goal as closed
 goalie goal list                    # List all goals with their state
-goalie log [note] [--goal ID] [--thread TAG] [--blocked]
+goalie log [note] [--goal ID] [--task TAG] [--blocked]
                                     # Append a journal entry; interactive if note is omitted
 goalie summary [--days N] [--user NAME|GLOB]
                                     # Your entries for the last N days (default 7); --user '*' for everyone
-goalie status                       # Morning standup view: latest entry per user×goal×thread, last 7 days
-goalie update                       # Interactive end-of-day review: update threads, log new activity
+goalie status                       # Morning standup view: latest entry per user×goal×task, last 7 days
+goalie update                       # Interactive end-of-day review: update tasks, log new activity
 goalie --version                    # Print version and exit
 ```
 
@@ -79,5 +79,5 @@ goalie --version                    # Print version and exit
 
 Running `goalie` opens a terminal interface with two tabs (switch with Tab / Shift-Tab):
 
-- **Activity** — shows the latest entry per person per thread across the last 30 days. Start typing to filter by note, goal, or thread tag.
-- **Update** — walks you through blocked threads, recent threads, and lets you log new activity. Press `q` to quit.
+- **Activity** — shows the latest entry per person per task across the last 30 days. Start typing to filter by note, goal, or task tag.
+- **Update** — walks you through blocked tasks, recent tasks, and lets you log new activity. Press `q` to quit.

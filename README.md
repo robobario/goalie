@@ -35,15 +35,23 @@ This clones (or connects to) the `data` branch of the repo into `~/.goalie/data`
 
 **Encryption** is optional. Use it when the repository is public or semi-public and you don't want goal descriptions or journal entries readable without a key. On a private enterprise repository the repo itself provides access control, so you can skip encryption. The choice is stored in the data branch so all team members share the same setting.
 
-If you enable encryption, each team member needs a key before they can read or write data:
+If you enable encryption, `goalie init` handles key setup for the first user: it reuses an existing local key if you have one, or generates a new one. Either way it prints the hex key and commits a `key-check.enc` sentinel to the data branch:
+
+```
+Encryption key: a1b2c3...
+Share with teammates: goalie key import <key>
+key-check.enc committed to the data branch — teammates must import the same key.
+```
+
+Each teammate imports the shared key before running any other command:
 
 ```sh
-# Generate a new key (prints the hex value — share it securely with teammates)
-goalie key init
-
-# Or import an existing key shared by a teammate
 goalie key import <hex-key>
 ```
+
+Running `goalie init` after importing will verify the key against `key-check.enc` and confirm with a green message. A mismatch produces a warning so you can correct it before writing any data.
+
+To replace a key, use `goalie key init` (generates a new key) or `goalie key import <hex>` (imports an existing one). Both commands warn you if a key file already exists, since replacing it will prevent you from decrypting data written under the old key.
 
 To keep goalie up to date, replace the binary with a newer build.
 

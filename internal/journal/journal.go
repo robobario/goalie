@@ -13,11 +13,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"goalie/internal/crypto"
 	"goalie/internal/git"
 )
 
 type Entry struct {
+	ID       string  `json:"id"`
 	TS       string  `json:"ts"`
 	Goal     *string `json:"goal"`
 	Note     string  `json:"note"`
@@ -84,6 +86,7 @@ func Append(dataDir string, r git.Runner, username string, e Entry, key []byte) 
 	}
 
 	now := time.Now().UTC()
+	e.ID = uuid.New().String()
 	e.TS = now.Format(time.RFC3339)
 
 	fname := weekFileName(username, now)
@@ -124,9 +127,14 @@ func Append(dataDir string, r git.Runner, username string, e Entry, key []byte) 
 	return git.Push(r, dataDir)
 }
 
-// UpdateEntry replaces the entry identified by original.TS in-place within its weekly
-// JSONL file, then commits and pushes. Returns an error if no matching entry is found.
+// UpdateEntry replaces the entry identified by original.ID in-place within its weekly
+// JSONL file (the week is located via original.TS), then commits and pushes.
+// Returns an error if original.ID is empty or no matching entry is found.
 func UpdateEntry(dataDir string, r git.Runner, username string, original, updated Entry, key []byte) error {
+	if original.ID == "" {
+		return fmt.Errorf("entry has no ID")
+	}
+
 	if err := r.Run([]string{"pull"}, dataDir); err != nil {
 		return err
 	}
@@ -157,7 +165,7 @@ func UpdateEntry(dataDir string, r git.Runner, username string, original, update
 			continue
 		}
 		var e Entry
-		if jsonErr := json.Unmarshal([]byte(line), &e); jsonErr == nil && e.TS == original.TS {
+		if jsonErr := json.Unmarshal([]byte(line), &e); jsonErr == nil && e.ID == original.ID {
 			updatedLine, marshalErr := json.Marshal(updated)
 			if marshalErr != nil {
 				return marshalErr
@@ -173,7 +181,7 @@ func UpdateEntry(dataDir string, r git.Runner, username string, original, update
 		return err
 	}
 	if !replaced {
-		return fmt.Errorf("entry with timestamp %q not found in %s", original.TS, fname)
+		return fmt.Errorf("entry with ID %q not found in %s", original.ID, fname)
 	}
 
 	encrypted, err := crypto.Encrypt(key, buf.Bytes())

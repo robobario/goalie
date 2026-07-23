@@ -63,6 +63,7 @@ func main() {
 
 	var logGoal string
 	var logBlocked bool
+	var logDone bool
 	var logTask string
 	var summaryDays int
 	var summaryUser string
@@ -103,11 +104,12 @@ func main() {
 			if len(args) > 0 {
 				note = args[0]
 			}
-			return cli.Log(ctx, note, logGoal, logBlocked, logTask)
+			return cli.Log(ctx, note, logGoal, logBlocked, logDone, logTask)
 		}),
 	}
 	logCmd.Flags().StringVar(&logGoal, "goal", "", "Goal ID to associate with this entry")
 	logCmd.Flags().BoolVar(&logBlocked, "blocked", false, "Mark this entry as blocked")
+	logCmd.Flags().BoolVar(&logDone, "done", false, "Mark the task as done")
 	logCmd.Flags().StringVar(&logTask, "task", "", "Task tag to associate with this entry")
 
 	statusCmd := &cobra.Command{

@@ -141,6 +141,41 @@ func TestGoalAddInvalidIDLowercaseExitsNonzero(t *testing.T) {
 
 // Status
 
+func TestStatusHidesDoneEntries(t *testing.T) {
+	ctx, stdout, _ := newCtx(t)
+
+	journalDir := filepath.Join(ctx.DataDir, "journal")
+	os.MkdirAll(journalDir, 0o755)
+	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("alice")), []jsonlEntry{
+		{"ts": ts(-2), "note": "in progress", "task": "#impl", "goal": "ROUTING", "blocked": false, "done": false},
+		{"ts": ts(-1), "note": "all done", "task": "#impl", "goal": "ROUTING", "blocked": false, "done": true},
+	}, ctx.EncryptionKey)
+
+	if err := cli.Status(ctx); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(stdout.String(), "all done") {
+		t.Errorf("expected done entry to be hidden from status:\n%s", stdout.String())
+	}
+}
+
+func TestStatusShowsNonDoneEntries(t *testing.T) {
+	ctx, stdout, _ := newCtx(t)
+
+	journalDir := filepath.Join(ctx.DataDir, "journal")
+	os.MkdirAll(journalDir, 0o755)
+	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("alice")), []jsonlEntry{
+		{"ts": ts(-1), "note": "still going", "task": "#impl", "goal": "ROUTING", "blocked": false, "done": false},
+	}, ctx.EncryptionKey)
+
+	if err := cli.Status(ctx); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "still going") {
+		t.Errorf("expected non-done entry in status:\n%s", stdout.String())
+	}
+}
+
 func TestStatusEntriesWithinWindowAreShown(t *testing.T) {
 	ctx, stdout, _ := newCtx(t)
 

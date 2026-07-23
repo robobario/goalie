@@ -83,13 +83,13 @@ func GoalList(ctx AppContext) error {
 	return nil
 }
 
-func Log(ctx AppContext, note, goalID string, blocked bool, task string) error {
+func Log(ctx AppContext, note, goalID string, blocked, done bool, task string) error {
 	if err := requireDataDir(ctx); err != nil {
 		return err
 	}
 	if note == "" {
 		var err error
-		note, goalID, task, blocked, err = InteractiveLog(&ctx)
+		note, goalID, task, blocked, done, err = InteractiveLog(&ctx)
 		if err != nil {
 			return err
 		}
@@ -122,6 +122,7 @@ func Log(ctx AppContext, note, goalID string, blocked bool, task string) error {
 		Goal:    goalPtr,
 		Note:    note,
 		Blocked: blocked,
+		Done:    done,
 		Task:    taskPtr,
 	}, ctx.EncryptionKey)
 }
@@ -141,6 +142,9 @@ func Status(ctx AppContext) error {
 
 	byUser := make(map[string][]journal.Entry)
 	for _, e := range entries {
+		if e.Done {
+			continue
+		}
 		byUser[e.Username] = append(byUser[e.Username], e)
 	}
 

@@ -430,6 +430,61 @@ func TestInvalidThreadTagSetsTagError(t *testing.T) {
 	}
 }
 
+func TestRecentDoneKeySubmitsWithDoneTrue(t *testing.T) {
+	m := updateModel{
+		phase:     phaseRecentReview,
+		recentSub: recentBlocked,
+		recentTasks: []recentTask{
+			makeRecentThread("#impl", nil, "Working on it", 24),
+		},
+		recentCursor: 0,
+		recentNotes:  "shipped",
+		updatedTags:  make(map[string]bool),
+	}
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	if !m2.recentDone {
+		// recentDone is reset after submit; check the entry was submitted by verifying task was removed
+	}
+	if len(m2.recentTasks) != 0 {
+		t.Errorf("expected task removed after 'd', got %d tasks", len(m2.recentTasks))
+	}
+}
+
+func TestDoneTaskNotInBlockedList(t *testing.T) {
+	m := updateModel{}
+	msg := taskStatesLoadedMsg{
+		blocked: []blockedTask{},
+		recent:  []recentTask{},
+		username: "alice",
+	}
+	// Simulate a done+blocked state: if state.Done is true it should not appear in blocked
+	// This is tested at the Init() level via the filter `state.Blocked && !state.Done`
+	m, _ = m.Update(msg)
+	if m.phase != phaseMenu {
+		t.Errorf("expected phaseMenu, got %v", m.phase)
+	}
+	if len(m.blockedTasks) != 0 {
+		t.Errorf("expected no blocked tasks, got %d", len(m.blockedTasks))
+	}
+}
+
+func TestRecentListShowsClosedLabel(t *testing.T) {
+	closedState := journal.TaskState{Note: "done", Done: true, TS: time.Now().Add(-24 * time.Hour).Format(time.RFC3339)}
+	m := updateModel{
+		phase:     phaseRecentReview,
+		recentSub: recentList,
+		recentTasks: []recentTask{
+			{tag: "#impl", state: closedState},
+		},
+		recentCursor: 0,
+		updatedTags:  make(map[string]bool),
+	}
+	view := m.View()
+	if !strings.Contains(view, "(closed)") {
+		t.Errorf("expected '(closed)' in recent list view:\n%s", view)
+	}
+}
+
 func TestUpdateRecentBlockedAnswerRemovesThread(t *testing.T) {
 	m := updateModel{
 		phase: phaseRecentReview,

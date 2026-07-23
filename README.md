@@ -66,8 +66,9 @@ goalie init <repo-url>              # Clone or create the data branch; prompts f
 goalie goal add <ID> <DESCRIPTION>  # Create a new open goal
 goalie goal close <ID>              # Mark a goal as closed
 goalie goal list                    # List all goals with their state
-goalie log [note] [--goal ID] --task TAG [--blocked]
+goalie log [note] [--goal ID] --task TAG [--blocked] [--done]
                                     # Append a journal entry; interactive if note is omitted. --task is required.
+                                    # --done marks the task closed (hidden from status until a regular entry re-opens it)
 goalie summary [--days N] [--user NAME|GLOB]
                                     # Entries grouped as stories per goal/task/user, last N days (default 7)
 goalie status                       # Morning standup view: latest entry per user×goal×task, last 7 days

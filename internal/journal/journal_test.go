@@ -191,6 +191,42 @@ func TestCurrentThreadStates(t *testing.T) {
 			t.Error("expected only #foo")
 		}
 	})
+
+	t.Run("done flag captured in state", func(t *testing.T) {
+		dir := t.TempDir()
+		key := testKey()
+		path := filepath.Join(dir, currentWeekFile("alice"))
+		writeEncryptedEntries(t, path, []journal.Entry{
+			{TS: "2026-01-01T00:00:00Z", Note: "some work", Task: strPtr("#foo"), Blocked: false},
+			{TS: "2026-01-02T00:00:00Z", Note: "all done", Task: strPtr("#foo"), Done: true},
+		}, key)
+
+		states, err := journal.CurrentTaskStates(dir, "alice", key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !states["#foo"].Done {
+			t.Error("expected Done=true for #foo after closing entry")
+		}
+	})
+
+	t.Run("regular entry after done re-opens task", func(t *testing.T) {
+		dir := t.TempDir()
+		key := testKey()
+		path := filepath.Join(dir, currentWeekFile("alice"))
+		writeEncryptedEntries(t, path, []journal.Entry{
+			{TS: "2026-01-01T00:00:00Z", Note: "done", Task: strPtr("#foo"), Done: true},
+			{TS: "2026-01-02T00:00:00Z", Note: "reopened", Task: strPtr("#foo"), Done: false},
+		}, key)
+
+		states, err := journal.CurrentTaskStates(dir, "alice", key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if states["#foo"].Done {
+			t.Error("expected Done=false after regular entry re-opens the task")
+		}
+	})
 }
 
 func TestAppend(t *testing.T) {

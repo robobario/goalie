@@ -183,6 +183,12 @@ func hasBlocked(entries []journal.Entry) bool {
 	return false
 }
 
+type summaryGroupKey struct {
+	goal     string
+	task     string
+	username string
+}
+
 func Summary(ctx AppContext, days int, user string) error {
 	if err := requireDataDir(ctx); err != nil {
 		return err
@@ -209,9 +215,46 @@ func Summary(ctx AppContext, days int, user string) error {
 		fmt.Fprintf(ctx.Stdout, "No entries in the last %d days.\n", days)
 		return nil
 	}
-	now := time.Now().UTC()
+
+	groups := make(map[summaryGroupKey][]journal.Entry)
 	for _, e := range entries {
-		fmt.Fprintln(ctx.Stdout, display.FormatEntry(e, now, ctx.IsTTY))
+		task := ""
+		if e.Task != nil {
+			task = *e.Task
+		}
+		goal := "(no goal)"
+		if e.Goal != nil {
+			goal = *e.Goal
+		}
+		k := summaryGroupKey{goal: goal, task: task, username: e.Username}
+		groups[k] = append(groups[k], e)
+	}
+
+	// Sort groups by most-recent entry timestamp, newest first.
+	keys := make([]summaryGroupKey, 0, len(groups))
+	for k := range groups {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		latestI := groups[keys[i]][len(groups[keys[i]])-1].TS
+		latestJ := groups[keys[j]][len(groups[keys[j]])-1].TS
+		if latestI != latestJ {
+			return latestI > latestJ
+		}
+		return keys[i].goal < keys[j].goal
+	})
+
+	now := time.Now().UTC()
+	for gi, k := range keys {
+		if gi > 0 {
+			fmt.Fprintln(ctx.Stdout)
+		}
+		fmt.Fprintln(ctx.Stdout, display.FormatSummaryHeader(k.goal, k.task, k.username, ctx.IsTTY))
+		prevBlocked := false
+		for _, e := range groups[k] {
+			fmt.Fprintln(ctx.Stdout, display.FormatSummaryEntry(e, prevBlocked, now, ctx.IsTTY))
+			prevBlocked = e.Blocked
+		}
 	}
 	return nil
 }

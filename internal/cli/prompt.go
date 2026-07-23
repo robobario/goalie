@@ -98,8 +98,8 @@ func SelectGoal(dataDir string, key []byte, r io.Reader, w io.Writer, tty bool) 
 	}
 }
 
-// InteractiveLog ports _interactive_log: prompts for goal, task, blocked, note.
-func InteractiveLog(ctx *AppContext) (note, goalID, task string, blocked bool, err error) {
+// InteractiveLog ports _interactive_log: prompts for goal, task, blocked, done, note.
+func InteractiveLog(ctx *AppContext) (note, goalID, task string, blocked, done bool, err error) {
 	r := bufio.NewReader(ctx.Stdin)
 
 	goalID, err = SelectGoal(ctx.DataDir, ctx.EncryptionKey, r, ctx.Stdout, ctx.IsTTY)
@@ -144,6 +144,11 @@ func InteractiveLog(ctx *AppContext) (note, goalID, task string, blocked bool, e
 	}
 
 	blocked, err = ynPrompt("Are you blocked? (y/n) ", r, ctx.Stdout, ctx.IsTTY)
+	if err != nil {
+		return
+	}
+
+	done, err = ynPrompt("Mark as done? (y/n) ", r, ctx.Stdout, ctx.IsTTY)
 	if err != nil {
 		return
 	}

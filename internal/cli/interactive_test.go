@@ -113,9 +113,9 @@ func appendJournalEntries(t *testing.T, dataDir, username string, entries []map[
 }
 
 func TestInteractiveNoGoalsNotBlocked(t *testing.T) {
-	ctx, _, _ := newInteractiveCtx(t, "#refactor\nn\nRefactoring auth\n")
+	ctx, _, _ := newInteractiveCtx(t, "#refactor\nn\nn\nRefactoring auth\n")
 
-	if err := cli.Log(ctx, "", "", false, ""); err != nil {
+	if err := cli.Log(ctx, "", "", false, false, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -135,10 +135,10 @@ func TestInteractiveNoGoalsNotBlocked(t *testing.T) {
 }
 
 func TestInteractiveWithGoalAndBlocked(t *testing.T) {
-	ctx, _, _ := newInteractiveCtx(t, "1\n#impl\ny\nRefactoring auth\n")
+	ctx, _, _ := newInteractiveCtx(t, "1\n#impl\ny\nn\nRefactoring auth\n")
 	addOpenGoal(t, ctx.DataDir, "AUTH_REWORK", ctx.EncryptionKey)
 
-	if err := cli.Log(ctx, "", "", false, ""); err != nil {
+	if err := cli.Log(ctx, "", "", false, false, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -155,10 +155,10 @@ func TestInteractiveWithGoalAndBlocked(t *testing.T) {
 }
 
 func TestInteractiveClosedGoalsNotOffered(t *testing.T) {
-	ctx, _, _ := newInteractiveCtx(t, "#mytask\nn\nSome work\n")
+	ctx, _, _ := newInteractiveCtx(t, "#mytask\nn\nn\nSome work\n")
 	addClosedGoal(t, ctx.DataDir, "CLOSED_GOAL", ctx.EncryptionKey)
 
-	if err := cli.Log(ctx, "", "", false, ""); err != nil {
+	if err := cli.Log(ctx, "", "", false, false, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -169,10 +169,10 @@ func TestInteractiveClosedGoalsNotOffered(t *testing.T) {
 }
 
 func TestInteractiveGoalBlankSkip(t *testing.T) {
-	ctx, _, _ := newInteractiveCtx(t, "\n#mytask\nn\nSome work\n")
+	ctx, _, _ := newInteractiveCtx(t, "\n#mytask\nn\nn\nSome work\n")
 	addOpenGoal(t, ctx.DataDir, "SOME_GOAL", ctx.EncryptionKey)
 
-	if err := cli.Log(ctx, "", "", false, ""); err != nil {
+	if err := cli.Log(ctx, "", "", false, false, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -183,14 +183,14 @@ func TestInteractiveGoalBlankSkip(t *testing.T) {
 }
 
 func TestInteractiveExistingThreadsOffered(t *testing.T) {
-	ctx, stdout, _ := newInteractiveCtx(t, "1\n1\nn\nSome work\n")
+	ctx, stdout, _ := newInteractiveCtx(t, "1\n1\nn\nn\nSome work\n")
 	addOpenGoal(t, ctx.DataDir, "AUTH_REWORK", ctx.EncryptionKey)
 	appendJournalEntries(t, ctx.DataDir, "testuser", []map[string]any{
 		{"ts": "2026-01-01T00:00:00+00:00", "goal": "AUTH_REWORK", "note": "a", "blocked": false, "task": "#impl"},
 		{"ts": "2026-01-01T00:00:01+00:00", "goal": "AUTH_REWORK", "note": "b", "blocked": false, "task": "#tests"},
 	}, ctx.EncryptionKey)
 
-	if err := cli.Log(ctx, "", "", false, ""); err != nil {
+	if err := cli.Log(ctx, "", "", false, false, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -211,10 +211,10 @@ func TestInteractiveExistingThreadsOffered(t *testing.T) {
 }
 
 func TestInteractiveNewHashtag(t *testing.T) {
-	ctx, _, _ := newInteractiveCtx(t, "1\n#new-thing\nn\nSome work\n")
+	ctx, _, _ := newInteractiveCtx(t, "1\n#new-thing\nn\nn\nSome work\n")
 	addOpenGoal(t, ctx.DataDir, "AUTH_REWORK", ctx.EncryptionKey)
 
-	if err := cli.Log(ctx, "", "", false, ""); err != nil {
+	if err := cli.Log(ctx, "", "", false, false, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -226,10 +226,10 @@ func TestInteractiveNewHashtag(t *testing.T) {
 
 func TestInteractiveTaskRequired(t *testing.T) {
 	// blank is not accepted; the prompt loops until a valid tag is given
-	ctx, _, _ := newInteractiveCtx(t, "1\n\n#impl\nn\nSome work\n")
+	ctx, _, _ := newInteractiveCtx(t, "1\n\n#impl\nn\nn\nSome work\n")
 	addOpenGoal(t, ctx.DataDir, "AUTH_REWORK", ctx.EncryptionKey)
 
-	if err := cli.Log(ctx, "", "", false, ""); err != nil {
+	if err := cli.Log(ctx, "", "", false, false, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -240,7 +240,7 @@ func TestInteractiveTaskRequired(t *testing.T) {
 }
 
 func TestInteractiveThreadsFromOtherGoalsNotOffered(t *testing.T) {
-	ctx, stdout, _ := newInteractiveCtx(t, "1\n1\nn\nSome work\n")
+	ctx, stdout, _ := newInteractiveCtx(t, "1\n1\nn\nn\nSome work\n")
 	addOpenGoal(t, ctx.DataDir, "GOAL_A", ctx.EncryptionKey)
 	addOpenGoal(t, ctx.DataDir, "GOAL_B", ctx.EncryptionKey)
 	appendJournalEntries(t, ctx.DataDir, "testuser", []map[string]any{
@@ -248,7 +248,7 @@ func TestInteractiveThreadsFromOtherGoalsNotOffered(t *testing.T) {
 		{"ts": "2026-01-01T00:00:01+00:00", "goal": "GOAL_B", "note": "b", "blocked": false, "task": "#docs"},
 	}, ctx.EncryptionKey)
 
-	if err := cli.Log(ctx, "", "", false, ""); err != nil {
+	if err := cli.Log(ctx, "", "", false, false, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -259,5 +259,36 @@ func TestInteractiveThreadsFromOtherGoalsNotOffered(t *testing.T) {
 	out := stdout.String()
 	if strings.Contains(out, "#docs") {
 		t.Errorf("unexpected '#docs' in output:\n%s", out)
+	}
+}
+
+func TestInteractiveDoneFlag(t *testing.T) {
+	// "y" for done → entry should have done=true
+	ctx, _, _ := newInteractiveCtx(t, "#impl\nn\ny\nAll wrapped up\n")
+
+	if err := cli.Log(ctx, "", "", false, false, ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	entry := lastJournalEntry(t, ctx.DataDir, ctx.EncryptionKey)
+	if entry["done"] != true {
+		t.Errorf("expected done=true, got %v", entry["done"])
+	}
+	if entry["task"] != "#impl" {
+		t.Errorf("expected task '#impl', got %v", entry["task"])
+	}
+}
+
+func TestInteractiveNonInteractiveDoneFlag(t *testing.T) {
+	// non-interactive path: note provided, done via flag
+	ctx, _, _ := newInteractiveCtx(t, "")
+
+	if err := cli.Log(ctx, "finished it", "", false, true, "#impl"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	entry := lastJournalEntry(t, ctx.DataDir, ctx.EncryptionKey)
+	if entry["done"] != true {
+		t.Errorf("expected done=true, got %v", entry["done"])
 	}
 }

@@ -23,6 +23,9 @@ func GenerateKey() ([]byte, error) {
 }
 
 func Encrypt(key, plaintext []byte) ([]byte, error) {
+	if key == nil {
+		return plaintext, nil
+	}
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
@@ -43,6 +46,9 @@ func Encrypt(key, plaintext []byte) ([]byte, error) {
 }
 
 func Decrypt(key, ciphertext []byte) ([]byte, error) {
+	if key == nil {
+		return ciphertext, nil
+	}
 	raw, err := base64.StdEncoding.DecodeString(string(ciphertext))
 	if err != nil {
 		return nil, err

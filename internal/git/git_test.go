@@ -2,6 +2,8 @@ package git
 
 import (
 	"errors"
+	"os/exec"
+	"strings"
 	"testing"
 )
 
@@ -45,6 +47,22 @@ func TestPushReturnsErrorWhenRetryFails(t *testing.T) {
 	}
 	if err := Push(r, "/tmp"); err == nil {
 		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestRealRunner_Run_CapturesStderr(t *testing.T) {
+	dir := t.TempDir()
+	if err := exec.Command("git", "init", dir).Run(); err != nil {
+		t.Fatalf("git init: %v", err)
+	}
+
+	r := &RealRunner{}
+	err := r.Run([]string{"push"}, dir)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "fatal") {
+		t.Errorf("expected stderr in error, got: %v", err)
 	}
 }
 

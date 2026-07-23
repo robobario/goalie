@@ -1,7 +1,8 @@
 package git
 
 import (
-	"os"
+	"bytes"
+	"fmt"
 	"os/exec"
 	"strings"
 )
@@ -16,8 +17,15 @@ type RealRunner struct{}
 func (r *RealRunner) Run(args []string, cwd string) error {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = cwd
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	var buf bytes.Buffer
+	cmd.Stderr = &buf
+	if err := cmd.Run(); err != nil {
+		if out := strings.TrimSpace(buf.String()); out != "" {
+			return fmt.Errorf("%w\n%s", err, out)
+		}
+		return err
+	}
+	return nil
 }
 
 func (r *RealRunner) Output(args []string, cwd string) (string, error) {

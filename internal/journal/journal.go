@@ -124,6 +124,76 @@ func Append(dataDir string, r git.Runner, username string, e Entry, key []byte) 
 	return git.Push(r, dataDir)
 }
 
+// UpdateEntry replaces the entry identified by original.TS in-place within its weekly
+// JSONL file, then commits and pushes. Returns an error if no matching entry is found.
+func UpdateEntry(dataDir string, r git.Runner, username string, original, updated Entry, key []byte) error {
+	if err := r.Run([]string{"pull"}, dataDir); err != nil {
+		return err
+	}
+
+	ts, err := time.Parse(time.RFC3339, original.TS)
+	if err != nil {
+		return fmt.Errorf("invalid entry timestamp %q: %w", original.TS, err)
+	}
+	journalDir := filepath.Join(dataDir, "journal")
+	fname := weekFileName(username, ts)
+	path := filepath.Join(journalDir, fname)
+
+	rawData, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	decrypted, err := crypto.Decrypt(key, rawData)
+	if err != nil {
+		return err
+	}
+
+	var buf bytes.Buffer
+	replaced := false
+	scanner := bufio.NewScanner(bytes.NewReader(decrypted))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		var e Entry
+		if jsonErr := json.Unmarshal([]byte(line), &e); jsonErr == nil && e.TS == original.TS {
+			updatedLine, marshalErr := json.Marshal(updated)
+			if marshalErr != nil {
+				return marshalErr
+			}
+			buf.Write(updatedLine)
+			replaced = true
+		} else {
+			buf.WriteString(line)
+		}
+		buf.WriteByte('\n')
+	}
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+	if !replaced {
+		return fmt.Errorf("entry with timestamp %q not found in %s", original.TS, fname)
+	}
+
+	encrypted, err := crypto.Encrypt(key, buf.Bytes())
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(path, encrypted, 0o644); err != nil {
+		return err
+	}
+
+	rel := "journal/" + fname
+	if err := r.Run([]string{"add", rel}, dataDir); err != nil {
+		return err
+	}
+	if err := r.Run([]string{"commit", "-m", "journal: edit entry"}, dataDir); err != nil {
+		return err
+	}
+	return git.Push(r, dataDir)
+}
+
 // Collect returns all entries within the last `days` days, optionally filtered
 // by a glob pattern on username. An empty userPattern includes all users.
 func Collect(dataDir string, r git.Runner, days int, userPattern string, key []byte) ([]Entry, error) {

@@ -564,6 +564,26 @@ func TestCollectLatest(t *testing.T) {
 		}
 	})
 
+	t.Run("done entries included (not filtered)", func(t *testing.T) {
+		dir := t.TempDir()
+		r := &git.FakeRunner{}
+		key := testKey()
+		writeEntries(t, dir, currentWeekFile("alice"), []journal.Entry{
+			{TS: relTS(-1), Note: "all done", Task: strPtr("#impl"), Done: true},
+		}, key)
+
+		entries, err := journal.CollectLatest(dir, r, 7, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(entries) != 1 {
+			t.Fatalf("expected 1 entry, got %d", len(entries))
+		}
+		if !entries[0].Done {
+			t.Error("expected Done=true")
+		}
+	})
+
 	t.Run("nil thread entries deduplicated per user", func(t *testing.T) {
 		dir := t.TempDir()
 		r := &git.FakeRunner{}
@@ -582,6 +602,85 @@ func TestCollectLatest(t *testing.T) {
 		}
 		if entries[0].Note != "second entry" {
 			t.Errorf("expected 'second entry', got %q", entries[0].Note)
+		}
+	})
+}
+
+func TestUpdateEntry(t *testing.T) {
+	t.Run("replaces note in-place", func(t *testing.T) {
+		dir := t.TempDir()
+		r := &git.FakeRunner{}
+		key := testKey()
+		original := journal.Entry{TS: relTS(-1), Note: "tpyo", Task: strPtr("#impl"), Blocked: false}
+		writeEntries(t, dir, currentWeekFile("alice"), []journal.Entry{original}, key)
+
+		updated := original
+		updated.Note = "no typo"
+		if err := journal.UpdateEntry(dir, r, "alice", original, updated, key); err != nil {
+			t.Fatal(err)
+		}
+
+		entries, err := journal.Collect(dir, r, 7, "alice", key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(entries) != 1 {
+			t.Fatalf("expected 1 entry, got %d", len(entries))
+		}
+		if entries[0].Note != "no typo" {
+			t.Errorf("expected 'no typo', got %q", entries[0].Note)
+		}
+	})
+
+	t.Run("preserves surrounding entries", func(t *testing.T) {
+		dir := t.TempDir()
+		r := &git.FakeRunner{}
+		key := testKey()
+		ts1, ts2, ts3 := relTS(-3), relTS(-2), relTS(-1)
+		writeEntries(t, dir, currentWeekFile("alice"), []journal.Entry{
+			{TS: ts1, Note: "entry one", Task: strPtr("#impl")},
+			{TS: ts2, Note: "entry two", Task: strPtr("#impl")},
+			{TS: ts3, Note: "entry three", Task: strPtr("#impl")},
+		}, key)
+
+		original := journal.Entry{TS: ts2, Note: "entry two", Task: strPtr("#impl")}
+		updated := original
+		updated.Note = "entry two corrected"
+		if err := journal.UpdateEntry(dir, r, "alice", original, updated, key); err != nil {
+			t.Fatal(err)
+		}
+
+		entries, err := journal.Collect(dir, r, 7, "alice", key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(entries) != 3 {
+			t.Fatalf("expected 3 entries, got %d", len(entries))
+		}
+		notes := map[string]bool{}
+		for _, e := range entries {
+			notes[e.Note] = true
+		}
+		if !notes["entry one"] || !notes["entry two corrected"] || !notes["entry three"] {
+			t.Errorf("unexpected notes: %v", notes)
+		}
+		if notes["entry two"] {
+			t.Error("old note should be gone")
+		}
+	})
+
+	t.Run("returns error when entry not found", func(t *testing.T) {
+		dir := t.TempDir()
+		r := &git.FakeRunner{}
+		key := testKey()
+		writeEntries(t, dir, currentWeekFile("alice"), []journal.Entry{
+			{TS: relTS(-1), Note: "something", Task: strPtr("#impl")},
+		}, key)
+
+		bogus := journal.Entry{TS: relTS(-2), Note: "ghost"}
+		err := journal.UpdateEntry(dir, r, "alice", bogus, bogus, key)
+		if err == nil {
+			t.Error("expected error for missing entry, got nil")
 		}
 	})
 }

@@ -106,6 +106,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.update, cmd = m.update.Update(msg)
 		cmds = append(cmds, cmd)
+	case editEntriesLoadedMsg:
+		var cmd tea.Cmd
+		m.update, cmd = m.update.Update(msg)
+		cmds = append(cmds, cmd)
+	case updateEntryDoneMsg:
+		var cmd tea.Cmd
+		m.update, cmd = m.update.Update(msg)
+		cmds = append(cmds, cmd)
 	}
 	return m, tea.Batch(cmds...)
 }

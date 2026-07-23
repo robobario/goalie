@@ -233,8 +233,8 @@ func TestMenuOptionsIncludesBlockedWhenPresent(t *testing.T) {
 		},
 	}
 	opts := m.menuOptions()
-	if len(opts) != 3 {
-		t.Fatalf("expected 3 options, got %d", len(opts))
+	if len(opts) != 4 {
+		t.Fatalf("expected 4 options, got %d", len(opts))
 	}
 	if opts[0].phase != phaseBlockedReview {
 		t.Errorf("expected first option to be blocked review, got %v", opts[0].phase)
@@ -353,6 +353,127 @@ func TestMenuViewContainsOptions(t *testing.T) {
 		if !containsFold(view, want) {
 			t.Errorf("expected %q in menu view:\n%s", want, view)
 		}
+	}
+}
+
+func TestMenuIncludesEditOption(t *testing.T) {
+	m := updateModel{phase: phaseMenu}
+	opts := m.menuOptions()
+	found := false
+	for _, o := range opts {
+		if o.phase == phaseEditEntry {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected 'Edit a recent entry' option in menu")
+	}
+}
+
+func TestEditEntriesLoadedSetsEntries(t *testing.T) {
+	m := updateModel{phase: phaseEditEntry, editSub: editPicking}
+	entries := []journal.Entry{
+		{TS: time.Now().Add(-time.Hour).Format(time.RFC3339), Note: "latest", Task: strPtr("#impl")},
+		{TS: time.Now().Add(-2 * time.Hour).Format(time.RFC3339), Note: "older", Task: strPtr("#impl")},
+	}
+	m, _ = m.Update(editEntriesLoadedMsg{entries: entries})
+	if len(m.editEntries) != 2 {
+		t.Fatalf("expected 2 editEntries, got %d", len(m.editEntries))
+	}
+}
+
+func TestEditPickingEnterAdvancesToNote(t *testing.T) {
+	m := updateModel{
+		phase:   phaseEditEntry,
+		editSub: editPicking,
+		editEntries: []journal.Entry{
+			{TS: time.Now().Add(-time.Hour).Format(time.RFC3339), Note: "fix this tpyo", Task: strPtr("#impl")},
+		},
+		editCursor: 0,
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.editSub != editNote {
+		t.Errorf("expected editNote after Enter, got %v", m.editSub)
+	}
+	if m.editNoteInput != "fix this tpyo" {
+		t.Errorf("expected note pre-filled, got %q", m.editNoteInput)
+	}
+}
+
+func TestEditNoteEnterAdvancesToTask(t *testing.T) {
+	m := updateModel{
+		phase:         phaseEditEntry,
+		editSub:       editNote,
+		editNoteInput: "corrected note",
+		editEntry:     journal.Entry{Task: strPtr("#impl")},
+		editTaskInput: "#impl",
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.editSub != editTask {
+		t.Errorf("expected editTask after Enter, got %v", m.editSub)
+	}
+}
+
+func TestEditTaskEnterWithValidTagAdvancesToBlockedDone(t *testing.T) {
+	m := updateModel{
+		phase:         phaseEditEntry,
+		editSub:       editTask,
+		editTaskInput: "#impl",
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.editSub != editBlockedDone {
+		t.Errorf("expected editBlockedDone after valid tag, got %v", m.editSub)
+	}
+}
+
+func TestEditTaskEnterWithInvalidTagStays(t *testing.T) {
+	m := updateModel{
+		phase:         phaseEditEntry,
+		editSub:       editTask,
+		editTaskInput: "NotAHashtag",
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.editSub != editTask {
+		t.Errorf("expected to stay on editTask for invalid tag, got %v", m.editSub)
+	}
+}
+
+func TestEditEscapeReturnsToMenu(t *testing.T) {
+	for _, sub := range []editSub{editPicking, editNote, editTask, editBlockedDone} {
+		m := updateModel{phase: phaseEditEntry, editSub: sub, editEntries: nil}
+		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+		if m.phase != phaseMenu {
+			t.Errorf("expected phaseMenu after Esc from editSub %v, got %v", sub, m.phase)
+		}
+	}
+}
+
+func TestUpdateEntryDoneSetsMenu(t *testing.T) {
+	m := updateModel{phase: phaseEditEntry}
+	m, _ = m.Update(updateEntryDoneMsg{err: nil})
+	if m.phase != phaseMenu {
+		t.Errorf("expected phaseMenu after successful edit, got %v", m.phase)
+	}
+}
+
+func TestEditPickingViewContainsEntries(t *testing.T) {
+	m := updateModel{
+		phase:   phaseEditEntry,
+		editSub: editPicking,
+		editEntries: []journal.Entry{
+			{
+				TS:   time.Now().Add(-time.Hour).Format(time.RFC3339),
+				Note: "my note here",
+				Task: strPtr("#impl"),
+			},
+		},
+	}
+	view := m.View()
+	if !strings.Contains(view, "my note here") {
+		t.Errorf("expected note in pick view:\n%s", view)
+	}
+	if !strings.Contains(view, "#impl") {
+		t.Errorf("expected task in pick view:\n%s", view)
 	}
 }
 

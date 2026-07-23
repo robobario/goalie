@@ -14,7 +14,7 @@ import (
 	"goalie/internal/meta"
 )
 
-func TestInit_NoKeyPrintsGuidance(t *testing.T) {
+func TestInit_NoKeyPromptsForKey(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -23,12 +23,13 @@ func TestInit_NoKeyPrintsGuidance(t *testing.T) {
 	runner := &git.FakeRunner{}
 	var out strings.Builder
 
-	if err := Init("https://example.com/repo.git", dataDir, configPath, runner, strings.NewReader(""), &out, false); err != nil {
+	// press Enter to skip the key prompt
+	if err := Init("https://example.com/repo.git", dataDir, configPath, runner, strings.NewReader("\n"), &out, false); err != nil {
 		t.Fatal(err)
 	}
 
-	if !strings.Contains(out.String(), "No encryption key found. Import the team key with: goalie key import <hex-key>") {
-		t.Errorf("expected key guidance in output; got %q", out.String())
+	if !strings.Contains(out.String(), "No key imported") {
+		t.Errorf("expected skip message; got %q", out.String())
 	}
 }
 
@@ -369,6 +370,103 @@ func TestInit_KeyMismatch_ShowsWarning(t *testing.T) {
 
 	if !strings.Contains(out.String(), "does not match the team key-check") {
 		t.Errorf("expected key mismatch warning; got %q", out.String())
+	}
+}
+
+func encryptedDataDir(t *testing.T, keyHex string) (dataDir string, keyBytes []byte) {
+	t.Helper()
+	dataDir = t.TempDir()
+	keyBytes, err := hex.DecodeString(keyHex)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := meta.Save(dataDir, meta.Meta{Encrypt: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := crypto.WriteKeyCheck(filepath.Join(dataDir, "key-check.enc"), keyBytes); err != nil {
+		t.Fatal(err)
+	}
+	return dataDir, keyBytes
+}
+
+func TestInit_PromptForKey_Skip(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	dataDir, _ := encryptedDataDir(t, strings.Repeat("aa", 32))
+	configPath := prewriteConfig(t, "Alice")
+	var out strings.Builder
+
+	if err := Init("https://example.com/repo.git", dataDir, configPath, &git.FakeRunner{}, strings.NewReader("\n"), &out, false); err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(out.String(), "No key imported") {
+		t.Errorf("expected skip message; got %q", out.String())
+	}
+}
+
+func TestInit_PromptForKey_ValidKey(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	keyHex := strings.Repeat("aa", 32)
+	dataDir, _ := encryptedDataDir(t, keyHex)
+	configPath := prewriteConfig(t, "Alice")
+	var out strings.Builder
+
+	if err := Init("https://example.com/repo.git", dataDir, configPath, &git.FakeRunner{}, strings.NewReader(keyHex+"\n"), &out, false); err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(out.String(), "Encryption key verified") {
+		t.Errorf("expected verification success; got %q", out.String())
+	}
+	savedKey, err := os.ReadFile(filepath.Join(home, ".goalie", "encryption.key"))
+	if err != nil {
+		t.Fatalf("expected key to be saved: %v", err)
+	}
+	if strings.TrimSpace(string(savedKey)) != keyHex {
+		t.Errorf("saved key %q does not match expected %q", string(savedKey), keyHex)
+	}
+}
+
+func TestInit_PromptForKey_InvalidThenValid(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	keyHex := strings.Repeat("aa", 32)
+	dataDir, _ := encryptedDataDir(t, keyHex)
+	configPath := prewriteConfig(t, "Alice")
+	var out strings.Builder
+
+	stdin := strings.NewReader("notvalidhex\n" + keyHex + "\n")
+	if err := Init("https://example.com/repo.git", dataDir, configPath, &git.FakeRunner{}, stdin, &out, false); err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(out.String(), "Invalid key") {
+		t.Errorf("expected invalid key message; got %q", out.String())
+	}
+	if !strings.Contains(out.String(), "Encryption key verified") {
+		t.Errorf("expected eventual success; got %q", out.String())
+	}
+}
+
+func TestInit_PromptForKey_WrongKeyThenSkip(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	keyHex := strings.Repeat("aa", 32)
+	dataDir, _ := encryptedDataDir(t, keyHex)
+	configPath := prewriteConfig(t, "Alice")
+	var out strings.Builder
+
+	wrongKey := strings.Repeat("bb", 32)
+	stdin := strings.NewReader(wrongKey + "\n\n")
+	if err := Init("https://example.com/repo.git", dataDir, configPath, &git.FakeRunner{}, stdin, &out, false); err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(out.String(), "does not match the team key-check") {
+		t.Errorf("expected mismatch message; got %q", out.String())
+	}
+	if !strings.Contains(out.String(), "No key imported") {
+		t.Errorf("expected skip message after wrong key; got %q", out.String())
 	}
 }
 

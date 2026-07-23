@@ -43,13 +43,14 @@ Share with teammates: goalie key import <key>
 key-check.enc committed to the data branch — teammates must import the same key.
 ```
 
-Each teammate imports the shared key before running any other command:
+When a teammate runs `goalie init`, it detects the encrypted repo and prompts for the shared key immediately:
 
-```sh
-goalie key import <hex-key>
+```
+Encryption key (paste hex or press Enter to skip): a1b2c3...
+Encryption key verified.
 ```
 
-Running `goalie init` after importing will verify the key against `key-check.enc` and confirm with a green message. A mismatch produces a warning so you can correct it before writing any data.
+The key is verified against `key-check.enc` before being saved. Invalid format or a mismatched key triggers an error and retries. Pressing Enter skips for now — the key can be imported later with `goalie key import <hex-key>`.
 
 To replace a key, use `goalie key init` (generates a new key) or `goalie key import <hex>` (imports an existing one). Both commands warn you if a key file already exists, since replacing it will prevent you from decrypting data written under the old key.
 

@@ -606,6 +606,74 @@ func TestRecentListShowsClosedLabel(t *testing.T) {
 	}
 }
 
+func TestGoalsLoadedWithNoGoalsDoesNotError(t *testing.T) {
+	m := updateModel{phase: phaseNewTask, newSub: newGoalPick}
+	// Empty goals list — previously caused a fatal error, now should be fine
+	m, _ = m.Update(goalsLoadedMsg{goals: []goals.Goal{}})
+	if m.err != nil {
+		t.Errorf("expected no error with empty goals, got: %v", m.err)
+	}
+	if m.newSub != newGoalPick {
+		t.Errorf("expected newSub=newGoalPick, got %v", m.newSub)
+	}
+}
+
+func TestGoalPickerIncludesSentinel(t *testing.T) {
+	items := goalPickerItems([]goals.Goal{{ID: "ROUTING", State: "open"}})
+	if len(items) != 2 {
+		t.Fatalf("expected 2 items (sentinel + 1 goal), got %d", len(items))
+	}
+	if items[0] != noGoalSentinel {
+		t.Errorf("expected first item to be %q, got %q", noGoalSentinel, items[0])
+	}
+	if items[1] != "ROUTING" {
+		t.Errorf("expected second item to be %q, got %q", "ROUTING", items[1])
+	}
+}
+
+func TestGoalPickerSentinelOnlyWhenNoGoals(t *testing.T) {
+	items := goalPickerItems([]goals.Goal{})
+	if len(items) != 1 || items[0] != noGoalSentinel {
+		t.Errorf("expected only sentinel when no goals, got %v", items)
+	}
+}
+
+func TestSelectingNoGoalSentinelAdvancesToTagPick(t *testing.T) {
+	m := updateModel{
+		phase:    phaseNewTask,
+		newSub:   newGoalPick,
+		allGoals: []goals.Goal{{ID: "ROUTING", State: "open"}},
+		goalPicker: pickerModel{
+			items:   goalPickerItems([]goals.Goal{{ID: "ROUTING", State: "open"}}),
+			matches: goalPickerItems([]goals.Goal{{ID: "ROUTING", State: "open"}}),
+		},
+	}
+	// Simulate selecting the "(no goal)" sentinel from the picker
+	// The picker treats Enter as selection of the first match when there's no query
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m2.newSub != newTagPick {
+		t.Errorf("expected newTagPick after selecting no-goal sentinel, got %v", m2.newSub)
+	}
+	if m2.selectedGoal != "" {
+		t.Errorf("expected empty selectedGoal, got %q", m2.selectedGoal)
+	}
+}
+
+func TestNewAnotherYesPickerIncludesSentinel(t *testing.T) {
+	m := updateModel{
+		phase:    phaseNewTask,
+		newSub:   newAnother,
+		allGoals: []goals.Goal{{ID: "PROJ", State: "open"}},
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	if m.newSub != newGoalPick {
+		t.Errorf("expected newGoalPick, got %v", m.newSub)
+	}
+	if len(m.goalPicker.items) == 0 || m.goalPicker.items[0] != noGoalSentinel {
+		t.Errorf("expected sentinel as first picker item, got %v", m.goalPicker.items)
+	}
+}
+
 func TestUpdateRecentBlockedAnswerRemovesThread(t *testing.T) {
 	m := updateModel{
 		phase: phaseRecentReview,

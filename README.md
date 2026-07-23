@@ -66,13 +66,27 @@ goalie init <repo-url>              # Clone or create the data branch; prompts f
 goalie goal add <ID> <DESCRIPTION>  # Create a new open goal
 goalie goal close <ID>              # Mark a goal as closed
 goalie goal list                    # List all goals with their state
-goalie log [note] [--goal ID] [--task TAG] [--blocked]
-                                    # Append a journal entry; interactive if note is omitted
+goalie log [note] [--goal ID] --task TAG [--blocked]
+                                    # Append a journal entry; interactive if note is omitted. --task is required.
 goalie summary [--days N] [--user NAME|GLOB]
-                                    # Your entries for the last N days (default 7); --user '*' for everyone
+                                    # Entries grouped as stories per goal/task/user, last N days (default 7)
 goalie status                       # Morning standup view: latest entry per user×goal×task, last 7 days
 goalie update                       # Interactive end-of-day review: update tasks, log new activity
 goalie --version                    # Print version and exit
+```
+
+### Summary output
+
+`goalie summary` groups entries by goal, task, and user and renders each group as a chronological story. State-change labels appear only when the blocked status changes:
+
+```
+= ROUTING#impl@alice
+- [Blocked] waiting for review — 5d ago
+- [Unblocked] addressing changes — 4d ago
+- still working through edge cases — 3d ago
+
+= (no goal)#docs@bob
+- started the ADR — 2d ago
 ```
 
 ## TUI

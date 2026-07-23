@@ -214,7 +214,7 @@ func (m updateModel) Update(msg tea.Msg) (updateModel, tea.Cmd) {
 			m.err = msg.err
 			return m, nil
 		}
-		m.threadPicker = newPicker(msg.tags)
+		m.threadPicker = newPicker(msg.tags).withPrefix("#")
 
 	case tea.KeyMsg:
 		switch m.phase {
@@ -515,7 +515,7 @@ func (m updateModel) enterPhaseNewThread() (updateModel, tea.Cmd) {
 	m.phase = phaseNewThread
 	m.newSub = newGoalPick
 	m.goalPicker = pickerModel{}
-	m.threadPicker = pickerModel{}
+	m.threadPicker = pickerModel{prefix: "#"}
 	m.selectedGoal = ""
 	m.selectedTag = ""
 	m.newNoteInput = ""
@@ -543,7 +543,7 @@ func (m updateModel) handleNewThreadKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 			if validGoal {
 				m.selectedGoal = selected
 				m.newSub = newTagPick
-				m.threadPicker = newPicker([]string{})
+				m.threadPicker = newPicker([]string{}).withPrefix("#")
 				ctx := m.ctx
 				goalID := selected
 				loadTags := func() tea.Msg {
@@ -572,7 +572,7 @@ func (m updateModel) handleNewThreadKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 				m.newSub = newNotes
 			} else {
 				if !goals.ValidThreadTag(selected) {
-					m.tagError = "Tag must match #[a-z][a-z0-9_-]* (e.g. #my-thread)"
+					m.tagError = "Tag must start with a lowercase letter, e.g. my-thread"
 				} else {
 					m.selectedTag = selected
 					m.tagError = ""
@@ -611,7 +611,7 @@ func (m updateModel) handleNewThreadKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 		case "y":
 			m.newSub = newGoalPick
 			m.goalPicker = newPicker(goalIDs(m.allGoals))
-			m.threadPicker = pickerModel{}
+			m.threadPicker = pickerModel{prefix: "#"}
 			m.selectedGoal = ""
 			m.selectedTag = ""
 			m.newNoteInput = ""

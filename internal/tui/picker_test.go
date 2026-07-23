@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -56,5 +57,48 @@ func TestPickerEnterReturnsItemAtCursor(t *testing.T) {
 	}
 	if selected != "second" {
 		t.Errorf("expected selected=%q, got %q", "second", selected)
+	}
+}
+
+func TestPickerPrefixPrependedOnTypedEnter(t *testing.T) {
+	p := newPicker([]string{}).withPrefix("#")
+	p, _, _, _ = p.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'i'}})
+	p, _, _, _ = p.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'m'}})
+	p, _, _, _ = p.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	p, _, _, _ = p.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
+	_, _, selected, wasSelected := p.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if !wasSelected {
+		t.Fatal("expected wasSelected=true")
+	}
+	if selected != "#impl" {
+		t.Errorf("expected %q, got %q", "#impl", selected)
+	}
+}
+
+func TestPickerPrefixCharIgnoredWhenQueryEmpty(t *testing.T) {
+	p := newPicker([]string{}).withPrefix("#")
+	p, _, _, _ = p.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'#'}})
+	if p.query != "" {
+		t.Errorf("expected empty query after typing prefix char, got %q", p.query)
+	}
+}
+
+func TestPickerPrefixShownInView(t *testing.T) {
+	p := newPicker([]string{}).withPrefix("#")
+	view := p.View()
+	if !strings.Contains(view, "Search: #") {
+		t.Errorf("expected view to show 'Search: #', got %q", view)
+	}
+}
+
+func TestPickerListSelectionNotDoublePrefixed(t *testing.T) {
+	p := newPicker([]string{"#backend", "#frontend"}).withPrefix("#")
+	p.cursor = 0
+	_, _, selected, wasSelected := p.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if !wasSelected {
+		t.Fatal("expected wasSelected=true")
+	}
+	if selected != "#backend" {
+		t.Errorf("expected %q, got %q", "#backend", selected)
 	}
 }

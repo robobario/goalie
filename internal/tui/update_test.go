@@ -268,7 +268,8 @@ func TestInvalidThreadTagSetsTagError(t *testing.T) {
 		threadPicker: pickerModel{
 			items:   []string{},
 			matches: []string{},
-			query:   "no-hash-prefix",
+			prefix:  "#",
+			query:   "1starts-with-digit",
 		},
 	}
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})

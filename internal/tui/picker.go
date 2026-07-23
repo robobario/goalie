@@ -13,6 +13,7 @@ type pickerModel struct {
 	query   string
 	matches []string
 	cursor  int
+	prefix  string
 }
 
 func newPicker(items []string) pickerModel {
@@ -22,6 +23,11 @@ func newPicker(items []string) pickerModel {
 		items:   items,
 		matches: matches,
 	}
+}
+
+func (p pickerModel) withPrefix(prefix string) pickerModel {
+	p.prefix = prefix
+	return p
 }
 
 func (p pickerModel) filter() []string {
@@ -73,12 +79,16 @@ func (p pickerModel) Update(msg tea.Msg) (pickerModel, tea.Cmd, string, bool) {
 			return p, nil, p.matches[p.cursor], true
 		}
 		if p.query != "" {
-			return p, nil, p.query, true
+			return p, nil, p.prefix + p.query, true
 		}
 		return p, nil, "", false
 	default:
 		if len(keyMsg.Runes) == 1 {
-			p.query += string(keyMsg.Runes)
+			ch := string(keyMsg.Runes[0])
+			if p.prefix != "" && p.query == "" && ch == p.prefix {
+				break
+			}
+			p.query += ch
 			p.matches = p.filter()
 			p.cursor = 0
 		}
@@ -88,7 +98,7 @@ func (p pickerModel) Update(msg tea.Msg) (pickerModel, tea.Cmd, string, bool) {
 
 func (p pickerModel) View() string {
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "Search: %s\n", p.query)
+	fmt.Fprintf(&sb, "Search: %s%s\n", p.prefix, p.query)
 	for i, m := range p.matches {
 		if i == p.cursor {
 			fmt.Fprintf(&sb, "> %s\n", m)

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -51,7 +52,7 @@ func TestUpdateInitialPhaseIsLoading(t *testing.T) {
 	}
 }
 
-func TestUpdateThreadStatesLoadedSetsBlockedReview(t *testing.T) {
+func TestUpdateThreadStatesLoadedSetsMenu(t *testing.T) {
 	m := updateModel{}
 	msg := taskStatesLoadedMsg{
 		blocked: []blockedTask{
@@ -60,8 +61,8 @@ func TestUpdateThreadStatesLoadedSetsBlockedReview(t *testing.T) {
 		},
 	}
 	m, _ = m.Update(msg)
-	if m.phase != phaseBlockedReview {
-		t.Errorf("expected phaseBlockedReview, got %v", m.phase)
+	if m.phase != phaseMenu {
+		t.Errorf("expected phaseMenu after loading, got %v", m.phase)
 	}
 	if m.blockedIdx != 0 {
 		t.Errorf("expected blockedIdx=0, got %d", m.blockedIdx)
@@ -114,7 +115,7 @@ func TestUpdateYesNotUnblockedWithNotesAdvancesIdx(t *testing.T) {
 	}
 }
 
-func TestUpdateAllSkippedTransitionsToRecentReview(t *testing.T) {
+func TestUpdateAllSkippedTransitionsToMenu(t *testing.T) {
 	m := updateModel{
 		phase: phaseBlockedReview,
 		blockedTasks: []blockedTask{
@@ -124,12 +125,12 @@ func TestUpdateAllSkippedTransitionsToRecentReview(t *testing.T) {
 	}
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
-	if m.phase != phaseRecentReview {
-		t.Errorf("expected phaseRecentReview after all skipped, got %v", m.phase)
+	if m.phase != phaseMenu {
+		t.Errorf("expected phaseMenu after all skipped, got %v", m.phase)
 	}
 }
 
-func TestUpdateLastThreadSubmittedTransitionsToRecentReview(t *testing.T) {
+func TestUpdateLastThreadSubmittedTransitionsToMenu(t *testing.T) {
 	m := updateModel{
 		phase: phaseBlockedReview,
 		blockedTasks: []blockedTask{
@@ -142,12 +143,12 @@ func TestUpdateLastThreadSubmittedTransitionsToRecentReview(t *testing.T) {
 		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{ch}})
 	}
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	if m.phase != phaseRecentReview {
-		t.Errorf("expected phaseRecentReview after last thread submitted, got %v", m.phase)
+	if m.phase != phaseMenu {
+		t.Errorf("expected phaseMenu after last thread submitted, got %v", m.phase)
 	}
 }
 
-func TestUpdateNoBlockedThreadsTransitionsToRecentReview(t *testing.T) {
+func TestUpdateLoadedAlwaysGoesToMenu(t *testing.T) {
 	m := updateModel{}
 	msg := taskStatesLoadedMsg{
 		blocked: []blockedTask{},
@@ -157,8 +158,8 @@ func TestUpdateNoBlockedThreadsTransitionsToRecentReview(t *testing.T) {
 		username: "alice",
 	}
 	m, _ = m.Update(msg)
-	if m.phase != phaseRecentReview {
-		t.Errorf("expected phaseRecentReview when no blocked threads, got %v", m.phase)
+	if m.phase != phaseMenu {
+		t.Errorf("expected phaseMenu after loading, got %v", m.phase)
 	}
 	if len(m.recentTasks) != 1 {
 		t.Errorf("expected 1 recent thread, got %d", len(m.recentTasks))
@@ -221,6 +222,154 @@ func TestUpdateRecentNotesEnterMovesToBlocked(t *testing.T) {
 	}
 }
 
+func TestMenuOptionsIncludesBlockedWhenPresent(t *testing.T) {
+	m := updateModel{
+		phase: phaseMenu,
+		blockedTasks: []blockedTask{
+			makeBlockedThread("#impl", nil, "waiting"),
+		},
+		recentTasks: []recentTask{
+			makeRecentThread("#docs", nil, "in progress", 2),
+		},
+	}
+	opts := m.menuOptions()
+	if len(opts) != 3 {
+		t.Fatalf("expected 3 options, got %d", len(opts))
+	}
+	if opts[0].phase != phaseBlockedReview {
+		t.Errorf("expected first option to be blocked review, got %v", opts[0].phase)
+	}
+	if opts[1].phase != phaseRecentReview {
+		t.Errorf("expected second option to be recent review, got %v", opts[1].phase)
+	}
+	if opts[2].phase != phaseNewTask {
+		t.Errorf("expected third option to be new task, got %v", opts[2].phase)
+	}
+}
+
+func TestMenuOptionsOmitsBlockedWhenNone(t *testing.T) {
+	m := updateModel{phase: phaseMenu}
+	opts := m.menuOptions()
+	for _, o := range opts {
+		if o.phase == phaseBlockedReview {
+			t.Error("expected no blocked-review option when no blocked tasks")
+		}
+	}
+}
+
+func TestMenuDownMovesCursor(t *testing.T) {
+	m := updateModel{
+		phase: phaseMenu,
+		recentTasks: []recentTask{
+			makeRecentThread("#docs", nil, "work", 2),
+		},
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	if m.menuCursor != 1 {
+		t.Errorf("expected menuCursor=1, got %d", m.menuCursor)
+	}
+}
+
+func TestMenuEnterSelectsBlockedReview(t *testing.T) {
+	m := updateModel{
+		phase: phaseMenu,
+		blockedTasks: []blockedTask{
+			makeBlockedThread("#impl", nil, "waiting"),
+		},
+		menuCursor: 0,
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.phase != phaseBlockedReview {
+		t.Errorf("expected phaseBlockedReview, got %v", m.phase)
+	}
+}
+
+func TestMenuEnterSelectsRecentReview(t *testing.T) {
+	m := updateModel{
+		phase: phaseMenu,
+		recentTasks: []recentTask{
+			makeRecentThread("#docs", nil, "work", 2),
+		},
+		menuCursor: 0,
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.phase != phaseRecentReview {
+		t.Errorf("expected phaseRecentReview, got %v", m.phase)
+	}
+}
+
+func TestBlockedEscapeReturnsToMenu(t *testing.T) {
+	m := updateModel{
+		phase: phaseBlockedReview,
+		blockedTasks: []blockedTask{
+			makeBlockedThread("#impl", nil, "waiting"),
+		},
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if m.phase != phaseMenu {
+		t.Errorf("expected phaseMenu after Escape, got %v", m.phase)
+	}
+}
+
+func TestRecentEscapeReturnsToMenu(t *testing.T) {
+	m := updateModel{
+		phase:       phaseRecentReview,
+		recentSub:   recentList,
+		recentTasks: []recentTask{makeRecentThread("#docs", nil, "work", 2)},
+		updatedTags: make(map[string]bool),
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if m.phase != phaseMenu {
+		t.Errorf("expected phaseMenu after Escape, got %v", m.phase)
+	}
+}
+
+func TestNewTaskEscapeReturnsToMenu(t *testing.T) {
+	m := updateModel{
+		phase:  phaseNewTask,
+		newSub: newNotes,
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if m.phase != phaseMenu {
+		t.Errorf("expected phaseMenu after Escape, got %v", m.phase)
+	}
+}
+
+func TestMenuViewContainsOptions(t *testing.T) {
+	m := updateModel{
+		phase: phaseMenu,
+		blockedTasks: []blockedTask{
+			makeBlockedThread("#impl", nil, "waiting"),
+		},
+		recentTasks: []recentTask{
+			makeRecentThread("#docs", nil, "work", 2),
+		},
+	}
+	view := m.View()
+	if view == "" {
+		t.Fatal("expected non-empty menu view")
+	}
+	for _, want := range []string{"blocked", "recent", "new"} {
+		if !containsFold(view, want) {
+			t.Errorf("expected %q in menu view:\n%s", want, view)
+		}
+	}
+}
+
+func containsFold(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr ||
+		len(s) > 0 && containsFoldHelper(s, substr))
+}
+
+func containsFoldHelper(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if strings.EqualFold(s[i:i+len(substr)], substr) {
+			return true
+		}
+	}
+	return false
+}
+
 func TestPickerFuzzyFilterAndSelect(t *testing.T) {
 	p := newPicker([]string{"PROJ-ALPHA", "PROJ-BETA"})
 	for _, ch := range "bet" {
@@ -250,14 +399,14 @@ func TestNewAnotherYesResetsToGoalPick(t *testing.T) {
 	}
 }
 
-func TestNewAnotherNoTransitionsToDone(t *testing.T) {
+func TestNewAnotherNoTransitionsToMenu(t *testing.T) {
 	m := updateModel{
 		phase:  phaseNewTask,
 		newSub: newAnother,
 	}
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
-	if m.phase != phaseDone {
-		t.Errorf("expected phaseDone, got %v", m.phase)
+	if m.phase != phaseMenu {
+		t.Errorf("expected phaseMenu, got %v", m.phase)
 	}
 }
 

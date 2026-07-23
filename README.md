@@ -94,4 +94,4 @@ goalie --version                    # Print version and exit
 Running `goalie` opens a terminal interface with two tabs (switch with Tab / Shift-Tab):
 
 - **Activity** — shows the latest entry per person per task across the last 30 days. Start typing to filter by note, goal, or task tag.
-- **Update** — walks you through blocked tasks, recent tasks, and lets you log new activity. Press `q` to quit.
+- **Update** — shows a menu to choose what to do: review blocked tasks, log progress on a recent task, or log a new task. ↑/↓ to move, Enter to select, Esc to return to the menu from any sub-flow, `q` to quit.

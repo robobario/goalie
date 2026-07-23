@@ -142,6 +142,9 @@ func Status(ctx AppContext) error {
 
 	byUser := make(map[string][]journal.Entry)
 	for _, e := range entries {
+		if e.Done {
+			continue
+		}
 		byUser[e.Username] = append(byUser[e.Username], e)
 	}
 

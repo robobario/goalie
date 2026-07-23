@@ -94,6 +94,7 @@ type updateModel struct {
 	updatedTags     map[string]bool
 	recentNotes     string
 	recentUnblocked bool
+	recentDone      bool
 
 	menuCursor   int
 
@@ -128,7 +129,7 @@ func (m updateModel) Init() tea.Cmd {
 		}
 		var blocked []blockedTask
 		for tag, state := range states {
-			if state.Blocked {
+			if state.Blocked && !state.Done {
 				blocked = append(blocked, blockedTask{tag: tag, state: state})
 			}
 		}
@@ -451,9 +452,15 @@ func (m updateModel) handleRecentBlockedKey(msg tea.KeyMsg) (updateModel, tea.Cm
 	switch msg.String() {
 	case "y":
 		m.recentUnblocked = false
+		m.recentDone = false
 		return m.submitRecentEntry()
 	case "n":
 		m.recentUnblocked = true
+		m.recentDone = false
+		return m.submitRecentEntry()
+	case "d":
+		m.recentUnblocked = true
+		m.recentDone = true
 		return m.submitRecentEntry()
 	}
 	return m, nil
@@ -468,6 +475,7 @@ func (m updateModel) submitRecentEntry() (updateModel, tea.Cmd) {
 		Goal:    item.state.Goal,
 		Note:    note,
 		Blocked: isBlocked,
+		Done:    m.recentDone,
 		Task:    &item.tag,
 	}
 	ctx := m.ctx
@@ -487,6 +495,7 @@ func (m updateModel) submitRecentEntry() (updateModel, tea.Cmd) {
 	}
 	m.recentNotes = ""
 	m.recentUnblocked = false
+	m.recentDone = false
 	m.recentSub = recentList
 
 	if len(m.recentTasks) == 0 {
@@ -561,7 +570,7 @@ func (m updateModel) viewRecentReview() string {
 		}
 		return fmt.Sprintf("%s — last note: %s\n\nNotes: %s_", header, item.state.Note, m.recentNotes)
 	case recentBlocked:
-		return "Blocked? [y/n]"
+		return "Blocked? [y] Not blocked? [n] Mark done? [d]"
 	default:
 		var sb strings.Builder
 		sb.WriteString("Recent tasks — select one to update (↑/↓, Enter to select, s to skip all)\n\n")
@@ -576,10 +585,14 @@ func (m updateModel) viewRecentReview() string {
 				goal = *item.state.Goal
 			}
 			age := ageString(item.state.TS, now)
+			label := item.tag
+			if item.state.Done {
+				label += " (closed)"
+			}
 			if goal != "" {
-				fmt.Fprintf(&sb, "%s%-20s %-12s %s\n", cursor, item.tag, goal, age)
+				fmt.Fprintf(&sb, "%s%-28s %-12s %s\n", cursor, label, goal, age)
 			} else {
-				fmt.Fprintf(&sb, "%s%-20s %s\n", cursor, item.tag, age)
+				fmt.Fprintf(&sb, "%s%-28s %s\n", cursor, label, age)
 			}
 		}
 		return sb.String()

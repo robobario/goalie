@@ -13,7 +13,7 @@ import (
 	"goalie/internal/journal"
 )
 
-var blockedStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+var blockedStyle  = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "124", Dark: "9"})
 var doneStyle     = lipgloss.NewStyle().Faint(true)
 var taskTagStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "130", Dark: "208"})
 var usernameStyle = lipgloss.NewStyle().Bold(true)

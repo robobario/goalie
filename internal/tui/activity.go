@@ -16,6 +16,7 @@ import (
 var blockedStyle       = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "124", Dark: "9"})
 var doneStyle          = lipgloss.NewStyle().Faint(true)
 var goalStyle          = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "27", Dark: "75"})
+var goalDescStyle      = lipgloss.NewStyle().Faint(true).Italic(true)
 var selectedItemStyle  = lipgloss.NewStyle().Bold(true)
 var taskTagStyle       = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "130", Dark: "208"})
 var usernameStyle      = lipgloss.NewStyle().Bold(true)

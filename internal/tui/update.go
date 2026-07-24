@@ -575,15 +575,26 @@ func (m updateModel) viewEditBlockedDone() string {
 		strings.TrimSpace(m.editNoteInput), taskTagStyle.Render(m.editTaskInput))
 }
 
-// viewGoalPicker renders the goal picker with goal IDs coloured.
-// The noGoalSentinel item is left unstyled since it is not a real goal ID.
+// viewGoalPicker renders the goal picker with goal IDs coloured and their
+// descriptions shown in italics alongside. The noGoalSentinel is left unstyled.
 func (m updateModel) viewGoalPicker() string {
+	// Build a lookup from goal ID → description for the display.
+	descByID := make(map[string]string, len(m.allGoals))
+	for _, g := range m.allGoals {
+		descByID[g.ID] = g.Description
+	}
+
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "Search: %s%s\n", m.goalPicker.prefix, m.goalPicker.query)
 	for i, item := range m.goalPicker.matches {
-		label := item
-		if item != noGoalSentinel {
+		var label string
+		if item == noGoalSentinel {
+			label = item
+		} else {
 			label = goalStyle.Render(item)
+			if desc := descByID[item]; desc != "" {
+				label += " " + goalDescStyle.Render(desc)
+			}
 		}
 		if i == m.goalPicker.cursor {
 			fmt.Fprintf(&sb, "> %s\n", selectedItemStyle.Render(label))

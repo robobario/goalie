@@ -44,18 +44,22 @@ func TestMenuViewSelectedItemHasCursor(t *testing.T) {
 }
 
 func TestViewGoalPickerContainsItems(t *testing.T) {
+	openGoals := []goals.Goal{{ID: "ROUTING", Description: "Implement routing layer", State: "open"}}
 	m := updateModel{
 		phase:    phaseNewTask,
 		newSub:   newFormGoal,
-		allGoals: []goals.Goal{{ID: "ROUTING", State: "open"}},
+		allGoals: openGoals,
 		goalPicker: pickerModel{
-			items:   goalPickerItems([]goals.Goal{{ID: "ROUTING", State: "open"}}),
-			matches: goalPickerItems([]goals.Goal{{ID: "ROUTING", State: "open"}}),
+			items:   goalPickerItems(openGoals),
+			matches: goalPickerItems(openGoals),
 		},
 	}
 	got := m.viewGoalPicker()
 	if !strings.Contains(got, "ROUTING") {
 		t.Errorf("expected ROUTING in goal picker; got %q", got)
+	}
+	if !strings.Contains(got, "Implement routing layer") {
+		t.Errorf("expected description in goal picker; got %q", got)
 	}
 	if !strings.Contains(got, noGoalSentinel) {
 		t.Errorf("expected sentinel in goal picker; got %q", got)

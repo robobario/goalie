@@ -40,6 +40,33 @@ func TestUpdateInitialPhaseIsLoading(t *testing.T) {
 	}
 }
 
+func TestAppendDoneNoErrorTriggersReload(t *testing.T) {
+	m := updateModel{}
+	_, cmd := m.Update(appendDoneMsg{err: nil})
+	if cmd == nil {
+		t.Fatal("expected reload command after successful appendDoneMsg, got nil")
+	}
+}
+
+func TestAppendDoneWithErrorDoesNotReload(t *testing.T) {
+	m := updateModel{}
+	_, cmd := m.Update(appendDoneMsg{err: errors.New("push failed")})
+	if cmd != nil {
+		t.Error("expected no reload command when appendDoneMsg has an error")
+	}
+}
+
+func TestUpdateEntryDoneNoErrorTriggersReload(t *testing.T) {
+	m := updateModel{phase: phaseEditEntry}
+	m2, cmd := m.Update(updateEntryDoneMsg{err: nil})
+	if cmd == nil {
+		t.Fatal("expected reload command after successful updateEntryDoneMsg, got nil")
+	}
+	if m2.phase != phaseMenu {
+		t.Errorf("expected phaseMenu after successful edit, got %v", m2.phase)
+	}
+}
+
 func TestUpdateLoadedSetsActiveTasks(t *testing.T) {
 	m := updateModel{}
 	active := makeActiveTask("#onboarding", nil, "Drafted outline", false, 24)

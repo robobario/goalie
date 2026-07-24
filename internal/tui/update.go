@@ -141,8 +141,16 @@ type updateModel struct {
 }
 
 func (m updateModel) Init() tea.Cmd {
+	return m.reloadTaskStatesCmd()
+}
+
+// reloadTaskStatesCmd returns a command that reads the current task states from
+// the local journal directory and returns a taskStatesLoadedMsg. It is called
+// at startup and after each action that writes journal data.
+func (m updateModel) reloadTaskStatesCmd() tea.Cmd {
+	ctx := m.ctx
 	return func() tea.Msg {
-		username := m.ctx.Username
+		username := ctx.Username
 		if username == "" {
 			cfg, err := config.Load()
 			if err != nil {
@@ -150,8 +158,8 @@ func (m updateModel) Init() tea.Cmd {
 			}
 			username = slugify.Slugify(cfg.Name)
 		}
-		journalDir := filepath.Join(m.ctx.DataDir, "journal")
-		states, err := journal.CurrentTaskStates(journalDir, username, m.ctx.EncryptionKey)
+		journalDir := filepath.Join(ctx.DataDir, "journal")
+		states, err := journal.CurrentTaskStates(journalDir, username, ctx.EncryptionKey)
 		if err != nil {
 			return taskStatesLoadedMsg{err: err}
 		}
@@ -192,7 +200,6 @@ func (m updateModel) Init() tea.Cmd {
 			return recent[i].state.TS > recent[j].state.TS
 		})
 		activeTasks := append(blocked, recent...)
-
 		return taskStatesLoadedMsg{activeTasks: activeTasks, username: username}
 	}
 }
@@ -212,6 +219,8 @@ func (m updateModel) Update(msg tea.Msg) (updateModel, tea.Cmd) {
 	case appendDoneMsg:
 		if msg.err != nil {
 			m.err = msg.err
+		} else {
+			return m, m.reloadTaskStatesCmd()
 		}
 
 	case editEntriesLoadedMsg:
@@ -227,6 +236,7 @@ func (m updateModel) Update(msg tea.Msg) (updateModel, tea.Cmd) {
 			m.err = msg.err
 		} else {
 			m.phase = phaseMenu
+			return m, m.reloadTaskStatesCmd()
 		}
 
 	case goalsLoadedMsg:

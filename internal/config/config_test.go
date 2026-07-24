@@ -8,6 +8,21 @@ import (
 	"testing"
 )
 
+func TestValidUsername(t *testing.T) {
+	valid := []string{"@alice", "@Alice", "@alice-jones", "@a", "@a1b2c3"}
+	for _, v := range valid {
+		if !ValidUsername(v) {
+			t.Errorf("expected %q to be valid", v)
+		}
+	}
+	invalid := []string{"alice", "@", "@-alice", "@alice!", "@ alice", ""}
+	for _, v := range invalid {
+		if ValidUsername(v) {
+			t.Errorf("expected %q to be invalid", v)
+		}
+	}
+}
+
 func TestRoundTrip(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	cfg := &Config{Name: "my-repo"}

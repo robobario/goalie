@@ -846,6 +846,9 @@ func (m updateModel) handleNewTaskKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 				m.selectedGoal = selected
 			}
 			m.newSub = newFormTask
+			if m.selectedTag == "" {
+				m.selectedTag = "#" // seed the fixed prefix
+			}
 		}
 		return m, cmd
 
@@ -862,12 +865,15 @@ func (m updateModel) handleNewTaskKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 			m.tagError = ""
 			m.newSub = newFormGoal
 		case "backspace":
-			if len(m.selectedTag) > 0 {
+			if len(m.selectedTag) > 1 { // stop at '#', never remove it
 				m.selectedTag = m.selectedTag[:len(m.selectedTag)-1]
 				m.tagError = ""
 			}
 		default:
 			if len(msg.Runes) == 1 {
+				if m.selectedTag == "" {
+					m.selectedTag = "#"
+				}
 				m.selectedTag += string(msg.Runes)
 				m.tagError = ""
 			}
@@ -942,16 +948,17 @@ func (m updateModel) viewNewTask() string {
 		sb.WriteString("  Goal:  " + goalLabel + "\n")
 	}
 
-	// Task field
+	// Task field — '#' is a fixed prefix; show only the body after it
+	tagBody := strings.TrimPrefix(m.selectedTag, "#")
 	if m.newSub == newFormTask {
-		sb.WriteString("\n> Task:  " + m.selectedTag + "_\n")
+		sb.WriteString("\n> Task:  #" + tagBody + "_\n")
 		if m.tagError != "" {
 			sb.WriteString("  " + m.tagError + "\n")
 		} else if info := m.existingTaskInfo(); info != "" {
 			sb.WriteString("  ↳ " + info + "\n")
 		}
 	} else {
-		sb.WriteString("\n  Task:  " + m.selectedTag + "\n")
+		sb.WriteString("\n  Task:  #" + tagBody + "\n")
 		if m.newSub > newFormTask {
 			if info := m.existingTaskInfo(); info != "" {
 				sb.WriteString("  ↳ " + info + "\n")

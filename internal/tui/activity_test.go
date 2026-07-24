@@ -128,6 +128,19 @@ func TestFilterEntriesFuzzyTolerance(t *testing.T) {
 	}
 }
 
+func TestFormatActivityEntryGoalIncluded(t *testing.T) {
+	goal := "ROUTING"
+	e := journal.Entry{
+		TS:   time.Now().Format(time.RFC3339),
+		Note: "some work",
+		Goal: strPtr(goal),
+	}
+	got := formatActivityEntry(e, time.Now())
+	if !strings.Contains(got, goal) {
+		t.Errorf("expected goal %q in entry output; got %q", goal, got)
+	}
+}
+
 func TestFormatActivityEntryTaskTagIncluded(t *testing.T) {
 	tag := "#impl"
 	e := journal.Entry{

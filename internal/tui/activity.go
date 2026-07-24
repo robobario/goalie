@@ -15,6 +15,7 @@ import (
 
 var blockedStyle  = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "124", Dark: "9"})
 var doneStyle     = lipgloss.NewStyle().Faint(true)
+var goalStyle     = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "27", Dark: "75"})
 var taskTagStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "130", Dark: "208"})
 var usernameStyle = lipgloss.NewStyle().Bold(true)
 
@@ -161,7 +162,7 @@ func formatActivityEntry(e journal.Entry, now time.Time) string {
 		parts = append(parts, taskTagStyle.Render(*e.Task))
 	}
 	if e.Goal != nil {
-		parts = append(parts, "("+*e.Goal+")")
+		parts = append(parts, "("+goalStyle.Render(*e.Goal)+")")
 	}
 	parts = append(parts, e.Note)
 	return strings.Join(parts, " ") + " — " + ageString(e.TS, now)

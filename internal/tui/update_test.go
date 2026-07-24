@@ -33,6 +33,24 @@ func TestUpdateViewMultiLineErrorPreserved(t *testing.T) {
 	}
 }
 
+func TestColorizeGoalInTaskDisplay_withGoal(t *testing.T) {
+	got := colorizeGoalInTaskDisplay("ROUTING#impl some work — 2d ago")
+	if !strings.Contains(got, "ROUTING") {
+		t.Errorf("expected goal in output; got %q", got)
+	}
+	if !strings.Contains(got, "#impl") {
+		t.Errorf("expected tag in output; got %q", got)
+	}
+}
+
+func TestColorizeGoalInTaskDisplay_noGoal(t *testing.T) {
+	input := "#impl some work — 2d ago"
+	got := colorizeGoalInTaskDisplay(input)
+	if got != input {
+		t.Errorf("expected unchanged output for no-goal item; got %q", got)
+	}
+}
+
 func TestReloadDoesNotResetMenuCursor(t *testing.T) {
 	// Regression: reloading task states (e.g. after a submit) was unconditionally
 	// resetting menuCursor to 0, causing the selection to jump.

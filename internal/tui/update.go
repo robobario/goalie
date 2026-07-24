@@ -540,7 +540,7 @@ func (m updateModel) viewEditPicking() string {
 		}
 		goalPart := ""
 		if e.Goal != nil {
-			goalPart = "(" + *e.Goal + ") "
+			goalPart = "(" + goalStyle.Render(*e.Goal) + ") "
 		}
 		age := ageString(e.TS, now)
 		note := e.Note
@@ -772,9 +772,9 @@ func (m updateModel) viewTaskUpdatePicking() string {
 		}
 		if strings.HasPrefix(item, "[BLOCKED] ") {
 			body := strings.TrimPrefix(item, "[BLOCKED] ")
-			sb.WriteString(prefix + blockedStyle.Render("[BLOCKED]") + " " + body + "\n")
+			sb.WriteString(prefix + blockedStyle.Render("[BLOCKED]") + " " + colorizeGoalInTaskDisplay(body) + "\n")
 		} else {
-			sb.WriteString(prefix + item + "\n")
+			sb.WriteString(prefix + colorizeGoalInTaskDisplay(item) + "\n")
 		}
 	}
 	if m.taskUpdatePicker.query != "" {
@@ -793,7 +793,7 @@ func (m updateModel) viewTaskUpdateForm() string {
 	var sb strings.Builder
 	header := task.tag
 	if goal != "" {
-		header = goal + header
+		header = goalStyle.Render(goal) + header
 	}
 	sb.WriteString(header + "\n\n")
 
@@ -1019,4 +1019,15 @@ func (m updateModel) existingTaskInfo() string {
 		}
 	}
 	return ""
+}
+
+// colorizeGoalInTaskDisplay colours the goal ID portion of a task display
+// string (text before the first '#'). Returns the string unchanged if no '#'
+// is found or the goal portion is empty.
+func colorizeGoalInTaskDisplay(s string) string {
+	idx := strings.Index(s, "#")
+	if idx > 0 {
+		return goalStyle.Render(s[:idx]) + s[idx:]
+	}
+	return s
 }

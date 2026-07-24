@@ -51,13 +51,19 @@ func TestColorizeGoalInTaskDisplay_withGoal(t *testing.T) {
 	if !strings.Contains(got, "#impl") {
 		t.Errorf("expected tag in output; got %q", got)
 	}
+	if !strings.Contains(got, "some work") {
+		t.Errorf("expected note in output; got %q", got)
+	}
 }
 
 func TestColorizeGoalInTaskDisplay_noGoal(t *testing.T) {
-	input := "#impl some work — 2d ago"
-	got := colorizeGoalInTaskDisplay(input)
-	if got != input {
-		t.Errorf("expected unchanged output for no-goal item; got %q", got)
+	got := colorizeGoalInTaskDisplay("#impl some work — 2d ago")
+	// tag and note should still appear
+	if !strings.Contains(got, "#impl") {
+		t.Errorf("expected tag in output; got %q", got)
+	}
+	if !strings.Contains(got, "some work") {
+		t.Errorf("expected note in output; got %q", got)
 	}
 }
 

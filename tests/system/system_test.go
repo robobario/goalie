@@ -22,7 +22,17 @@ import (
 var binaryPath string
 
 func TestMain(m *testing.M) {
-	// Build the binary once; all tests share it.
+	// If GOALIE_BINARY is set, use that pre-built binary (e.g. a release build).
+	// Otherwise build from source so plain `go test ./tests/system/...` works.
+	if p := os.Getenv("GOALIE_BINARY"); p != "" {
+		abs, err := filepath.Abs(p)
+		if err != nil {
+			panic(fmt.Sprintf("GOALIE_BINARY path error: %v", err))
+		}
+		binaryPath = abs
+		os.Exit(m.Run())
+	}
+
 	tmp, err := os.MkdirTemp("", "goalie-system-*")
 	if err != nil {
 		panic(err)

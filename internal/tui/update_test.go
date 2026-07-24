@@ -222,38 +222,21 @@ func TestUpdateRecentNotesEnterMovesToBlocked(t *testing.T) {
 	}
 }
 
-func TestMenuOptionsIncludesBlockedWhenPresent(t *testing.T) {
-	m := updateModel{
-		phase: phaseMenu,
-		blockedTasks: []blockedTask{
-			makeBlockedThread("#impl", nil, "waiting"),
-		},
-		recentTasks: []recentTask{
-			makeRecentThread("#docs", nil, "in progress", 2),
-		},
-	}
-	opts := m.menuOptions()
-	if len(opts) != 4 {
-		t.Fatalf("expected 4 options, got %d", len(opts))
-	}
-	if opts[0].phase != phaseBlockedReview {
-		t.Errorf("expected first option to be blocked review, got %v", opts[0].phase)
-	}
-	if opts[1].phase != phaseRecentReview {
-		t.Errorf("expected second option to be recent review, got %v", opts[1].phase)
-	}
-	if opts[2].phase != phaseNewTask {
-		t.Errorf("expected third option to be new task, got %v", opts[2].phase)
-	}
-}
-
-func TestMenuOptionsOmitsBlockedWhenNone(t *testing.T) {
+func TestMenuOptionsAlwaysHasThreeItems(t *testing.T) {
+	// Menu always shows: Update a task, New task, Edit a recent entry.
 	m := updateModel{phase: phaseMenu}
 	opts := m.menuOptions()
-	for _, o := range opts {
-		if o.phase == phaseBlockedReview {
-			t.Error("expected no blocked-review option when no blocked tasks")
-		}
+	if len(opts) != 3 {
+		t.Fatalf("expected 3 options, got %d", len(opts))
+	}
+	if opts[0].phase != phaseTaskUpdate {
+		t.Errorf("expected first option to be phaseTaskUpdate, got %v", opts[0].phase)
+	}
+	if opts[1].phase != phaseNewTask {
+		t.Errorf("expected second option to be phaseNewTask, got %v", opts[1].phase)
+	}
+	if opts[2].phase != phaseEditEntry {
+		t.Errorf("expected third option to be phaseEditEntry, got %v", opts[2].phase)
 	}
 }
 
@@ -270,31 +253,14 @@ func TestMenuDownMovesCursor(t *testing.T) {
 	}
 }
 
-func TestMenuEnterSelectsBlockedReview(t *testing.T) {
+func TestMenuEnterSelectsTaskUpdate(t *testing.T) {
 	m := updateModel{
-		phase: phaseMenu,
-		blockedTasks: []blockedTask{
-			makeBlockedThread("#impl", nil, "waiting"),
-		},
-		menuCursor: 0,
+		phase:      phaseMenu,
+		menuCursor: 0, // first item is "Update a task"
 	}
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	if m.phase != phaseBlockedReview {
-		t.Errorf("expected phaseBlockedReview, got %v", m.phase)
-	}
-}
-
-func TestMenuEnterSelectsRecentReview(t *testing.T) {
-	m := updateModel{
-		phase: phaseMenu,
-		recentTasks: []recentTask{
-			makeRecentThread("#docs", nil, "work", 2),
-		},
-		menuCursor: 0,
-	}
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	if m.phase != phaseRecentReview {
-		t.Errorf("expected phaseRecentReview, got %v", m.phase)
+	if m.phase != phaseTaskUpdate {
+		t.Errorf("expected phaseTaskUpdate, got %v", m.phase)
 	}
 }
 
@@ -336,23 +302,121 @@ func TestNewTaskEscapeReturnsToMenu(t *testing.T) {
 }
 
 func TestMenuViewContainsOptions(t *testing.T) {
+	m := updateModel{phase: phaseMenu}
+	view := m.View()
+	if view == "" {
+		t.Fatal("expected non-empty menu view")
+	}
+	for _, want := range []string{"Update a task", "new task", "Edit"} {
+		if !containsFold(view, want) {
+			t.Errorf("expected %q in menu view:\n%s", want, view)
+		}
+	}
+}
+
+func TestTaskUpdateEnterPhasePopulatesPicker(t *testing.T) {
 	m := updateModel{
 		phase: phaseMenu,
 		blockedTasks: []blockedTask{
 			makeBlockedThread("#impl", nil, "waiting"),
 		},
 		recentTasks: []recentTask{
-			makeRecentThread("#docs", nil, "work", 2),
+			makeRecentThread("#docs", nil, "in progress", 2),
 		},
 	}
-	view := m.View()
-	if view == "" {
-		t.Fatal("expected non-empty menu view")
+	m = m.enterPhaseTaskUpdate()
+	if m.phase != phaseTaskUpdate {
+		t.Errorf("expected phaseTaskUpdate, got %v", m.phase)
 	}
-	for _, want := range []string{"blocked", "recent", "new"} {
-		if !containsFold(view, want) {
-			t.Errorf("expected %q in menu view:\n%s", want, view)
-		}
+	if len(m.taskUpdatePicker.items) != 2 {
+		t.Errorf("expected 2 picker items (1 blocked + 1 recent), got %d", len(m.taskUpdatePicker.items))
+	}
+	// Blocked tasks should come first and have [BLOCKED] prefix
+	if !strings.HasPrefix(m.taskUpdatePicker.items[0], "[BLOCKED]") {
+		t.Errorf("expected blocked task first with [BLOCKED] prefix, got %q", m.taskUpdatePicker.items[0])
+	}
+}
+
+func TestTaskUpdatePickerEnterAdvancesToNote(t *testing.T) {
+	m := updateModel{
+		phase: phaseMenu,
+		blockedTasks: []blockedTask{
+			makeBlockedThread("#impl", nil, "waiting for review"),
+		},
+	}
+	m = m.enterPhaseTaskUpdate()
+	// Enter on the first picker item (blocked task)
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.taskUpdateSub != taskUpdateNote {
+		t.Errorf("expected taskUpdateNote after picker Enter, got %v", m.taskUpdateSub)
+	}
+	if m.taskUpdateState != entryBlocked {
+		t.Errorf("expected state pre-filled as entryBlocked for blocked task, got %v", m.taskUpdateState)
+	}
+}
+
+func TestTaskUpdateNoteEnterAdvancesToState(t *testing.T) {
+	m := updateModel{
+		phase:          phaseTaskUpdate,
+		taskUpdateSub:  taskUpdateNote,
+		taskUpdateNote: "making progress",
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.taskUpdateSub != taskUpdateState {
+		t.Errorf("expected taskUpdateState after Enter, got %v", m.taskUpdateSub)
+	}
+}
+
+func TestTaskUpdateStateUpGoesBackToNote(t *testing.T) {
+	m := updateModel{
+		phase:         phaseTaskUpdate,
+		taskUpdateSub: taskUpdateState,
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	if m.taskUpdateSub != taskUpdateNote {
+		t.Errorf("expected taskUpdateNote after Up from state, got %v", m.taskUpdateSub)
+	}
+}
+
+func TestTaskUpdateStateCyclesWithArrows(t *testing.T) {
+	m := updateModel{
+		phase:          phaseTaskUpdate,
+		taskUpdateSub:  taskUpdateState,
+		taskUpdateState: entryBlocked,
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	if m.taskUpdateState != entryUnblocked {
+		t.Errorf("expected entryUnblocked after Right, got %v", m.taskUpdateState)
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	if m.taskUpdateState != entryDone {
+		t.Errorf("expected entryDone after second Right, got %v", m.taskUpdateState)
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyLeft})
+	if m.taskUpdateState != entryUnblocked {
+		t.Errorf("expected entryUnblocked after Left, got %v", m.taskUpdateState)
+	}
+}
+
+func TestTaskUpdateEscFromPickerGoesToMenu(t *testing.T) {
+	m := updateModel{
+		phase:         phaseTaskUpdate,
+		taskUpdateSub: taskUpdatePicking,
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if m.phase != phaseMenu {
+		t.Errorf("expected phaseMenu after Esc from picker, got %v", m.phase)
+	}
+}
+
+func TestTaskUpdateEscFromFormGoesToPicker(t *testing.T) {
+	m := updateModel{
+		phase:         phaseTaskUpdate,
+		taskUpdateSub: taskUpdateNote,
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if m.taskUpdateSub != taskUpdatePicking {
+		t.Errorf("expected taskUpdatePicking after Esc from form, got %v", m.taskUpdateSub)
 	}
 }
 

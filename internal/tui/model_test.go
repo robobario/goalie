@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -153,6 +154,17 @@ func TestShiftTabFromUpdateMenuSwitchesToActivity(t *testing.T) {
 	got := next.(Model)
 	if got.activeTab != activityTab {
 		t.Errorf("expected activityTab after Shift+Tab from update menu, got %v", got.activeTab)
+	}
+}
+
+func TestViewIncludesKeyHelpBar(t *testing.T) {
+	m := newModel()
+	view := m.View()
+	if !strings.Contains(view, "Tab") {
+		t.Errorf("expected key-help bar with Tab hint in view; got:\n%s", view)
+	}
+	if !strings.Contains(view, "q: quit") {
+		t.Errorf("expected 'q: quit' in view key-help; got:\n%s", view)
 	}
 }
 

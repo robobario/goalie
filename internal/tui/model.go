@@ -17,6 +17,7 @@ var (
 	activeTabStyle   = lipgloss.NewStyle().Bold(true).Underline(true).Padding(0, 2)
 	inactiveTabStyle = lipgloss.NewStyle().Padding(0, 2)
 	tabBarStyle      = lipgloss.NewStyle().MarginBottom(1)
+	helpBarStyle     = lipgloss.NewStyle().Faint(true).MarginTop(1)
 )
 
 type Model struct {
@@ -137,7 +138,8 @@ func (m Model) View() string {
 		body = m.update.View()
 	}
 
-	return lipgloss.JoinVertical(lipgloss.Left, tabBar, body)
+	helpBar := helpBarStyle.Render("Tab/Shift-Tab: switch view  q: quit")
+	return lipgloss.JoinVertical(lipgloss.Left, tabBar, body, helpBar)
 }
 
 func Run(ctx *cli.AppContext) error {

@@ -131,6 +131,31 @@ func TestShiftTabToActivityTabTriggersRefresh(t *testing.T) {
 	}
 }
 
+func TestTabFromUpdateMenuSwitchesToActivity(t *testing.T) {
+	// Regression test: Tab was silently consumed by the update model when
+	// phase != phaseLoading, preventing the user from returning to the
+	// Activity tab.
+	m := newModel()
+	m.activeTab = updateTab
+	m.update.phase = phaseMenu // simulate fully-loaded update tab at the menu
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	got := next.(Model)
+	if got.activeTab != activityTab {
+		t.Errorf("expected activityTab after Tab from update menu, got %v", got.activeTab)
+	}
+}
+
+func TestShiftTabFromUpdateMenuSwitchesToActivity(t *testing.T) {
+	m := newModel()
+	m.activeTab = updateTab
+	m.update.phase = phaseMenu
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+	got := next.(Model)
+	if got.activeTab != activityTab {
+		t.Errorf("expected activityTab after Shift+Tab from update menu, got %v", got.activeTab)
+	}
+}
+
 func TestWindowSizeMsgNotForwardedToActivityChild(t *testing.T) {
 	// activityModel has no width/height field; this test documents that
 	// WindowSizeMsg is stored on the top-level Model only and is not

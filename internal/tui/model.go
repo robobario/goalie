@@ -45,7 +45,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if m.activeTab == updateTab && m.update.phase != phaseLoading {
+		if m.activeTab == updateTab && m.update.phase != phaseLoading &&
+			msg.String() != "tab" && msg.String() != "shift+tab" {
 			var cmd tea.Cmd
 			m.update, cmd = m.update.Update(msg)
 			cmds = append(cmds, cmd)

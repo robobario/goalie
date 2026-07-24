@@ -76,6 +76,12 @@ func (m activityModel) Update(msg tea.Msg) (activityModel, tea.Cmd) {
 		m.entries = msg.entries
 		m.filtered = FilterEntries(m.entries, m.search)
 	case tea.KeyMsg:
+		if msg.Paste {
+			m.searchMode = true
+			m.search += string(msg.Runes)
+			m.filtered = FilterEntries(m.entries, m.search)
+			break
+		}
 		switch msg.String() {
 		case "esc":
 			m.search = ""

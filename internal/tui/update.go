@@ -532,7 +532,7 @@ func (m updateModel) viewEditPicking() string {
 	for i, e := range m.editEntries {
 		task := ""
 		if e.Task != nil {
-			task = *e.Task + " "
+			task = taskTagStyle.Render(*e.Task) + " "
 		}
 		goalPart := ""
 		if e.Goal != nil {
@@ -560,19 +560,19 @@ func (m updateModel) viewEditNote() string {
 	}
 	header := "Editing entry"
 	if task != "" {
-		header = "Editing: " + task
+		header = "Editing: " + taskTagStyle.Render(task)
 	}
 	return fmt.Sprintf("%s\n\nNote: %s_\n\nEnter to continue, Esc to cancel", header, m.editNoteInput)
 }
 
 func (m updateModel) viewEditTask() string {
 	return fmt.Sprintf("Note: %s\n\nTask tag: %s_\n\nEnter to confirm (#hashtag required), Esc to cancel",
-		strings.TrimSpace(m.editNoteInput), m.editTaskInput)
+		strings.TrimSpace(m.editNoteInput), taskTagStyle.Render(m.editTaskInput))
 }
 
 func (m updateModel) viewEditBlockedDone() string {
 	return fmt.Sprintf("Note: %s\nTask: %s\n\nBlocked? [y]  Not blocked? [n]  Done? [d]  (Esc to cancel)",
-		strings.TrimSpace(m.editNoteInput), m.editTaskInput)
+		strings.TrimSpace(m.editNoteInput), taskTagStyle.Render(m.editTaskInput))
 }
 
 func goalIDs(gs []goals.Goal) []string {
@@ -800,7 +800,7 @@ func (m updateModel) viewTaskUpdateForm() string {
 	}
 
 	var sb strings.Builder
-	header := task.tag
+	header := taskTagStyle.Render(task.tag)
 	if goal != "" {
 		header = goalStyle.Render(goal) + header
 	}
@@ -961,14 +961,14 @@ func (m updateModel) viewNewTask() string {
 	// Task field — '#' is a fixed prefix; show only the body after it
 	tagBody := strings.TrimPrefix(m.selectedTag, "#")
 	if m.newSub == newFormTask {
-		sb.WriteString("\n> Task:  #" + tagBody + "_\n")
+		sb.WriteString("\n> Task:  " + taskTagStyle.Render("#"+tagBody) + "_\n")
 		if m.tagError != "" {
 			sb.WriteString("  " + m.tagError + "\n")
 		} else if info := m.existingTaskInfo(); info != "" {
 			sb.WriteString("  ↳ " + info + "\n")
 		}
 	} else {
-		sb.WriteString("\n  Task:  #" + tagBody + "\n")
+		sb.WriteString("\n  Task:  " + taskTagStyle.Render("#"+tagBody) + "\n")
 		if m.newSub > newFormTask {
 			if info := m.existingTaskInfo(); info != "" {
 				sb.WriteString("  ↳ " + info + "\n")
@@ -1030,13 +1030,27 @@ func (m updateModel) existingTaskInfo() string {
 	return ""
 }
 
-// colorizeGoalInTaskDisplay colours the goal ID portion of a task display
-// string (text before the first '#'). Returns the string unchanged if no '#'
-// is found or the goal portion is empty.
+// colorizeGoalInTaskDisplay colours the goal ID (text before the first '#')
+// and the task tag (the '#word' immediately after) in a display string.
 func colorizeGoalInTaskDisplay(s string) string {
 	idx := strings.Index(s, "#")
-	if idx > 0 {
-		return goalStyle.Render(s[:idx]) + s[idx:]
+	if idx < 0 {
+		return s
 	}
-	return s
+	rest := s[idx:]               // "#impl note — age"
+	spaceIdx := strings.Index(rest, " ")
+	if spaceIdx < 0 {
+		// tag only, no trailing text
+		tag := goalStyle.Render(s[:idx]) + taskTagStyle.Render(rest)
+		if idx == 0 {
+			return taskTagStyle.Render(rest)
+		}
+		return tag
+	}
+	tag := rest[:spaceIdx]        // "#impl"
+	after := rest[spaceIdx:]      // " note — age"
+	if idx > 0 {
+		return goalStyle.Render(s[:idx]) + taskTagStyle.Render(tag) + after
+	}
+	return taskTagStyle.Render(tag) + after
 }

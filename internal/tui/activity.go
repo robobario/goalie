@@ -159,11 +159,13 @@ func formatActivityEntry(e journal.Entry, now time.Time) string {
 	} else if e.Blocked {
 		parts = append(parts, blockedStyle.Render("[BLOCKED]"))
 	}
-	if e.Task != nil {
+	// Render as GOAL_ID#task-tag (no space between them) when both are present.
+	if e.Goal != nil && e.Task != nil {
+		parts = append(parts, goalStyle.Render(*e.Goal)+taskTagStyle.Render(*e.Task))
+	} else if e.Goal != nil {
+		parts = append(parts, goalStyle.Render(*e.Goal))
+	} else if e.Task != nil {
 		parts = append(parts, taskTagStyle.Render(*e.Task))
-	}
-	if e.Goal != nil {
-		parts = append(parts, "("+goalStyle.Render(*e.Goal)+")")
 	}
 	parts = append(parts, e.Note)
 	return strings.Join(parts, " ") + " — " + ageString(e.TS, now)

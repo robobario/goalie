@@ -128,6 +128,27 @@ func TestFilterEntriesFuzzyTolerance(t *testing.T) {
 	}
 }
 
+func TestFormatActivityEntryGoalTaskCombined(t *testing.T) {
+	// GOAL_ID#task-tag should appear as one token without a space between them.
+	e := journal.Entry{
+		TS:   time.Now().Format(time.RFC3339),
+		Note: "some work",
+		Goal: strPtr("ROUTING"),
+		Task: strPtr("#impl"),
+	}
+	got := formatActivityEntry(e, time.Now())
+	if !strings.Contains(got, "ROUTING") {
+		t.Errorf("expected goal in output; got %q", got)
+	}
+	if !strings.Contains(got, "#impl") {
+		t.Errorf("expected task tag in output; got %q", got)
+	}
+	// Goal should NOT be wrapped in parentheses anymore.
+	if strings.Contains(got, "(ROUTING)") {
+		t.Errorf("goal should not be wrapped in parentheses; got %q", got)
+	}
+}
+
 func TestFormatActivityEntryGoalIncluded(t *testing.T) {
 	goal := "ROUTING"
 	e := journal.Entry{

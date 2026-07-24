@@ -13,8 +13,9 @@ import (
 	"goalie/internal/journal"
 )
 
-var blockedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
-var doneStyle    = lipgloss.NewStyle().Faint(true)
+var blockedStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+var doneStyle     = lipgloss.NewStyle().Faint(true)
+var taskTagStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "130", Dark: "208"})
 var usernameStyle = lipgloss.NewStyle().Bold(true)
 
 type entriesLoadedMsg struct {
@@ -157,7 +158,7 @@ func formatActivityEntry(e journal.Entry, now time.Time) string {
 		parts = append(parts, blockedStyle.Render("[BLOCKED]"))
 	}
 	if e.Task != nil {
-		parts = append(parts, *e.Task)
+		parts = append(parts, taskTagStyle.Render(*e.Task))
 	}
 	if e.Goal != nil {
 		parts = append(parts, "("+*e.Goal+")")

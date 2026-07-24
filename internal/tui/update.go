@@ -18,13 +18,11 @@ import (
 type updatePhase int
 
 const (
-	phaseLoading       updatePhase = iota
-	phaseMenu                      // top-level action menu
-	phaseBlockedReview             // reviewing blocked tasks one at a time
-	phaseRecentReview
+	phaseLoading    updatePhase = iota
+	phaseMenu                   // top-level action menu
 	phaseNewTask
-	phaseEditEntry   // editing an existing journal entry
-	phaseTaskUpdate  // combined active-task picker + log form
+	phaseEditEntry  // editing an existing journal entry
+	phaseTaskUpdate // combined active-task picker + log form
 	phaseDone
 )
 
@@ -82,29 +80,10 @@ type taskTagsLoadedMsg struct {
 	err  error
 }
 
-type blockedTask struct {
-	tag   string
-	state journal.TaskState
-}
-
-type recentSub int
-
-const (
-	recentList    recentSub = iota // list shown, cursor moving
-	recentNotes                    // capturing notes for selected task
-	recentBlocked                  // y/n for blocked
-)
-
-type recentTask struct {
-	tag   string
-	state journal.TaskState
-}
-
 type taskStatesLoadedMsg struct {
-	blocked  []blockedTask
-	recent   []recentTask
-	username string
-	err      error
+	activeTasks []activeTask
+	username    string
+	err         error
 }
 
 type appendDoneMsg struct {
@@ -126,20 +105,7 @@ type updateModel struct {
 	phase    updatePhase
 	err      error
 
-	blockedTasks    []blockedTask
-	blockedIdx      int
-	awaitingUnblock bool // showing "Is it now unblocked?" prompt
-	inputMode       bool // capturing notes text
-	notesInput      string
-	nowUnblocked    bool
-
-	recentTasks     []recentTask
-	recentCursor    int
-	recentSub       recentSub
-	updatedTags     map[string]bool
-	recentNotes     string
-	recentUnblocked bool
-	recentDone      bool
+	activeTasks []activeTask
 
 	menuCursor   int
 
@@ -189,11 +155,25 @@ func (m updateModel) Init() tea.Cmd {
 		if err != nil {
 			return taskStatesLoadedMsg{err: err}
 		}
-		var blocked []blockedTask
+		// Collect blocked tasks first (sorted by goal then tag), then recent non-blocked.
+		var blocked, recent []activeTask
+		cutoff := time.Now().UTC().Add(-7 * 24 * time.Hour)
 		for tag, state := range states {
-			if state.Blocked && !state.Done {
-				blocked = append(blocked, blockedTask{tag: tag, state: state})
+			if state.Done {
+				continue
 			}
+			if state.Blocked {
+				blocked = append(blocked, activeTask{tag: tag, state: state})
+				continue
+			}
+			if state.TS == "" {
+				continue
+			}
+			ts, parseErr := time.Parse(time.RFC3339, state.TS)
+			if parseErr != nil || ts.Before(cutoff) {
+				continue
+			}
+			recent = append(recent, activeTask{tag: tag, state: state})
 		}
 		sort.Slice(blocked, func(i, j int) bool {
 			gi, gj := "", ""
@@ -208,27 +188,12 @@ func (m updateModel) Init() tea.Cmd {
 			}
 			return blocked[i].tag < blocked[j].tag
 		})
-
-		cutoff := time.Now().UTC().Add(-7 * 24 * time.Hour)
-		var recent []recentTask
-		for tag, state := range states {
-			if state.Blocked || state.TS == "" {
-				continue
-			}
-			ts, err := time.Parse(time.RFC3339, state.TS)
-			if err != nil {
-				continue
-			}
-			if ts.Before(cutoff) {
-				continue
-			}
-			recent = append(recent, recentTask{tag: tag, state: state})
-		}
 		sort.Slice(recent, func(i, j int) bool {
 			return recent[i].state.TS > recent[j].state.TS
 		})
+		activeTasks := append(blocked, recent...)
 
-		return taskStatesLoadedMsg{blocked: blocked, recent: recent, username: username}
+		return taskStatesLoadedMsg{activeTasks: activeTasks, username: username}
 	}
 }
 
@@ -240,11 +205,7 @@ func (m updateModel) Update(msg tea.Msg) (updateModel, tea.Cmd) {
 			return m, nil
 		}
 		m.username = msg.username
-		m.blockedTasks = msg.blocked
-		m.blockedIdx = 0
-		m.recentTasks = msg.recent
-		m.recentCursor = 0
-		m.updatedTags = make(map[string]bool)
+		m.activeTasks = msg.activeTasks
 		m.phase = phaseMenu
 		m.menuCursor = 0
 
@@ -294,16 +255,6 @@ func (m updateModel) Update(msg tea.Msg) (updateModel, tea.Cmd) {
 		switch m.phase {
 		case phaseMenu:
 			return m.handleMenuKey(msg)
-		case phaseBlockedReview:
-			if m.inputMode {
-				return m.handleInputKey(msg)
-			}
-			if m.awaitingUnblock {
-				return m.handleUnblockKey(msg)
-			}
-			return m.handleBlockedReviewKey(msg)
-		case phaseRecentReview:
-			return m.handleRecentReviewKey(msg)
 		case phaseNewTask:
 			return m.handleNewTaskKey(msg)
 		case phaseEditEntry:
@@ -360,15 +311,6 @@ func (m updateModel) handleMenuKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 		switch opts[m.menuCursor].phase {
 		case phaseTaskUpdate:
 			return m.enterPhaseTaskUpdate(), nil
-		case phaseBlockedReview:
-			m.phase = phaseBlockedReview
-			m.blockedIdx = 0
-			m.inputMode = false
-			m.awaitingUnblock = false
-		case phaseRecentReview:
-			m.phase = phaseRecentReview
-			m.recentCursor = 0
-			m.recentSub = recentList
 		case phaseNewTask:
 			return m.enterPhaseNewTask()
 		case phaseEditEntry:
@@ -399,191 +341,6 @@ func (m updateModel) viewMenu() string {
 	return sb.String()
 }
 
-func (m updateModel) handleInputKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
-	switch msg.String() {
-	case "enter":
-		note := strings.TrimSpace(m.notesInput)
-		var cmd tea.Cmd
-		if note != "" || m.nowUnblocked {
-			entryNote := note
-			if entryNote == "" {
-				entryNote = "unblocked"
-			}
-			tag := m.blockedTasks[m.blockedIdx].tag
-			item := m.blockedTasks[m.blockedIdx]
-			entry := journal.Entry{
-				Goal:    item.state.Goal,
-				Note:    entryNote,
-				Blocked: !m.nowUnblocked,
-				Task:    &tag,
-			}
-			ctx := m.ctx
-			username := m.username
-			cmd = func() tea.Msg {
-				err := journal.Append(ctx.DataDir, ctx.Git, username, entry, ctx.EncryptionKey)
-				return appendDoneMsg{err: err}
-			}
-		}
-		m.inputMode = false
-		m.notesInput = ""
-		m.nowUnblocked = false
-		m.blockedIdx++
-		if m.blockedIdx >= len(m.blockedTasks) {
-			m.phase = phaseMenu
-		}
-		return m, cmd
-	case "backspace":
-		if len(m.notesInput) > 0 {
-			m.notesInput = m.notesInput[:len(m.notesInput)-1]
-		}
-	default:
-		if len(msg.Runes) == 1 {
-			m.notesInput += string(msg.Runes)
-		}
-	}
-	return m, nil
-}
-
-func (m updateModel) handleUnblockKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
-	switch msg.String() {
-	case "y":
-		m.nowUnblocked = true
-		m.awaitingUnblock = false
-		m.inputMode = true
-	case "n":
-		m.nowUnblocked = false
-		m.awaitingUnblock = false
-		m.inputMode = true
-	case "esc":
-		m.awaitingUnblock = false
-		m.phase = phaseMenu
-	}
-	return m, nil
-}
-
-func (m updateModel) handleBlockedReviewKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
-	switch msg.String() {
-	case "y":
-		m.awaitingUnblock = true
-	case "n":
-		m.blockedIdx++
-		if m.blockedIdx >= len(m.blockedTasks) {
-			m.phase = phaseMenu
-		}
-	case "esc":
-		m.phase = phaseMenu
-	}
-	return m, nil
-}
-
-func (m updateModel) handleRecentReviewKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
-	switch m.recentSub {
-	case recentList:
-		return m.handleRecentListKey(msg)
-	case recentNotes:
-		return m.handleRecentNotesKey(msg)
-	case recentBlocked:
-		return m.handleRecentBlockedKey(msg)
-	}
-	return m, nil
-}
-
-func (m updateModel) handleRecentListKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
-	switch msg.String() {
-	case "q", "ctrl+c":
-		return m, tea.Quit
-	case "s", "esc":
-		m.phase = phaseMenu
-		return m, nil
-	case "up":
-		if m.recentCursor > 0 {
-			m.recentCursor--
-		}
-	case "down":
-		if m.recentCursor < len(m.recentTasks)-1 {
-			m.recentCursor++
-		}
-	case "enter":
-		if len(m.recentTasks) > 0 {
-			m.recentNotes = ""
-			m.recentSub = recentNotes
-		}
-	}
-	return m, nil
-}
-
-func (m updateModel) handleRecentNotesKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
-	switch msg.String() {
-	case "enter":
-		m.recentSub = recentBlocked
-	case "backspace":
-		if len(m.recentNotes) > 0 {
-			m.recentNotes = m.recentNotes[:len(m.recentNotes)-1]
-		}
-	default:
-		if len(msg.Runes) == 1 {
-			m.recentNotes += string(msg.Runes)
-		}
-	}
-	return m, nil
-}
-
-func (m updateModel) handleRecentBlockedKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
-	switch msg.String() {
-	case "y":
-		m.recentUnblocked = false
-		m.recentDone = false
-		return m.submitRecentEntry()
-	case "n":
-		m.recentUnblocked = true
-		m.recentDone = false
-		return m.submitRecentEntry()
-	case "d":
-		m.recentUnblocked = true
-		m.recentDone = true
-		return m.submitRecentEntry()
-	}
-	return m, nil
-}
-
-func (m updateModel) submitRecentEntry() (updateModel, tea.Cmd) {
-	item := m.recentTasks[m.recentCursor]
-	note := strings.TrimSpace(m.recentNotes)
-	isBlocked := !m.recentUnblocked
-
-	entry := journal.Entry{
-		Goal:    item.state.Goal,
-		Note:    note,
-		Blocked: isBlocked,
-		Done:    m.recentDone,
-		Task:    &item.tag,
-	}
-	ctx := m.ctx
-	username := m.username
-	var cmd tea.Cmd
-	if note != "" {
-		cmd = func() tea.Msg {
-			err := journal.Append(ctx.DataDir, ctx.Git, username, entry, ctx.EncryptionKey)
-			return appendDoneMsg{err: err}
-		}
-	}
-
-	m.updatedTags[item.tag] = true
-	m.recentTasks = append(m.recentTasks[:m.recentCursor], m.recentTasks[m.recentCursor+1:]...)
-	if m.recentCursor >= len(m.recentTasks) && m.recentCursor > 0 {
-		m.recentCursor = len(m.recentTasks) - 1
-	}
-	m.recentNotes = ""
-	m.recentUnblocked = false
-	m.recentDone = false
-	m.recentSub = recentList
-
-	if len(m.recentTasks) == 0 {
-		m.phase = phaseMenu
-		return m, cmd
-	}
-	return m, cmd
-}
 
 func (m updateModel) View() string {
 	if m.err != nil {
@@ -594,10 +351,6 @@ func (m updateModel) View() string {
 		return "Loading..."
 	case phaseMenu:
 		return m.viewMenu()
-	case phaseBlockedReview:
-		return m.viewBlockedReview()
-	case phaseRecentReview:
-		return m.viewRecentReview()
 	case phaseNewTask:
 		return m.viewNewTask()
 	case phaseEditEntry:
@@ -610,78 +363,6 @@ func (m updateModel) View() string {
 	return ""
 }
 
-func (m updateModel) viewBlockedReview() string {
-	if m.blockedIdx >= len(m.blockedTasks) {
-		return ""
-	}
-	item := m.blockedTasks[m.blockedIdx]
-	remaining := len(m.blockedTasks) - m.blockedIdx
-
-	if m.inputMode {
-		return fmt.Sprintf("Notes: %s_", m.notesInput)
-	}
-
-	if m.awaitingUnblock {
-		return "Is it now unblocked? [y/n]"
-	}
-
-	var sb strings.Builder
-	fmt.Fprintf(&sb, "Reviewing blocked tasks (%d remaining)\n\n", remaining)
-	if item.state.Goal != nil {
-		fmt.Fprintf(&sb, "Goal:    %s\n", *item.state.Goal)
-	}
-	fmt.Fprintf(&sb, "Task:    %s\n", item.tag)
-	fmt.Fprintf(&sb, "Note:    %s\n", item.state.Note)
-	fmt.Fprintf(&sb, "Since:   %s\n", ageString(item.state.TS, time.Now().UTC()))
-	sb.WriteString("\n[y] Report changes   [n] Skip   [q] Quit")
-	return sb.String()
-}
-
-func (m updateModel) viewRecentReview() string {
-	switch m.recentSub {
-	case recentNotes:
-		if len(m.recentTasks) == 0 {
-			return ""
-		}
-		item := m.recentTasks[m.recentCursor]
-		goal := ""
-		if item.state.Goal != nil {
-			goal = *item.state.Goal
-		}
-		header := item.tag
-		if goal != "" {
-			header = fmt.Sprintf("%s (%s)", item.tag, goal)
-		}
-		return fmt.Sprintf("%s — last note: %s\n\nNotes: %s_", header, item.state.Note, m.recentNotes)
-	case recentBlocked:
-		return "Blocked? [y] Not blocked? [n] Mark done? [d]"
-	default:
-		var sb strings.Builder
-		sb.WriteString("Recent tasks — select one to update (↑/↓, Enter to select, s to skip all)\n\n")
-		now := time.Now().UTC()
-		for i, item := range m.recentTasks {
-			cursor := "  "
-			if i == m.recentCursor {
-				cursor = "> "
-			}
-			goal := ""
-			if item.state.Goal != nil {
-				goal = *item.state.Goal
-			}
-			age := ageString(item.state.TS, now)
-			label := item.tag
-			if item.state.Done {
-				label += " (closed)"
-			}
-			if goal != "" {
-				fmt.Fprintf(&sb, "%s%-28s %-12s %s\n", cursor, label, goal, age)
-			} else {
-				fmt.Fprintf(&sb, "%s%-28s %s\n", cursor, label, age)
-			}
-		}
-		return sb.String()
-	}
-}
 
 func (m updateModel) loadEditEntriesCmd() tea.Cmd {
 	ctx := m.ctx
@@ -927,20 +608,14 @@ func (m updateModel) enterPhaseTaskUpdate() updateModel {
 	m.taskUpdateNote = ""
 	m.taskUpdateState = entryUnblocked
 
-	// Combine blocked (first) then recent tasks into one active list.
 	now := time.Now().UTC()
-	displays := make([]string, 0, len(m.blockedTasks)+len(m.recentTasks))
-	byDisplay := make(map[string]activeTask, len(m.blockedTasks)+len(m.recentTasks))
+	displays := make([]string, 0, len(m.activeTasks))
+	byDisplay := make(map[string]activeTask, len(m.activeTasks))
 
-	for _, bt := range m.blockedTasks {
-		d := formatActiveTask(bt.tag, bt.state, true, now)
+	for _, at := range m.activeTasks {
+		d := formatActiveTask(at.tag, at.state, at.state.Blocked, now)
 		displays = append(displays, d)
-		byDisplay[d] = activeTask{tag: bt.tag, state: bt.state}
-	}
-	for _, rt := range m.recentTasks {
-		d := formatActiveTask(rt.tag, rt.state, false, now)
-		displays = append(displays, d)
-		byDisplay[d] = activeTask{tag: rt.tag, state: rt.state}
+		byDisplay[d] = at
 	}
 
 	m.taskUpdatePicker = newPicker(displays)

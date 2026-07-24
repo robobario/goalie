@@ -116,7 +116,8 @@ goalie summary --user "*"             # everyone on the team
 
 ```
 goalie                              # Open the TUI (activity view + guided update)
-goalie init <repo-url>              # Clone or create the data branch; prompts for name and encryption
+goalie init <repo-url> [--branch NAME]
+                                    # Clone or create the data branch (default: "data"); prompts for name and encryption
 goalie goal add <ID> <DESCRIPTION>  # Create a new open goal
 goalie goal close <ID>              # Mark a goal as closed
 goalie goal list                    # List all goals with their state

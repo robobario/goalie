@@ -16,26 +16,26 @@ import (
 	"goalie/internal/meta"
 )
 
-func Init(repoURL string, dataDir string, configPath string, r git.Runner, stdin io.Reader, stdout io.Writer, tty bool) error {
+func Init(repoURL string, dataDir string, configPath string, branch string, r git.Runner, stdin io.Reader, stdout io.Writer, tty bool) error {
 	// Wrap stdin once so sequential prompts share the same buffer and don't lose buffered input.
 	sr := bufio.NewReader(stdin)
 
 	if _, err := os.Stat(dataDir); err == nil {
 		fmt.Fprint(stdout, "Goalie data directory already exists.\n")
 	} else {
-		out, err := r.Output([]string{"ls-remote", "--heads", repoURL, "data"}, "")
+		out, err := r.Output([]string{"ls-remote", "--heads", repoURL, branch}, "")
 		if err != nil {
 			return err
 		}
 		if out != "" {
-			if err := r.Run([]string{"clone", "--branch", "data", repoURL, dataDir}, ""); err != nil {
+			if err := r.Run([]string{"clone", "--branch", branch, repoURL, dataDir}, ""); err != nil {
 				return err
 			}
 		} else {
 			if err := r.Run([]string{"init", dataDir}, ""); err != nil {
 				return err
 			}
-			if err := r.Run([]string{"symbolic-ref", "HEAD", "refs/heads/data"}, dataDir); err != nil {
+			if err := r.Run([]string{"symbolic-ref", "HEAD", "refs/heads/" + branch}, dataDir); err != nil {
 				return err
 			}
 			if err := r.Run([]string{"remote", "add", "origin", repoURL}, dataDir); err != nil {
@@ -78,7 +78,7 @@ func Init(repoURL string, dataDir string, configPath string, r git.Runner, stdin
 			if err := r.Run([]string{"commit", "-m", "chore: initialise goalie data branch"}, dataDir); err != nil {
 				return err
 			}
-			if err := r.Run([]string{"push", "--set-upstream", "origin", "data"}, dataDir); err != nil {
+			if err := r.Run([]string{"push", "--set-upstream", "origin", branch}, dataDir); err != nil {
 				return err
 			}
 

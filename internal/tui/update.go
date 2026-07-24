@@ -12,7 +12,6 @@ import (
 	"goalie/internal/config"
 	"goalie/internal/goals"
 	"goalie/internal/journal"
-	"goalie/internal/slugify"
 )
 
 type updatePhase int
@@ -155,7 +154,7 @@ func (m updateModel) reloadTaskStatesCmd() tea.Cmd {
 			if err != nil {
 				return taskStatesLoadedMsg{err: err}
 			}
-			username = slugify.Slugify(cfg.Name)
+			username = cfg.Name
 		}
 		journalDir := filepath.Join(ctx.DataDir, "journal")
 		states, err := journal.CurrentTaskStates(journalDir, username, ctx.EncryptionKey)

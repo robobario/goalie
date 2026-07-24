@@ -91,11 +91,11 @@ func Init(repoURL string, dataDir string, configPath string, branch string, r gi
 	}
 
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		name, err := requireInput("Your name: ", sr, stdout, tty)
+		username, err := promptUsername(sr, stdout, tty)
 		if err != nil {
 			return err
 		}
-		if err := config.SaveTo(configPath, &config.Config{Name: name}); err != nil {
+		if err := config.SaveTo(configPath, &config.Config{Name: username}); err != nil {
 			return err
 		}
 	}
@@ -121,6 +121,24 @@ func Init(repoURL string, dataDir string, configPath string, branch string, r gi
 	}
 
 	return nil
+}
+
+// promptUsername loops until the user enters a valid GitHub-style handle.
+// The '@' prefix is shown as a fixed part of the prompt; the user types only the body.
+func promptUsername(r io.Reader, w io.Writer, tty bool) (string, error) {
+	for {
+		fmt.Fprint(w, display.Bold("Your username: @", tty))
+		line, err := readLine(r)
+		if err != nil {
+			return "", err
+		}
+		body := strings.TrimSpace(line)
+		username := "@" + body
+		if config.ValidUsername(username) {
+			return username, nil
+		}
+		fmt.Fprint(w, "Username must start with a letter or digit and contain only letters, digits, and hyphens (e.g. @alice or @alice-jones).\n")
+	}
 }
 
 // promptForKey loops until the user pastes a valid, verified hex key or presses Enter to skip.

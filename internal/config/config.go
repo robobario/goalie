@@ -5,9 +5,16 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"goalie/internal/goalieenv"
 )
+
+// UsernameRe matches a valid goalie username: @ followed by a GitHub-style
+// handle (alphanumeric and hyphens, starting with alphanumeric, 1–39 chars).
+var UsernameRe = regexp.MustCompile(`^@[a-zA-Z0-9][a-zA-Z0-9-]{0,38}$`)
+
+func ValidUsername(s string) bool { return UsernameRe.MatchString(s) }
 
 type Config struct {
 	Name string `json:"name"`

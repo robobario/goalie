@@ -142,7 +142,7 @@ func TestScenario_Unencrypted_MultiUser(t *testing.T) {
 
 	// WHEN: user1 inits a fresh unencrypted repo and gives their name
 	// stdin: "n" for encryption prompt, "Alice" for name prompt
-	runGoalie(t, user1, gh, "n\nAlice\n", "init", repo)
+	runGoalie(t, user1, gh, "n\nalice\n", "init", repo)
 
 	// AND: user1 creates a shared goal
 	runGoalie(t, user1, gh, "", "goal", "add", "ROUTING", "Implement the routing layer")
@@ -154,7 +154,7 @@ func TestScenario_Unencrypted_MultiUser(t *testing.T) {
 	// WHEN: user2 joins from the same repo (branch already exists — no encryption prompt)
 	// stdin: "Bob" for name prompt only
 	user2 := t.TempDir()
-	runGoalie(t, user2, gh, "Bob\n", "init", repo)
+	runGoalie(t, user2, gh, "bob\n", "init", repo)
 
 	// THEN: user2 can see user1's entries in the standup view
 	status := runGoalie(t, user2, gh, "", "status")
@@ -190,7 +190,7 @@ func TestScenario_Unencrypted_GoalCRUD(t *testing.T) {
 	gh := gitHome(t)
 	home := t.TempDir()
 
-	runGoalie(t, home, gh, "n\nAlice\n", "init", repo)
+	runGoalie(t, home, gh, "n\nalice\n", "init", repo)
 
 	// Add and list goals
 	runGoalie(t, home, gh, "", "goal", "add", "FEAT_A", "Feature A")
@@ -221,7 +221,7 @@ func TestScenario_Encrypted_MultiUser(t *testing.T) {
 	// GIVEN: user1 inits with encryption enabled
 	// stdin: "y" for encryption, "Alice" for name
 	user1 := t.TempDir()
-	out := runGoalie(t, user1, gh, "y\nAlice\n", "init", repo)
+	out := runGoalie(t, user1, gh, "y\nalice\n", "init", repo)
 
 	// AND: the hex key is printed for sharing
 	hexKey := extractHexKey(t, out)
@@ -236,7 +236,7 @@ func TestScenario_Encrypted_MultiUser(t *testing.T) {
 	// WHEN: user2 joins, pasting the shared key at the prompt
 	// stdin: "Bob" for name, then the hex key at the key prompt
 	user2 := t.TempDir()
-	runGoalie(t, user2, gh, "Bob\n"+hexKey+"\n", "init", repo)
+	runGoalie(t, user2, gh, "bob\n"+hexKey+"\n", "init", repo)
 
 	// THEN: user2 can read status (decryption works)
 	status := runGoalie(t, user2, gh, "", "status")
@@ -264,13 +264,13 @@ func TestScenario_Encrypted_WrongKeyRejected(t *testing.T) {
 
 	// GIVEN: user1 inits with encryption
 	user1 := t.TempDir()
-	runGoalie(t, user1, gh, "y\nAlice\n", "init", repo)
+	runGoalie(t, user1, gh, "y\nalice\n", "init", repo)
 
 	// WHEN: user2 tries to init with the wrong key then skips
 	user2 := t.TempDir()
 	wrongKey := strings.Repeat("ab", 32)
 	// stdin: name, wrong key (rejected), then Enter to skip
-	out, _ := runGoalieMayFail(t, user2, gh, "Bob\n"+wrongKey+"\n\n", "init", repo)
+	out, _ := runGoalieMayFail(t, user2, gh, "bob\n"+wrongKey+"\n\n", "init", repo)
 
 	// THEN: output warns about the mismatch
 	if !strings.Contains(out, "does not match") {

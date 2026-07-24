@@ -79,6 +79,10 @@ func hasCall(calls [][]string, args ...string) bool {
 func prewriteConfig(t *testing.T, name string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "config.json")
+	// Ensure the stored name is in @username format if not already.
+	if len(name) > 0 && name[0] != '@' {
+		name = "@" + name
+	}
 	if err := config.SaveTo(path, &config.Config{Name: name}); err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +211,8 @@ func TestInit_ConfigWritten(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	runner := &git.FakeRunner{}
 
-	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, strings.NewReader("Alice\n"), os.Stdout, false); err != nil {
+	// User types just the body after '@' — the prompt prepends '@' automatically.
+	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, strings.NewReader("alice\n"), os.Stdout, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -215,8 +220,8 @@ func TestInit_ConfigWritten(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading config: %v", err)
 	}
-	if cfg.Name != "Alice" {
-		t.Errorf("expected Name=Alice; got %q", cfg.Name)
+	if cfg.Name != "@alice" {
+		t.Errorf("expected Name=@alice; got %q", cfg.Name)
 	}
 }
 
@@ -501,6 +506,30 @@ func TestInit_PromptForKey_WrongKeyThenSkip(t *testing.T) {
 	}
 }
 
+func TestInit_UsernameInvalidThenValid(t *testing.T) {
+	t.Setenv("GOALIE_HOME", t.TempDir())
+	dataDir := t.TempDir()
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	runner := &git.FakeRunner{}
+	var out strings.Builder
+
+	// First input has a space (invalid), second is valid
+	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, strings.NewReader("bad user\nalice-jones\n"), &out, false); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.LoadFrom(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Name != "@alice-jones" {
+		t.Errorf("expected @alice-jones, got %q", cfg.Name)
+	}
+	if !strings.Contains(out.String(), "must start with a letter") {
+		t.Errorf("expected validation error message in output; got %q", out.String())
+	}
+}
+
 func TestInit_ConfigNotOverwritten(t *testing.T) {
 	t.Setenv("GOALIE_HOME", t.TempDir())
 	dataDir := t.TempDir()
@@ -519,7 +548,7 @@ func TestInit_ConfigNotOverwritten(t *testing.T) {
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Name != "OriginalName" {
-		t.Errorf("expected config unchanged with Name=OriginalName; got %q", cfg.Name)
+	if cfg.Name != "@OriginalName" {
+		t.Errorf("expected config unchanged with Name=@OriginalName; got %q", cfg.Name)
 	}
 }

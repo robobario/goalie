@@ -46,7 +46,7 @@ func FilterEntries(entries []journal.Entry, query string) []journal.Entry {
 	}
 	searchable := make([]string, len(entries))
 	for i, e := range entries {
-		parts := []string{e.Note, "@" + e.Username}
+		parts := []string{e.Note, e.Username}
 		if e.Goal != nil {
 			parts = append(parts, *e.Goal)
 		}
@@ -139,7 +139,7 @@ func (m activityModel) View() string {
 			return entries[i].TS > entries[j].TS
 		})
 
-		sb.WriteString(usernameStyle.Render("@"+username) + ":\n")
+		sb.WriteString(usernameStyle.Render(username) + ":\n")
 		for _, e := range entries {
 			sb.WriteString("  " + formatActivityEntry(e, now) + "\n")
 		}

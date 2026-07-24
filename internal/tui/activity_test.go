@@ -2,6 +2,7 @@ package tui
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -124,6 +125,37 @@ func TestFilterEntriesFuzzyTolerance(t *testing.T) {
 	}
 	if !matched {
 		t.Error("expected entry with thread '#bug-fix' in results")
+	}
+}
+
+func TestFormatActivityEntryDoneShowsLabel(t *testing.T) {
+	e := journal.Entry{
+		TS:   time.Now().Format(time.RFC3339),
+		Note: "all finished",
+		Done: true,
+		Task: strPtr("#impl"),
+	}
+	got := formatActivityEntry(e, time.Now())
+	if !strings.Contains(got, "[done]") {
+		t.Errorf("expected '[done]' in done entry; got %q", got)
+	}
+	if strings.Contains(got, "[BLOCKED]") {
+		t.Errorf("expected no '[BLOCKED]' in done entry; got %q", got)
+	}
+}
+
+func TestFormatActivityEntryBlockedShowsLabel(t *testing.T) {
+	e := journal.Entry{
+		TS:      time.Now().Format(time.RFC3339),
+		Note:    "waiting",
+		Blocked: true,
+	}
+	got := formatActivityEntry(e, time.Now())
+	if !strings.Contains(got, "[BLOCKED]") {
+		t.Errorf("expected '[BLOCKED]' in blocked entry; got %q", got)
+	}
+	if strings.Contains(got, "[done]") {
+		t.Errorf("expected no '[done]' in blocked entry; got %q", got)
 	}
 }
 

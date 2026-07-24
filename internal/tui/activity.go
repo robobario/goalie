@@ -14,6 +14,7 @@ import (
 )
 
 var blockedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+var doneStyle    = lipgloss.NewStyle().Faint(true)
 var usernameStyle = lipgloss.NewStyle().Bold(true)
 
 type entriesLoadedMsg struct {
@@ -150,7 +151,9 @@ func (m activityModel) View() string {
 
 func formatActivityEntry(e journal.Entry, now time.Time) string {
 	var parts []string
-	if e.Blocked {
+	if e.Done {
+		parts = append(parts, doneStyle.Render("[done]"))
+	} else if e.Blocked {
 		parts = append(parts, blockedStyle.Render("[BLOCKED]"))
 	}
 	if e.Task != nil {

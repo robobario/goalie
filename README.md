@@ -81,6 +81,16 @@ Paste the hex key you received. Goalie verifies it against `key-check.enc` befor
 goalie key import <hex-key>
 ```
 
+### Using a different branch name
+
+By default goalie uses a branch called `data`. To experiment without touching the team's real data, pass `--branch` to `goalie init`:
+
+```sh
+goalie init https://github.com/your-org/your-repo.git --branch data-test
+```
+
+All teammates who want to work against that branch must also pass `--branch data-test` when running `goalie init`.
+
 ### Replacing or rotating a key
 
 Use `goalie key init` to generate a new key or `goalie key import <hex>` to import one. Both commands warn you before overwriting an existing key file, since replacing it will prevent you from decrypting data written under the old key.

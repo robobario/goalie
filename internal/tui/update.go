@@ -341,7 +341,6 @@ func (m updateModel) viewMenu() string {
 	return sb.String()
 }
 
-
 func (m updateModel) View() string {
 	if m.err != nil {
 		return "Error: " + m.err.Error()
@@ -757,7 +756,6 @@ func (m updateModel) viewTaskUpdatePicking() string {
 	if len(items) == 0 {
 		items = m.taskUpdatePicker.items
 	}
-	now := time.Now().UTC()
 	cursor := m.taskUpdatePicker.cursor
 	for i, item := range items {
 		prefix := "  "
@@ -766,14 +764,15 @@ func (m updateModel) viewTaskUpdatePicking() string {
 		}
 		if strings.HasPrefix(item, "[BLOCKED] ") {
 			body := strings.TrimPrefix(item, "[BLOCKED] ")
-			_ = now // already embedded in the display string
 			sb.WriteString(prefix + blockedStyle.Render("[BLOCKED]") + " " + body + "\n")
 		} else {
 			sb.WriteString(prefix + item + "\n")
 		}
 	}
-	sb.WriteString("\n" + m.taskUpdatePicker.View()[len(items)*0:]) // query line
-	return m.taskUpdatePicker.View()
+	if m.taskUpdatePicker.query != "" {
+		sb.WriteString("\nFilter: " + m.taskUpdatePicker.query + "_")
+	}
+	return sb.String()
 }
 
 func (m updateModel) viewTaskUpdateForm() string {

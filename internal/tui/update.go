@@ -63,11 +63,10 @@ const noGoalSentinel = "(no goal)"
 type newTaskSub int
 
 const (
-	newGoalPick newTaskSub = iota
-	newTagPick
-	newNotes
-	newBlocked
-	newAnother
+	newFormGoal    newTaskSub = iota // goal field focused; inline picker shown
+	newFormTask                      // task tag text input
+	newFormNote                      // note text input
+	newFormBlocked                   // y/n blocked
 )
 
 type goalsLoadedMsg struct {
@@ -252,7 +251,6 @@ func (m updateModel) Update(msg tea.Msg) (updateModel, tea.Cmd) {
 		}
 		m.allGoals = open
 		m.goalPicker = newPicker(goalPickerItems(open))
-		m.newSub = newGoalPick
 
 	case taskTagsLoadedMsg:
 		if msg.err != nil {
@@ -598,9 +596,8 @@ func (m updateModel) loadGoalsCmd() tea.Cmd {
 
 func (m updateModel) enterPhaseNewTask() (updateModel, tea.Cmd) {
 	m.phase = phaseNewTask
-	m.newSub = newGoalPick
+	m.newSub = newFormGoal
 	m.goalPicker = pickerModel{}
-	m.taskPicker = pickerModel{prefix: "#"}
 	m.selectedGoal = ""
 	m.selectedTag = ""
 	m.newNoteInput = ""
@@ -839,69 +836,55 @@ func (m updateModel) handleNewTaskKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 		return m, nil
 	}
 	switch m.newSub {
-	case newGoalPick:
+	case newFormGoal:
 		updated, cmd, selected, wasSelected := m.goalPicker.Update(msg)
 		m.goalPicker = updated
 		if wasSelected && selected != "" {
 			if selected == noGoalSentinel {
 				m.selectedGoal = ""
-				m.newSub = newTagPick
-				m.taskPicker = newPicker([]string{}).withPrefix("#")
-				return m, cmd
-			}
-			validGoal := false
-			for _, g := range m.allGoals {
-				if g.ID == selected {
-					validGoal = true
-					break
-				}
-			}
-			if validGoal {
-				m.selectedGoal = selected
-				m.newSub = newTagPick
-				m.taskPicker = newPicker([]string{}).withPrefix("#")
-				ctx := m.ctx
-				goalID := selected
-				loadTags := func() tea.Msg {
-					tags, err := journal.CollectTasks(ctx.DataDir, goalID, ctx.EncryptionKey)
-					return taskTagsLoadedMsg{tags: tags, err: err}
-				}
-				return m, tea.Batch(cmd, loadTags)
-			}
-		}
-		return m, cmd
-
-	case newTagPick:
-		updated, cmd, selected, wasSelected := m.taskPicker.Update(msg)
-		m.taskPicker = updated
-		if wasSelected && selected != "" {
-			inList := false
-			for _, item := range m.taskPicker.items {
-				if item == selected {
-					inList = true
-					break
-				}
-			}
-			if inList {
-				m.selectedTag = selected
-				m.tagError = ""
-				m.newSub = newNotes
 			} else {
-				if !goals.ValidTaskTag(selected) {
-					m.tagError = "Tag must start with a lowercase letter, e.g. my-task"
-				} else {
-					m.selectedTag = selected
-					m.tagError = ""
-					m.newSub = newNotes
-				}
+				m.selectedGoal = selected
+			}
+			m.newSub = newFormTask
+			if m.selectedTag == "" {
+				m.selectedTag = "#" // seed the fixed prefix
 			}
 		}
 		return m, cmd
 
-	case newNotes:
+	case newFormTask:
 		switch msg.String() {
 		case "enter":
-			m.newSub = newBlocked
+			if goals.ValidTaskTag(m.selectedTag) {
+				m.tagError = ""
+				m.newSub = newFormNote
+			} else {
+				m.tagError = "Tag must start with # followed by lowercase letters, e.g. #impl"
+			}
+		case "up":
+			m.tagError = ""
+			m.newSub = newFormGoal
+		case "backspace":
+			if len(m.selectedTag) > 1 { // stop at '#', never remove it
+				m.selectedTag = m.selectedTag[:len(m.selectedTag)-1]
+				m.tagError = ""
+			}
+		default:
+			if len(msg.Runes) == 1 {
+				if m.selectedTag == "" {
+					m.selectedTag = "#"
+				}
+				m.selectedTag += string(msg.Runes)
+				m.tagError = ""
+			}
+		}
+
+	case newFormNote:
+		switch msg.String() {
+		case "enter":
+			m.newSub = newFormBlocked
+		case "up":
+			m.newSub = newFormTask
 		case "backspace":
 			if len(m.newNoteInput) > 0 {
 				m.newNoteInput = m.newNoteInput[:len(m.newNoteInput)-1]
@@ -912,7 +895,7 @@ func (m updateModel) handleNewTaskKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 			}
 		}
 
-	case newBlocked:
+	case newFormBlocked:
 		switch msg.String() {
 		case "y":
 			m.newUnblocked = false
@@ -920,21 +903,8 @@ func (m updateModel) handleNewTaskKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 		case "n":
 			m.newUnblocked = true
 			return m.submitNewTask()
-		}
-
-	case newAnother:
-		switch msg.String() {
-		case "y":
-			m.newSub = newGoalPick
-			m.goalPicker = newPicker(goalPickerItems(m.allGoals))
-			m.taskPicker = pickerModel{prefix: "#"}
-			m.selectedGoal = ""
-			m.selectedTag = ""
-			m.newNoteInput = ""
-			m.tagError = ""
-			m.newUnblocked = false
-		case "n", "esc":
-			m.phase = phaseMenu
+		case "up":
+			m.newSub = newFormNote
 		}
 	}
 	return m, nil
@@ -961,29 +931,91 @@ func (m updateModel) submitNewTask() (updateModel, tea.Cmd) {
 		err := journal.Append(ctx.DataDir, ctx.Git, username, entry, ctx.EncryptionKey)
 		return appendDoneMsg{err: err}
 	}
-	m.newSub = newAnother
+	m.phase = phaseMenu
 	return m, cmd
 }
 
 func (m updateModel) viewNewTask() string {
-	switch m.newSub {
-	case newGoalPick:
-		return "Select a goal (or choose '" + noGoalSentinel + "'):\n\n" + m.goalPicker.View()
-	case newTagPick:
-		var sb strings.Builder
-		fmt.Fprintf(&sb, "Goal: %s\n\n", m.selectedGoal)
-		sb.WriteString("Select or type a task tag:\n\n")
-		sb.WriteString(m.taskPicker.View())
+	var sb strings.Builder
+	sb.WriteString("Log a new task\n\n")
+
+	// Goal field
+	goalLabel := m.newGoalDisplay()
+	if m.newSub == newFormGoal {
+		sb.WriteString("> Goal:  " + goalLabel + "\n")
+		sb.WriteString(m.goalPicker.View())
+	} else {
+		sb.WriteString("  Goal:  " + goalLabel + "\n")
+	}
+
+	// Task field — '#' is a fixed prefix; show only the body after it
+	tagBody := strings.TrimPrefix(m.selectedTag, "#")
+	if m.newSub == newFormTask {
+		sb.WriteString("\n> Task:  #" + tagBody + "_\n")
 		if m.tagError != "" {
-			sb.WriteString("\n" + m.tagError)
+			sb.WriteString("  " + m.tagError + "\n")
+		} else if info := m.existingTaskInfo(); info != "" {
+			sb.WriteString("  ↳ " + info + "\n")
 		}
-		return sb.String()
-	case newNotes:
-		return fmt.Sprintf("Task: %s\n\nNotes: %s_", m.selectedTag, m.newNoteInput)
-	case newBlocked:
-		return "Blocked? [y/n]"
-	case newAnother:
-		return "Log another new task? [y/n]"
+	} else {
+		sb.WriteString("\n  Task:  #" + tagBody + "\n")
+		if m.newSub > newFormTask {
+			if info := m.existingTaskInfo(); info != "" {
+				sb.WriteString("  ↳ " + info + "\n")
+			}
+		}
+	}
+
+	// Note field
+	if m.newSub == newFormNote {
+		sb.WriteString("\n> Note:  " + m.newNoteInput + "_\n")
+	} else {
+		sb.WriteString("\n  Note:  " + m.newNoteInput + "\n")
+	}
+
+	// Blocked field
+	if m.newSub == newFormBlocked {
+		sb.WriteString("\n> Blocked? [y/n]\n")
+	} else {
+		sb.WriteString("\n  Blocked? [y/n]\n")
+	}
+
+	sb.WriteString("\nEnter to advance/submit, ↑ to go back, Esc to cancel")
+	return sb.String()
+}
+
+// newGoalDisplay returns the display string for the goal field.
+func (m updateModel) newGoalDisplay() string {
+	if m.newSub == newFormGoal && m.selectedGoal == "" && len(m.allGoals) > 0 {
+		return "—" // picker is open, nothing chosen yet
+	}
+	if m.selectedGoal == "" {
+		return noGoalSentinel
+	}
+	return m.selectedGoal
+}
+
+// existingTaskInfo returns a short hint when the current tag+goal combination
+// matches one of the user's already-active tasks.
+func (m updateModel) existingTaskInfo() string {
+	if m.selectedTag == "" || !goals.ValidTaskTag(m.selectedTag) {
+		return ""
+	}
+	for _, at := range m.activeTasks {
+		if at.tag != m.selectedTag {
+			continue
+		}
+		atGoal := ""
+		if at.state.Goal != nil {
+			atGoal = *at.state.Goal
+		}
+		if atGoal == m.selectedGoal {
+			note := at.state.Note
+			if len(note) > 40 {
+				note = note[:37] + "..."
+			}
+			return "existing active task — last note: " + note
+		}
 	}
 	return ""
 }

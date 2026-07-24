@@ -122,13 +122,12 @@ func TestMenuEnterSelectsTaskUpdate(t *testing.T) {
 
 
 func TestNewTaskEscapeReturnsToMenu(t *testing.T) {
-	m := updateModel{
-		phase:  phaseNewTask,
-		newSub: newNotes,
-	}
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
-	if m.phase != phaseMenu {
-		t.Errorf("expected phaseMenu after Escape, got %v", m.phase)
+	for _, sub := range []newTaskSub{newFormGoal, newFormTask, newFormNote, newFormBlocked} {
+		m := updateModel{phase: phaseNewTask, newSub: sub}
+		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+		if m.phase != phaseMenu {
+			t.Errorf("expected phaseMenu after Escape from newSub %v, got %v", sub, m.phase)
+		}
 	}
 }
 
@@ -400,46 +399,78 @@ func TestPickerFuzzyFilterAndSelect(t *testing.T) {
 	}
 }
 
-func TestNewAnotherYesResetsToGoalPick(t *testing.T) {
+func TestNewTaskSubmitGoesToMenu(t *testing.T) {
 	m := updateModel{
-		phase:    phaseNewTask,
-		newSub:   newAnother,
-		allGoals: []goals.Goal{{ID: "PROJ", State: "open"}},
-	}
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
-	if m.newSub != newGoalPick {
-		t.Errorf("expected newSub=newGoalPick, got %v", m.newSub)
-	}
-}
-
-func TestNewAnotherNoTransitionsToMenu(t *testing.T) {
-	m := updateModel{
-		phase:  phaseNewTask,
-		newSub: newAnother,
+		phase:       phaseNewTask,
+		newSub:      newFormBlocked,
+		selectedTag: "#impl",
+		newNoteInput: "some progress",
 	}
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
 	if m.phase != phaseMenu {
-		t.Errorf("expected phaseMenu, got %v", m.phase)
+		t.Errorf("expected phaseMenu after submit, got %v", m.phase)
 	}
 }
 
-func TestInvalidThreadTagSetsTagError(t *testing.T) {
+func TestNewTaskInvalidTagSetsError(t *testing.T) {
 	m := updateModel{
-		phase:  phaseNewTask,
-		newSub: newTagPick,
-		taskPicker: pickerModel{
-			items:   []string{},
-			matches: []string{},
-			prefix:  "#",
-			query:   "1starts-with-digit",
-		},
+		phase:       phaseNewTask,
+		newSub:      newFormTask,
+		selectedTag: "no-hash-prefix", // invalid: must start with #
 	}
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if m.tagError == "" {
-		t.Error("expected tagError to be set for invalid tag")
+		t.Error("expected tagError to be set for tag without # prefix")
 	}
-	if m.newSub != newTagPick {
-		t.Errorf("expected newSub=newTagPick, got %v", m.newSub)
+	if m.newSub != newFormTask {
+		t.Errorf("expected to stay on newFormTask, got %v", m.newSub)
+	}
+}
+
+func TestNewTaskValidTagAdvancesToNote(t *testing.T) {
+	m := updateModel{
+		phase:       phaseNewTask,
+		newSub:      newFormTask,
+		selectedTag: "#impl",
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.newSub != newFormNote {
+		t.Errorf("expected newFormNote after valid tag, got %v", m.newSub)
+	}
+	if m.tagError != "" {
+		t.Errorf("expected no tag error, got %q", m.tagError)
+	}
+}
+
+func TestNewTaskNoteEnterAdvancesToBlocked(t *testing.T) {
+	m := updateModel{phase: phaseNewTask, newSub: newFormNote}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.newSub != newFormBlocked {
+		t.Errorf("expected newFormBlocked, got %v", m.newSub)
+	}
+}
+
+func TestNewTaskUpFromTaskGoesToGoal(t *testing.T) {
+	m := updateModel{phase: phaseNewTask, newSub: newFormTask}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	if m.newSub != newFormGoal {
+		t.Errorf("expected newFormGoal after Up from task, got %v", m.newSub)
+	}
+}
+
+func TestNewTaskUpFromNoteGoesToTask(t *testing.T) {
+	m := updateModel{phase: phaseNewTask, newSub: newFormNote}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	if m.newSub != newFormTask {
+		t.Errorf("expected newFormTask after Up from note, got %v", m.newSub)
+	}
+}
+
+func TestNewTaskUpFromBlockedGoesToNote(t *testing.T) {
+	m := updateModel{phase: phaseNewTask, newSub: newFormBlocked}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	if m.newSub != newFormNote {
+		t.Errorf("expected newFormNote after Up from blocked, got %v", m.newSub)
 	}
 }
 
@@ -460,14 +491,14 @@ func TestDoneTaskNotInActiveTasks(t *testing.T) {
 }
 
 func TestGoalsLoadedWithNoGoalsDoesNotError(t *testing.T) {
-	m := updateModel{phase: phaseNewTask, newSub: newGoalPick}
+	m := updateModel{phase: phaseNewTask, newSub: newFormGoal}
 	// Empty goals list — previously caused a fatal error, now should be fine
 	m, _ = m.Update(goalsLoadedMsg{goals: []goals.Goal{}})
 	if m.err != nil {
 		t.Errorf("expected no error with empty goals, got: %v", m.err)
 	}
-	if m.newSub != newGoalPick {
-		t.Errorf("expected newSub=newGoalPick, got %v", m.newSub)
+	if m.newSub != newFormGoal {
+		t.Errorf("expected newSub=newFormGoal after goals load, got %v", m.newSub)
 	}
 }
 
@@ -491,39 +522,62 @@ func TestGoalPickerSentinelOnlyWhenNoGoals(t *testing.T) {
 	}
 }
 
-func TestSelectingNoGoalSentinelAdvancesToTagPick(t *testing.T) {
+func TestSelectingNoGoalSentinelAdvancesToTask(t *testing.T) {
 	m := updateModel{
 		phase:    phaseNewTask,
-		newSub:   newGoalPick,
+		newSub:   newFormGoal,
 		allGoals: []goals.Goal{{ID: "ROUTING", State: "open"}},
 		goalPicker: pickerModel{
 			items:   goalPickerItems([]goals.Goal{{ID: "ROUTING", State: "open"}}),
 			matches: goalPickerItems([]goals.Goal{{ID: "ROUTING", State: "open"}}),
 		},
 	}
-	// Simulate selecting the "(no goal)" sentinel from the picker
-	// The picker treats Enter as selection of the first match when there's no query
+	// The picker's first match is the sentinel; Enter selects it
 	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	if m2.newSub != newTagPick {
-		t.Errorf("expected newTagPick after selecting no-goal sentinel, got %v", m2.newSub)
+	if m2.newSub != newFormTask {
+		t.Errorf("expected newFormTask after selecting no-goal sentinel, got %v", m2.newSub)
 	}
 	if m2.selectedGoal != "" {
 		t.Errorf("expected empty selectedGoal, got %q", m2.selectedGoal)
 	}
 }
 
-func TestNewAnotherYesPickerIncludesSentinel(t *testing.T) {
-	m := updateModel{
-		phase:    phaseNewTask,
-		newSub:   newAnother,
-		allGoals: []goals.Goal{{ID: "PROJ", State: "open"}},
-	}
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
-	if m.newSub != newGoalPick {
-		t.Errorf("expected newGoalPick, got %v", m.newSub)
-	}
+func TestGoalPickerIncludesSentinelOnEntry(t *testing.T) {
+	// When goals load, picker should include the sentinel as first item.
+	m := updateModel{phase: phaseNewTask, newSub: newFormGoal}
+	m, _ = m.Update(goalsLoadedMsg{goals: []goals.Goal{{ID: "PROJ", State: "open"}}})
 	if len(m.goalPicker.items) == 0 || m.goalPicker.items[0] != noGoalSentinel {
 		t.Errorf("expected sentinel as first picker item, got %v", m.goalPicker.items)
+	}
+}
+
+func TestExistingTaskInfoDetectsMatch(t *testing.T) {
+	m := updateModel{
+		selectedGoal: "ROUTING",
+		selectedTag:  "#impl",
+		activeTasks: []activeTask{
+			makeActiveTask("#impl", strPtr("ROUTING"), "fixing the layer", false, 2),
+		},
+	}
+	info := m.existingTaskInfo()
+	if info == "" {
+		t.Error("expected existing task info, got empty string")
+	}
+	if !strings.Contains(info, "fixing the layer") {
+		t.Errorf("expected last note in info, got %q", info)
+	}
+}
+
+func TestExistingTaskInfoNoMatchDifferentGoal(t *testing.T) {
+	m := updateModel{
+		selectedGoal: "OTHER",
+		selectedTag:  "#impl",
+		activeTasks: []activeTask{
+			makeActiveTask("#impl", strPtr("ROUTING"), "fixing the layer", false, 2),
+		},
+	}
+	if info := m.existingTaskInfo(); info != "" {
+		t.Errorf("expected no info for different goal, got %q", info)
 	}
 }
 

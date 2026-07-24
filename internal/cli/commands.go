@@ -11,7 +11,6 @@ import (
 	"goalie/internal/display"
 	"goalie/internal/goals"
 	"goalie/internal/journal"
-	"goalie/internal/slugify"
 )
 
 func requireDataDir(ctx AppContext) error {
@@ -30,7 +29,7 @@ func resolveUsername(ctx AppContext) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return slugify.Slugify(cfg.Name), nil
+	return cfg.Name, nil
 }
 
 func GoalAdd(ctx AppContext, id, desc string) error {
@@ -163,7 +162,7 @@ func Status(ctx AppContext) error {
 
 	now := time.Now().UTC()
 	for _, u := range users {
-		display.Section("@"+u, ctx.Stdout, ctx.IsTTY)
+		display.Section(u, ctx.Stdout, ctx.IsTTY)
 		ues := byUser[u]
 		sort.Slice(ues, func(i, j int) bool {
 			if ues[i].Blocked != ues[j].Blocked {
@@ -202,7 +201,10 @@ func Summary(ctx AppContext, days int, user string) error {
 		if strings.ContainsAny(user, "*?[") {
 			pattern = user
 		} else {
-			pattern = slugify.Slugify(user)
+			if !strings.HasPrefix(user, "@") {
+				user = "@" + user
+			}
+			pattern = user
 		}
 	} else {
 		username, err := resolveUsername(ctx)

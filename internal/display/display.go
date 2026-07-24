@@ -31,7 +31,7 @@ func Green(s string, tty bool) string {
 }
 
 func Username(name string, tty bool) string {
-	return Bold("@"+name, tty)
+	return Bold(name, tty)
 }
 
 func Section(title string, w io.Writer, tty bool) {
@@ -44,7 +44,7 @@ func Section(title string, w io.Writer, tty bool) {
 // FormatSummaryHeader returns the group header for a summary story block.
 // goal is empty or "(no goal)"; task is the #hashtag; username is the slugified name.
 func FormatSummaryHeader(goal, task, username string, tty bool) string {
-	return Bold("= "+goal+task+"@"+username, tty)
+	return Bold("= "+goal+task+username, tty)
 }
 
 // FormatSummaryEntry formats a single entry line within a summary story block.

@@ -146,7 +146,7 @@ func TestStatusHidesDoneEntries(t *testing.T) {
 
 	journalDir := filepath.Join(ctx.DataDir, "journal")
 	os.MkdirAll(journalDir, 0o755)
-	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("alice")), []jsonlEntry{
+	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("@alice")), []jsonlEntry{
 		{"ts": ts(-2), "note": "in progress", "task": "#impl", "goal": "ROUTING", "blocked": false, "done": false},
 		{"ts": ts(-1), "note": "all done", "task": "#impl", "goal": "ROUTING", "blocked": false, "done": true},
 	}, ctx.EncryptionKey)
@@ -164,7 +164,7 @@ func TestStatusShowsNonDoneEntries(t *testing.T) {
 
 	journalDir := filepath.Join(ctx.DataDir, "journal")
 	os.MkdirAll(journalDir, 0o755)
-	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("alice")), []jsonlEntry{
+	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("@alice")), []jsonlEntry{
 		{"ts": ts(-1), "note": "still going", "task": "#impl", "goal": "ROUTING", "blocked": false, "done": false},
 	}, ctx.EncryptionKey)
 
@@ -181,7 +181,7 @@ func TestStatusEntriesWithinWindowAreShown(t *testing.T) {
 
 	journalDir := filepath.Join(ctx.DataDir, "journal")
 	os.MkdirAll(journalDir, 0o755)
-	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("alice")), []jsonlEntry{
+	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("@alice")), []jsonlEntry{
 		{"ts": ts(-1), "note": "recent work", "goal": nil, "blocked": false, "task": nil},
 	}, ctx.EncryptionKey)
 
@@ -198,7 +198,7 @@ func TestStatusBlockedEntryShowsBlockedPrefix(t *testing.T) {
 
 	journalDir := filepath.Join(ctx.DataDir, "journal")
 	os.MkdirAll(journalDir, 0o755)
-	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("alice")), []jsonlEntry{
+	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("@alice")), []jsonlEntry{
 		{"ts": ts(-1), "note": "stalled", "goal": nil, "blocked": true, "task": nil},
 	}, ctx.EncryptionKey)
 
@@ -231,7 +231,7 @@ func TestSummaryEntriesWithinWindowAreShown(t *testing.T) {
 
 	journalDir := filepath.Join(ctx.DataDir, "journal")
 	os.MkdirAll(journalDir, 0o755)
-	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("alice")), []jsonlEntry{
+	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("@alice")), []jsonlEntry{
 		{"ts": ts(-1), "note": "recent work", "goal": nil, "blocked": false},
 	}, ctx.EncryptionKey)
 
@@ -248,7 +248,7 @@ func TestSummaryGroupsEntriesByGoalAndTask(t *testing.T) {
 
 	journalDir := filepath.Join(ctx.DataDir, "journal")
 	os.MkdirAll(journalDir, 0o755)
-	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("alice")), []jsonlEntry{
+	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("@alice")), []jsonlEntry{
 		{"ts": ts(-3), "note": "started", "goal": "ROUTING", "task": "#impl", "blocked": false},
 		{"ts": ts(-2), "note": "blocked on review", "goal": "ROUTING", "task": "#impl", "blocked": true},
 		{"ts": ts(-1), "note": "unblocked", "goal": "ROUTING", "task": "#impl", "blocked": false},
@@ -278,7 +278,7 @@ func TestSummaryNoGoalUsesPlaceholder(t *testing.T) {
 
 	journalDir := filepath.Join(ctx.DataDir, "journal")
 	os.MkdirAll(journalDir, 0o755)
-	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("alice")), []jsonlEntry{
+	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("@alice")), []jsonlEntry{
 		{"ts": ts(-1), "note": "some work", "goal": nil, "task": "#refactor", "blocked": false},
 	}, ctx.EncryptionKey)
 
@@ -296,7 +296,7 @@ func TestSummaryStateChangeOnlyShowsLabel(t *testing.T) {
 
 	journalDir := filepath.Join(ctx.DataDir, "journal")
 	os.MkdirAll(journalDir, 0o755)
-	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("alice")), []jsonlEntry{
+	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("@alice")), []jsonlEntry{
 		{"ts": ts(-4), "note": "steady progress", "goal": "GOAL", "task": "#impl", "blocked": false},
 		{"ts": ts(-3), "note": "still going", "goal": "GOAL", "task": "#impl", "blocked": false},
 		{"ts": ts(-2), "note": "hit a wall", "goal": "GOAL", "task": "#impl", "blocked": true},
@@ -323,10 +323,10 @@ func TestSummaryUserArgFiltersByName(t *testing.T) {
 
 	journalDir := filepath.Join(ctx.DataDir, "journal")
 	os.MkdirAll(journalDir, 0o755)
-	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("alice")), []jsonlEntry{
+	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("@alice")), []jsonlEntry{
 		{"ts": ts(-1), "note": "alice work", "goal": nil, "blocked": false},
 	}, ctx.EncryptionKey)
-	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("bob")), []jsonlEntry{
+	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("@bob")), []jsonlEntry{
 		{"ts": ts(-1), "note": "bob work", "goal": nil, "blocked": false},
 	}, ctx.EncryptionKey)
 

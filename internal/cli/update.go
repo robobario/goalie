@@ -13,7 +13,6 @@ import (
 	"goalie/internal/display"
 	"goalie/internal/goals"
 	"goalie/internal/journal"
-	"goalie/internal/slugify"
 )
 
 type blockedTask struct {
@@ -37,7 +36,7 @@ func InteractiveUpdate(ctx *AppContext) error {
 			return err
 		}
 		name = cfg.Name
-		username = slugify.Slugify(cfg.Name)
+		username = cfg.Name
 	}
 
 	r := bufio.NewReader(ctx.Stdin)

@@ -56,20 +56,20 @@ func TestSection(t *testing.T) {
 }
 
 func TestUsernamePlainText(t *testing.T) {
-	if got := Username("alice", false); got != "@alice" {
+	if got := Username("@alice", false); got != "@alice" {
 		t.Errorf("got %q, want %q", got, "@alice")
 	}
 }
 
 func TestUsernameBoldTTY(t *testing.T) {
-	got := Username("alice", true)
+	got := Username("@alice", true)
 	if !strings.HasPrefix(got, "\033[1m") || !strings.Contains(got, "@alice") {
 		t.Errorf("expected bold @alice, got %q", got)
 	}
 }
 
 func TestFormatEntryIncludesAtPrefix(t *testing.T) {
-	e := journal.Entry{TS: fixedTS, Note: "work", Username: "alice"}
+	e := journal.Entry{TS: fixedTS, Note: "work", Username: "@alice"}
 	got := FormatEntry(e, fixedNow, false)
 	if !strings.HasPrefix(got, "@alice") {
 		t.Errorf("expected @alice prefix, got %q", got)
@@ -81,7 +81,7 @@ func TestFormatEntryUnblockedNoThread(t *testing.T) {
 		TS:       fixedTS,
 		Note:     "work",
 		Blocked:  false,
-		Username: "alice",
+		Username: "@alice",
 	}
 	got := FormatEntry(e, fixedNow, false)
 	want := "@alice work - 1d ago"
@@ -95,7 +95,7 @@ func TestFormatEntryBlocked(t *testing.T) {
 		TS:       fixedTS,
 		Note:     "stuck",
 		Blocked:  true,
-		Username: "bob",
+		Username: "@bob",
 	}
 	got := FormatEntry(e, fixedNow, false)
 	if !strings.HasPrefix(got, "[BLOCKED]") {
@@ -109,7 +109,7 @@ func TestFormatEntryWithThread(t *testing.T) {
 		Note:     "note",
 		Blocked:  false,
 		Task:   ptr("feat-x"),
-		Username: "carol",
+		Username: "@carol",
 	}
 	got := FormatEntry(e, fixedNow, false)
 	want := "@carol feat-x note - 1d ago"
@@ -147,7 +147,7 @@ func TestFormatStatusEntryBlockedWithGoal(t *testing.T) {
 }
 
 func TestFormatSummaryHeader(t *testing.T) {
-	got := FormatSummaryHeader("ROUTING", "#impl", "alice", false)
+	got := FormatSummaryHeader("ROUTING", "#impl", "@alice", false)
 	want := "= ROUTING#impl@alice"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
@@ -155,7 +155,7 @@ func TestFormatSummaryHeader(t *testing.T) {
 }
 
 func TestFormatSummaryHeaderNoGoal(t *testing.T) {
-	got := FormatSummaryHeader("(no goal)", "#refactor", "bob", false)
+	got := FormatSummaryHeader("(no goal)", "#refactor", "@bob", false)
 	if !strings.Contains(got, "(no goal)") || !strings.Contains(got, "@bob") {
 		t.Errorf("unexpected header: %q", got)
 	}

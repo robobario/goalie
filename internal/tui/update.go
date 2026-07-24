@@ -575,6 +575,36 @@ func (m updateModel) viewEditBlockedDone() string {
 		strings.TrimSpace(m.editNoteInput), taskTagStyle.Render(m.editTaskInput))
 }
 
+// viewGoalPicker renders the goal picker with goal IDs coloured and their
+// descriptions shown in italics alongside. The noGoalSentinel is left unstyled.
+func (m updateModel) viewGoalPicker() string {
+	// Build a lookup from goal ID → description for the display.
+	descByID := make(map[string]string, len(m.allGoals))
+	for _, g := range m.allGoals {
+		descByID[g.ID] = g.Description
+	}
+
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "Search: %s%s\n", m.goalPicker.prefix, m.goalPicker.query)
+	for i, item := range m.goalPicker.matches {
+		var label string
+		if item == noGoalSentinel {
+			label = item
+		} else {
+			label = goalStyle.Render(item)
+			if desc := descByID[item]; desc != "" {
+				label += " " + goalDescStyle.Render(desc)
+			}
+		}
+		if i == m.goalPicker.cursor {
+			fmt.Fprintf(&sb, "> %s\n", selectedItemStyle.Render(label))
+		} else {
+			fmt.Fprintf(&sb, "  %s\n", label)
+		}
+	}
+	return sb.String()
+}
+
 func goalIDs(gs []goals.Goal) []string {
 	ids := make([]string, 0, len(gs))
 	for _, g := range gs {
@@ -949,13 +979,17 @@ func (m updateModel) viewNewTask() string {
 	var sb strings.Builder
 	sb.WriteString("Log a new task\n\n")
 
-	// Goal field
+	// Goal field — colour the goal ID except the sentinel and the placeholder.
 	goalLabel := m.newGoalDisplay()
+	coloredGoalLabel := goalLabel
+	if goalLabel != "—" && goalLabel != noGoalSentinel {
+		coloredGoalLabel = goalStyle.Render(goalLabel)
+	}
 	if m.newSub == newFormGoal {
-		sb.WriteString("> Goal:  " + goalLabel + "\n")
-		sb.WriteString(m.goalPicker.View())
+		sb.WriteString("> Goal:  " + coloredGoalLabel + "\n")
+		sb.WriteString(m.viewGoalPicker())
 	} else {
-		sb.WriteString("  Goal:  " + goalLabel + "\n")
+		sb.WriteString("  Goal:  " + coloredGoalLabel + "\n")
 	}
 
 	// Task field — '#' is a fixed prefix; show only the body after it

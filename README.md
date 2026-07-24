@@ -35,11 +35,13 @@ Goalie stores goals and journal entries in a dedicated `data` branch of a shared
 
 ### First person on the team
 
-Run `init`, pointing at the shared repo. Goalie creates the `data` branch, prompts for your name, and asks whether to enable client-side encryption.
+Run `init`, pointing at the shared repo. Goalie creates the `data` branch, asks for your username, and asks whether to enable client-side encryption.
 
 ```sh
 goalie init https://github.com/your-org/your-repo.git
 ```
+
+The username prompt displays a fixed `@` prefix — type just the handle body (e.g. `alice` or `alice-jones`). Usernames follow GitHub handle rules: letters, digits, and hyphens, starting with a letter or digit. The `@` is stored as part of the username and shown in all output.
 
 **Should you enable encryption?** The client-side encryption in goalie is minimal — it is intended for experimentation and light privacy, not as a security guarantee. For any real team data, use a private, access-controlled git repository as your primary protection. The encryption option exists for cases where the repo is public or semi-public and you want a basic layer of obscurity on top; it is not a substitute for proper access control.
 
@@ -68,7 +70,7 @@ Get the repo URL and, if encryption is enabled, the hex key from the person who 
 goalie init https://github.com/your-org/your-repo.git
 ```
 
-Goalie clones the `data` branch, prompts for your name, and — if the repo uses encryption — immediately asks for the key:
+Goalie clones the `data` branch, asks for your username, and — if the repo uses encryption — immediately asks for the key:
 
 ```
 Encryption key (paste hex or press Enter to skip): a1b2c3d4...

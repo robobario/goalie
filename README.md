@@ -25,38 +25,92 @@ cp goalie-darwin-amd64 ~/bin/goalie
 chmod +x ~/bin/goalie
 ```
 
-Then initialise goalie, pointing it at a shared repository:
+To keep goalie up to date, replace the binary with a newer build.
+
+By default goalie stores all data under `~/.goalie`. Set the `GOALIE_HOME` environment variable to use a different directory.
+
+## Team Setup
+
+Goalie stores goals and journal entries in a dedicated `data` branch of a shared git repository. You need an existing repo that all team members can push to.
+
+### First person on the team
+
+Run `init`, pointing at the shared repo. Goalie creates the `data` branch, prompts for your name, and asks whether to enable client-side encryption.
 
 ```sh
 goalie init https://github.com/your-org/your-repo.git
 ```
 
-This clones (or connects to) the `data` branch of the repo into `~/.goalie/data`, prompts for your name, and — on a new branch — asks whether to enable client-side encryption.
+**Should you enable encryption?** Use it when the repository is public or semi-public and you don't want goals or journal entries readable without a key. On a private enterprise repository the repo itself provides access control, so you can skip it.
 
-**Encryption** is optional. Use it when the repository is public or semi-public and you don't want goal descriptions or journal entries readable without a key. On a private enterprise repository the repo itself provides access control, so you can skip encryption. The choice is stored in the data branch so all team members share the same setting.
-
-If you enable encryption, `goalie init` handles key setup for the first user: it reuses an existing local key if you have one, or generates a new one. Either way it prints the hex key and commits a `key-check.enc` sentinel to the data branch:
+If you enable encryption, `goalie init` generates a key, commits a `key-check.enc` sentinel to the data branch, and prints the key:
 
 ```
-Encryption key: a1b2c3...
+Encryption key: a1b2c3d4...
 Share with teammates: goalie key import <key>
 key-check.enc committed to the data branch — teammates must import the same key.
 ```
 
-When a teammate runs `goalie init`, it detects the encrypted repo and prompts for the shared key immediately:
+**Copy the hex key and share it securely with every teammate** (e.g. a password manager, a private message). Without it they cannot read or write data.
+
+Once setup is done, create the team's first goals:
+
+```sh
+goalie goal add FEATURE_X "Implement feature X"
+goalie goal add BUG_Y "Fix the production bug"
+```
+
+### Joining the team
+
+Get the repo URL and, if encryption is enabled, the hex key from the person who ran the first `goalie init`.
+
+```sh
+goalie init https://github.com/your-org/your-repo.git
+```
+
+Goalie clones the `data` branch, prompts for your name, and — if the repo uses encryption — immediately asks for the key:
 
 ```
-Encryption key (paste hex or press Enter to skip): a1b2c3...
+Encryption key (paste hex or press Enter to skip): a1b2c3d4...
 Encryption key verified.
 ```
 
-The key is verified against `key-check.enc` before being saved. Invalid format or a mismatched key triggers an error and retries. Pressing Enter skips for now — the key can be imported later with `goalie key import <hex-key>`.
+Paste the hex key you received. Goalie verifies it against `key-check.enc` before saving. If you don't have the key yet, press Enter to skip and import it later:
 
-To replace a key, use `goalie key init` (generates a new key) or `goalie key import <hex>` (imports an existing one). Both commands warn you if a key file already exists, since replacing it will prevent you from decrypting data written under the old key.
+```sh
+goalie key import <hex-key>
+```
 
-By default goalie stores all data under `~/.goalie`. Set the `GOALIE_HOME` environment variable to use a different directory.
+### Replacing or rotating a key
 
-To keep goalie up to date, replace the binary with a newer build.
+Use `goalie key init` to generate a new key or `goalie key import <hex>` to import one. Both commands warn you before overwriting an existing key file, since replacing it will prevent you from decrypting data written under the old key.
+
+## Daily Workflow
+
+**Check what the team is working on:**
+
+```sh
+goalie status          # morning standup view — latest entry per person/task, last 7 days
+```
+
+**Log what you are doing:**
+
+```sh
+goalie log "started the API layer" --task #impl --goal FEATURE_X
+goalie log "hit a dependency issue" --task #impl --goal FEATURE_X --blocked
+goalie log "dependency resolved, back to it" --task #impl --goal FEATURE_X
+goalie log "shipped" --task #impl --goal FEATURE_X --done
+```
+
+**Review your own history:**
+
+```sh
+goalie summary                        # your entries for the last 7 days
+goalie summary --days 14              # last two weeks
+goalie summary --user "*"             # everyone on the team
+```
+
+**Use the TUI** for end-of-day updates — run `goalie` with no arguments.
 
 ## Usage
 

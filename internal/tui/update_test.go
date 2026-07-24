@@ -33,6 +33,26 @@ func TestUpdateViewMultiLineErrorPreserved(t *testing.T) {
 	}
 }
 
+func TestReloadDoesNotResetMenuCursor(t *testing.T) {
+	// Regression: reloading task states (e.g. after a submit) was unconditionally
+	// resetting menuCursor to 0, causing the selection to jump.
+	m := updateModel{phase: phaseMenu, menuCursor: 2}
+	msg := taskStatesLoadedMsg{activeTasks: []activeTask{}, username: "@alice"}
+	m, _ = m.Update(msg)
+	if m.menuCursor != 2 {
+		t.Errorf("expected menuCursor=2 preserved on reload, got %d", m.menuCursor)
+	}
+}
+
+func TestInitialLoadSetsMenuCursorToZero(t *testing.T) {
+	m := updateModel{phase: phaseLoading}
+	msg := taskStatesLoadedMsg{activeTasks: []activeTask{}, username: "@alice"}
+	m, _ = m.Update(msg)
+	if m.menuCursor != 0 {
+		t.Errorf("expected menuCursor=0 on initial load, got %d", m.menuCursor)
+	}
+}
+
 func TestUpdateInitialPhaseIsLoading(t *testing.T) {
 	m := updateModel{}
 	if m.phase != phaseLoading {

@@ -211,8 +211,10 @@ func (m updateModel) Update(msg tea.Msg) (updateModel, tea.Cmd) {
 		}
 		m.username = msg.username
 		m.activeTasks = msg.activeTasks
+		if m.phase == phaseLoading {
+			m.menuCursor = 0 // initialise cursor only on first load
+		}
 		m.phase = phaseMenu
-		m.menuCursor = 0
 
 	case appendDoneMsg:
 		if msg.err != nil {

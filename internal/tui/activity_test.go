@@ -74,6 +74,28 @@ func TestFilterEntriesMatchesThread(t *testing.T) {
 	}
 }
 
+func TestFilterEntriesMatchesUsername(t *testing.T) {
+	entries := []journal.Entry{
+		{Note: "some work", Username: "alice"},
+		{Note: "other work", Username: "bob"},
+	}
+	result := FilterEntries(entries, "alice")
+	if len(result) != 1 || result[0].Username != "alice" {
+		t.Errorf("expected alice's entry, got %v", result)
+	}
+}
+
+func TestFilterEntriesMatchesAtPrefixUsername(t *testing.T) {
+	entries := []journal.Entry{
+		{Note: "some work", Username: "alice"},
+		{Note: "other work", Username: "bob"},
+	}
+	result := FilterEntries(entries, "@alice")
+	if len(result) != 1 || result[0].Username != "alice" {
+		t.Errorf("expected alice's entry when searching '@alice', got %v", result)
+	}
+}
+
 func TestFilterEntriesNoMatchReturnsEmpty(t *testing.T) {
 	entries := []journal.Entry{
 		{Note: "working on auth"},

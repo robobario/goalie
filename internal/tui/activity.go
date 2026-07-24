@@ -37,7 +37,8 @@ func loadActivityCmd(ctx *cli.AppContext) tea.Cmd {
 	}
 }
 
-// FilterEntries returns entries whose note+goal+task fuzzy-match query.
+// FilterEntries returns entries whose note+goal+task+username fuzzy-match query.
+// Username is stored with an "@" prefix so both "alice" and "@alice" match.
 // Returns all entries when query is empty.
 func FilterEntries(entries []journal.Entry, query string) []journal.Entry {
 	if query == "" {
@@ -45,7 +46,7 @@ func FilterEntries(entries []journal.Entry, query string) []journal.Entry {
 	}
 	searchable := make([]string, len(entries))
 	for i, e := range entries {
-		parts := []string{e.Note}
+		parts := []string{e.Note, "@" + e.Username}
 		if e.Goal != nil {
 			parts = append(parts, *e.Goal)
 		}

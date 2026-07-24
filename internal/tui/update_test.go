@@ -43,6 +43,47 @@ func TestMenuViewSelectedItemHasCursor(t *testing.T) {
 	}
 }
 
+func pasteKey(runes string) tea.KeyMsg {
+	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(runes), Paste: true}
+}
+
+func TestPasteIntoTaskUpdateNoteDoesNotAdvanceField(t *testing.T) {
+	m := updateModel{
+		phase:         phaseTaskUpdate,
+		taskUpdateSub: taskUpdateNote,
+	}
+	// Pasting "enter" content should append, not advance the sub-phase.
+	m, _ = m.Update(pasteKey("hello"))
+	if m.taskUpdateNote != "hello" {
+		t.Errorf("expected note='hello', got %q", m.taskUpdateNote)
+	}
+	if m.taskUpdateSub != taskUpdateNote {
+		t.Errorf("expected to stay on taskUpdateNote, got %v", m.taskUpdateSub)
+	}
+}
+
+func TestPasteIntoNewTaskNoteDoesNotAdvanceField(t *testing.T) {
+	m := updateModel{phase: phaseNewTask, newSub: newFormNote}
+	m, _ = m.Update(pasteKey("https://example.com/path"))
+	if m.newNoteInput != "https://example.com/path" {
+		t.Errorf("expected full URL in note; got %q", m.newNoteInput)
+	}
+	if m.newSub != newFormNote {
+		t.Errorf("expected to stay on newFormNote, got %v", m.newSub)
+	}
+}
+
+func TestPasteIntoEditNoteDoesNotAdvanceField(t *testing.T) {
+	m := updateModel{phase: phaseEditEntry, editSub: editNote}
+	m, _ = m.Update(pasteKey("pasted text"))
+	if m.editNoteInput != "pasted text" {
+		t.Errorf("expected 'pasted text'; got %q", m.editNoteInput)
+	}
+	if m.editSub != editNote {
+		t.Errorf("expected to stay on editNote, got %v", m.editSub)
+	}
+}
+
 func TestViewGoalPickerContainsItems(t *testing.T) {
 	openGoals := []goals.Goal{{ID: "ROUTING", Description: "Implement routing layer", State: "open"}}
 	m := updateModel{

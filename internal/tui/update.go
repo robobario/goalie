@@ -433,6 +433,10 @@ func (m updateModel) handleEditPickingKey(msg tea.KeyMsg) (updateModel, tea.Cmd)
 }
 
 func (m updateModel) handleEditNoteKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
+	if msg.Paste {
+		m.editNoteInput += string(msg.Runes)
+		return m, nil
+	}
 	switch msg.String() {
 	case "esc":
 		m.phase = phaseMenu
@@ -451,6 +455,10 @@ func (m updateModel) handleEditNoteKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 }
 
 func (m updateModel) handleEditTaskKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
+	if msg.Paste {
+		m.editTaskInput += string(msg.Runes)
+		return m, nil
+	}
 	switch msg.String() {
 	case "esc":
 		m.phase = phaseMenu
@@ -719,6 +727,10 @@ func (m updateModel) handleTaskUpdatePickingKey(msg tea.KeyMsg) (updateModel, te
 }
 
 func (m updateModel) handleTaskUpdateNoteKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
+	if msg.Paste {
+		m.taskUpdateNote += string(msg.Runes)
+		return m, nil
+	}
 	switch msg.String() {
 	case "enter", "down":
 		m.taskUpdateSub = taskUpdateState
@@ -893,6 +905,11 @@ func (m updateModel) handleNewTaskKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 		return m, cmd
 
 	case newFormTask:
+		if msg.Paste {
+			m.selectedTag += string(msg.Runes)
+			m.tagError = ""
+			break
+		}
 		switch msg.String() {
 		case "enter":
 			if goals.ValidTaskTag(m.selectedTag) {
@@ -920,6 +937,10 @@ func (m updateModel) handleNewTaskKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 		}
 
 	case newFormNote:
+		if msg.Paste {
+			m.newNoteInput += string(msg.Runes)
+			break
+		}
 		switch msg.String() {
 		case "enter":
 			m.newSub = newFormBlocked

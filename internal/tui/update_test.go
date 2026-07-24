@@ -43,6 +43,25 @@ func TestMenuViewSelectedItemHasCursor(t *testing.T) {
 	}
 }
 
+func TestViewGoalPickerContainsItems(t *testing.T) {
+	m := updateModel{
+		phase:    phaseNewTask,
+		newSub:   newFormGoal,
+		allGoals: []goals.Goal{{ID: "ROUTING", State: "open"}},
+		goalPicker: pickerModel{
+			items:   goalPickerItems([]goals.Goal{{ID: "ROUTING", State: "open"}}),
+			matches: goalPickerItems([]goals.Goal{{ID: "ROUTING", State: "open"}}),
+		},
+	}
+	got := m.viewGoalPicker()
+	if !strings.Contains(got, "ROUTING") {
+		t.Errorf("expected ROUTING in goal picker; got %q", got)
+	}
+	if !strings.Contains(got, noGoalSentinel) {
+		t.Errorf("expected sentinel in goal picker; got %q", got)
+	}
+}
+
 func TestColorizeGoalInTaskDisplay_withGoal(t *testing.T) {
 	got := colorizeGoalInTaskDisplay("ROUTING#impl some work — 2d ago")
 	if !strings.Contains(got, "ROUTING") {

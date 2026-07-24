@@ -101,7 +101,7 @@ func (p pickerModel) View() string {
 	fmt.Fprintf(&sb, "Search: %s%s\n", p.prefix, p.query)
 	for i, m := range p.matches {
 		if i == p.cursor {
-			fmt.Fprintf(&sb, "> %s\n", m)
+			fmt.Fprintf(&sb, "> %s\n", selectedItemStyle.Render(m))
 		} else {
 			fmt.Fprintf(&sb, "  %s\n", m)
 		}

@@ -33,6 +33,16 @@ func TestUpdateViewMultiLineErrorPreserved(t *testing.T) {
 	}
 }
 
+func TestMenuViewSelectedItemHasCursor(t *testing.T) {
+	m := updateModel{phase: phaseMenu, menuCursor: 1}
+	view := m.View()
+	// The second menu item should be on the "> " line.
+	// (Bold is applied via lipgloss but stripped in non-TTY tests.)
+	if !strings.Contains(view, "> Log progress on a new task") {
+		t.Errorf("expected selected item on '> ' line; got:\n%s", view)
+	}
+}
+
 func TestColorizeGoalInTaskDisplay_withGoal(t *testing.T) {
 	got := colorizeGoalInTaskDisplay("ROUTING#impl some work — 2d ago")
 	if !strings.Contains(got, "ROUTING") {

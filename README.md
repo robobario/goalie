@@ -41,7 +41,7 @@ Run `init`, pointing at the shared repo. Goalie creates the `data` branch, promp
 goalie init https://github.com/your-org/your-repo.git
 ```
 
-**Should you enable encryption?** Use it when the repository is public or semi-public and you don't want goals or journal entries readable without a key. On a private enterprise repository the repo itself provides access control, so you can skip it.
+**Should you enable encryption?** The client-side encryption in goalie is minimal — it is intended for experimentation and light privacy, not as a security guarantee. For any real team data, use a private, access-controlled git repository as your primary protection. The encryption option exists for cases where the repo is public or semi-public and you want a basic layer of obscurity on top; it is not a substitute for proper access control.
 
 If you enable encryption, `goalie init` generates a key, commits a `key-check.enc` sentinel to the data branch, and prints the key:
 

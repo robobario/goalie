@@ -36,6 +36,8 @@ const (
 	editBlockedDone                // setting blocked/done state
 )
 
+const noGoalSentinel = "(no goal)"
+
 type newTaskSub int
 
 const (
@@ -245,12 +247,8 @@ func (m updateModel) Update(msg tea.Msg) (updateModel, tea.Cmd) {
 				open = append(open, g)
 			}
 		}
-		if len(open) == 0 {
-			m.err = fmt.Errorf("No open goals — use `goalie goal add` first")
-			return m, tea.Quit
-		}
 		m.allGoals = open
-		m.goalPicker = newPicker(goalIDs(open))
+		m.goalPicker = newPicker(goalPickerItems(open))
 		m.newSub = newGoalPick
 
 	case taskTagsLoadedMsg:
@@ -865,6 +863,11 @@ func goalIDs(gs []goals.Goal) []string {
 	return ids
 }
 
+// goalPickerItems returns the picker list for goal selection: sentinel first, then goal IDs.
+func goalPickerItems(gs []goals.Goal) []string {
+	return append([]string{noGoalSentinel}, goalIDs(gs)...)
+}
+
 func (m updateModel) loadGoalsCmd() tea.Cmd {
 	ctx := m.ctx
 	return func() tea.Msg {
@@ -899,6 +902,12 @@ func (m updateModel) handleNewTaskKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 		updated, cmd, selected, wasSelected := m.goalPicker.Update(msg)
 		m.goalPicker = updated
 		if wasSelected && selected != "" {
+			if selected == noGoalSentinel {
+				m.selectedGoal = ""
+				m.newSub = newTagPick
+				m.taskPicker = newPicker([]string{}).withPrefix("#")
+				return m, cmd
+			}
 			validGoal := false
 			for _, g := range m.allGoals {
 				if g.ID == selected {
@@ -976,7 +985,7 @@ func (m updateModel) handleNewTaskKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 		switch msg.String() {
 		case "y":
 			m.newSub = newGoalPick
-			m.goalPicker = newPicker(goalIDs(m.allGoals))
+			m.goalPicker = newPicker(goalPickerItems(m.allGoals))
 			m.taskPicker = pickerModel{prefix: "#"}
 			m.selectedGoal = ""
 			m.selectedTag = ""
@@ -1018,7 +1027,7 @@ func (m updateModel) submitNewTask() (updateModel, tea.Cmd) {
 func (m updateModel) viewNewTask() string {
 	switch m.newSub {
 	case newGoalPick:
-		return "Select a goal:\n\n" + m.goalPicker.View()
+		return "Select a goal (or choose '" + noGoalSentinel + "'):\n\n" + m.goalPicker.View()
 	case newTagPick:
 		var sb strings.Builder
 		fmt.Fprintf(&sb, "Goal: %s\n\n", m.selectedGoal)

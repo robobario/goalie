@@ -340,11 +340,11 @@ func (m updateModel) viewMenu() string {
 	var sb strings.Builder
 	sb.WriteString("What would you like to do?\n\n")
 	for i, opt := range opts {
-		cursor := "  "
 		if i == m.menuCursor {
-			cursor = "> "
+			sb.WriteString("> " + selectedItemStyle.Render(opt.label) + "\n")
+		} else {
+			sb.WriteString("  " + opt.label + "\n")
 		}
-		sb.WriteString(cursor + opt.label + "\n")
 	}
 	sb.WriteString("\n↑/↓ to select, Enter to confirm, q to quit")
 	return sb.String()
@@ -530,10 +530,6 @@ func (m updateModel) viewEditPicking() string {
 	sb.WriteString("Select an entry to edit (↑/↓, Enter to select, Esc to go back)\n\n")
 	now := time.Now().UTC()
 	for i, e := range m.editEntries {
-		cursor := "  "
-		if i == m.editCursor {
-			cursor = "> "
-		}
 		task := ""
 		if e.Task != nil {
 			task = *e.Task + " "
@@ -547,7 +543,12 @@ func (m updateModel) viewEditPicking() string {
 		if len(note) > 40 {
 			note = note[:37] + "..."
 		}
-		fmt.Fprintf(&sb, "%s%s%s%s — %s\n", cursor, task, goalPart, note, age)
+		line := fmt.Sprintf("%s%s%s — %s", task, goalPart, note, age)
+		if i == m.editCursor {
+			fmt.Fprintf(&sb, "> %s\n", selectedItemStyle.Render(line))
+		} else {
+			fmt.Fprintf(&sb, "  %s\n", line)
+		}
 	}
 	return sb.String()
 }
@@ -772,9 +773,17 @@ func (m updateModel) viewTaskUpdatePicking() string {
 		}
 		if strings.HasPrefix(item, "[BLOCKED] ") {
 			body := strings.TrimPrefix(item, "[BLOCKED] ")
-			sb.WriteString(prefix + blockedStyle.Render("[BLOCKED]") + " " + colorizeGoalInTaskDisplay(body) + "\n")
+			rendered := blockedStyle.Render("[BLOCKED]") + " " + colorizeGoalInTaskDisplay(body)
+			if i == cursor {
+				rendered = selectedItemStyle.Render(rendered)
+			}
+			sb.WriteString(prefix + rendered + "\n")
 		} else {
-			sb.WriteString(prefix + colorizeGoalInTaskDisplay(item) + "\n")
+			body := colorizeGoalInTaskDisplay(item)
+			if i == cursor {
+				body = selectedItemStyle.Render(body)
+			}
+			sb.WriteString(prefix + body + "\n")
 		}
 	}
 	if m.taskUpdatePicker.query != "" {

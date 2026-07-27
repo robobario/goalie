@@ -4,6 +4,8 @@ Goalie helps a remote team of open source developers share their goals and surfa
 
 Add shared goals, then create tasks using hashtags. Log updates to show whether you are blocked or making progress. Run `goalie` with no arguments to open the TUI — a two-tab interface showing team activity and a guided end-of-day update flow.
 
+Own your data. Your goals and updates are stored in the git server you point `goalie` at. Every team member writes updates to the shared git server, so no server to maintain, you can piggyback off your established Git authentication and authorization.
+
 ## Installation
 
 **Prerequisites:** git.

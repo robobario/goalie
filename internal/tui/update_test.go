@@ -869,3 +869,86 @@ func TestTabWithNoAtSignLeavesNoteUnchanged(t *testing.T) {
 	}
 }
 
+func TestTabCompletionStripsLeadingAtFromUsername(t *testing.T) {
+	// KnownUsernames may return names with a leading @ if the config Name field
+	// includes one (e.g. "@SamBarker"). Completion must produce @SamBarker,
+	// not @@SamBarker.
+	m := updateModel{
+		phase:          phaseTaskUpdate,
+		taskUpdateSub:  taskUpdateNote,
+		taskUpdateNote: "ping @",
+		knownUsernames: []string{"@SamBarker"},
+	}
+	m, _ = m.Update(tabKey())
+	if m.taskUpdateNote != "ping @SamBarker" {
+		t.Errorf("expected @SamBarker (no double @), got %q", m.taskUpdateNote)
+	}
+}
+
+func TestTabCompletionIsCaseInsensitive(t *testing.T) {
+	// Prefix typed as uppercase should still match a lowercase stored username.
+	m := updateModel{
+		phase:          phaseTaskUpdate,
+		taskUpdateSub:  taskUpdateNote,
+		taskUpdateNote: "fixed by @S",
+		knownUsernames: []string{"sambarker"},
+	}
+	m, _ = m.Update(tabKey())
+	if m.taskUpdateNote != "fixed by @sambarker" {
+		t.Errorf("expected case-insensitive match, got %q", m.taskUpdateNote)
+	}
+}
+
+func TestTabCyclingAfterCaseInsensitiveCompletion(t *testing.T) {
+	// After completing @ali → @Alice, a second Tab should still cycle (not restart).
+	m := updateModel{
+		phase:          phaseTaskUpdate,
+		taskUpdateSub:  taskUpdateNote,
+		taskUpdateNote: "for @ali",
+		knownUsernames: []string{"Alice", "Alicia"},
+	}
+	m, _ = m.Update(tabKey()) // → @Alice
+	m, _ = m.Update(tabKey()) // → @Alicia (not a fresh start)
+	if m.taskUpdateNote != "for @Alicia" {
+		t.Errorf("expected second candidate after cycling, got %q", m.taskUpdateNote)
+	}
+}
+
+func TestMentionStyledInTaskUpdateNoteView(t *testing.T) {
+	m := updateModel{
+		phase:          phaseTaskUpdate,
+		taskUpdateSub:  taskUpdateNote,
+		taskUpdateSelected: activeTask{tag: "#impl"},
+		taskUpdateNote: "fixed with @alice",
+	}
+	view := m.viewTaskUpdateForm()
+	if !strings.Contains(view, "@alice") {
+		t.Errorf("expected @alice in task update note view; got:\n%s", view)
+	}
+}
+
+func TestMentionStyledInNewTaskNoteView(t *testing.T) {
+	m := updateModel{
+		phase:        phaseNewTask,
+		newSub:       newFormNote,
+		newNoteInput: "blocked by @bob",
+	}
+	view := m.viewNewTask()
+	if !strings.Contains(view, "@bob") {
+		t.Errorf("expected @bob in new task note view; got:\n%s", view)
+	}
+}
+
+func TestMentionStyledInEditNoteView(t *testing.T) {
+	m := updateModel{
+		phase:         phaseEditEntry,
+		editSub:       editNote,
+		editNoteInput: "reviewed by @carol",
+		editEntry:     journal.Entry{Task: strPtr("#impl")},
+	}
+	view := m.viewEditNote()
+	if !strings.Contains(view, "@carol") {
+		t.Errorf("expected @carol in edit note view; got:\n%s", view)
+	}
+}
+

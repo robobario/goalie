@@ -625,17 +625,17 @@ func (m updateModel) viewEditNote() string {
 	if task != "" {
 		header = "Editing: " + taskTagStyle.Render(task)
 	}
-	return fmt.Sprintf("%s\n\nNote: %s_\n\nEnter to continue, Esc to cancel", header, m.editNoteInput)
+	return fmt.Sprintf("%s\n\nNote: %s_\n\nEnter to continue, Esc to cancel", header, renderNoteWithMentions(m.editNoteInput, m.username))
 }
 
 func (m updateModel) viewEditTask() string {
 	return fmt.Sprintf("Note: %s\n\nTask tag: %s_\n\nEnter to confirm (#hashtag required), Esc to cancel",
-		strings.TrimSpace(m.editNoteInput), taskTagStyle.Render(m.editTaskInput))
+		renderNoteWithMentions(strings.TrimSpace(m.editNoteInput), m.username), taskTagStyle.Render(m.editTaskInput))
 }
 
 func (m updateModel) viewEditBlockedDone() string {
 	return fmt.Sprintf("Note: %s\nTask: %s\n\nBlocked? [y]  Not blocked? [n]  Done? [d]  (Esc to cancel)",
-		strings.TrimSpace(m.editNoteInput), taskTagStyle.Render(m.editTaskInput))
+		renderNoteWithMentions(strings.TrimSpace(m.editNoteInput), m.username), taskTagStyle.Render(m.editTaskInput))
 }
 
 // viewGoalPicker renders the goal picker with goal IDs coloured and their
@@ -791,13 +791,17 @@ func (m updateModel) advanceMention(note string) (string, mentionCompletion) {
 		return note, mentionCompletion{}
 	}
 	mc := m.mentionCompletion
-	if mc.active && strings.HasPrefix(suffix[1:], mc.prefix) {
+	// mc.prefix is stored lowercase; compare case-insensitively so that
+	// cycling still works after the completed username is inserted.
+	if mc.active && strings.HasPrefix(strings.ToLower(suffix[1:]), mc.prefix) {
 		mc.index = (mc.index + 1) % len(mc.candidates)
 	} else {
-		prefix := suffix[1:]
+		prefix := strings.ToLower(suffix[1:])
 		var candidates []string
 		for _, u := range m.knownUsernames {
-			if strings.HasPrefix(u, prefix) {
+			// Strip a leading @ in case the stored username includes one.
+			u = strings.TrimPrefix(u, "@")
+			if strings.HasPrefix(strings.ToLower(u), prefix) {
 				candidates = append(candidates, u)
 			}
 		}
@@ -941,7 +945,7 @@ func (m updateModel) viewTaskUpdateForm() string {
 	sb.WriteString(header + "\n\n")
 
 	// Note field
-	noteLine := "Note: " + m.taskUpdateNote
+	noteLine := "Note: " + renderNoteWithMentions(m.taskUpdateNote, m.username)
 	if m.taskUpdateSub == taskUpdateNote {
 		noteLine += "_"
 	}
@@ -1134,9 +1138,9 @@ func (m updateModel) viewNewTask() string {
 
 	// Note field
 	if m.newSub == newFormNote {
-		sb.WriteString("\n> Note:  " + m.newNoteInput + "_\n")
+		sb.WriteString("\n> Note:  " + renderNoteWithMentions(m.newNoteInput, m.username) + "_\n")
 	} else {
-		sb.WriteString("\n  Note:  " + m.newNoteInput + "\n")
+		sb.WriteString("\n  Note:  " + renderNoteWithMentions(m.newNoteInput, m.username) + "\n")
 	}
 
 	// Blocked field

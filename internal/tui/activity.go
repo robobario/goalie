@@ -23,8 +23,8 @@ var goalDescStyle     = lipgloss.NewStyle().Faint(true).Italic(true)
 var selectedItemStyle = lipgloss.NewStyle().Bold(true)
 var taskTagStyle      = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "130", Dark: "208"})
 var usernameStyle     = lipgloss.NewStyle().Bold(true)
-var mentionStyle      = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "20", Dark: "75"})
-var selfMentionStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "5", Dark: "13"})
+var mentionStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "28", Dark: "76"})
+var selfMentionStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "22", Dark: "82"})
 
 type entriesLoadedMsg struct {
 	entries []journal.Entry

@@ -37,25 +37,25 @@ func Username(name string, tty bool) string {
 	return Bold(name, tty)
 }
 
-// Cyan wraps s in ANSI cyan+bold escape when tty is true.
-func Cyan(s string, tty bool) string {
+// BoldGreen wraps s in ANSI bold+green escape when tty is true.
+func BoldGreen(s string, tty bool) string {
 	if !tty {
 		return s
 	}
-	return "\033[1;36m" + s + "\033[0m"
+	return "\033[1;32m" + s + "\033[0m"
 }
 
 // HighlightMentions replaces @handle tokens in note with styled versions.
-// Mentions matching selfUsername get extra emphasis (bold+cyan); others get bold.
+// Mentions matching selfUsername get extra emphasis (bold+bright-green); others get bold+green.
 func HighlightMentions(note, selfUsername string, tty bool) string {
 	if !tty {
 		return note
 	}
 	return mentionRe.ReplaceAllStringFunc(note, func(m string) string {
 		if selfUsername != "" && m == selfUsername {
-			return Cyan(m, tty)
+			return "\033[1;92m" + m + "\033[0m"
 		}
-		return Bold(m, tty)
+		return BoldGreen(m, tty)
 	})
 }
 

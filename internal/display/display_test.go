@@ -216,30 +216,30 @@ func TestHighlightMentionsNoTTY(t *testing.T) {
 	}
 }
 
-func TestHighlightMentionsOtherUserBold(t *testing.T) {
+func TestHighlightMentionsOtherUserGreen(t *testing.T) {
 	got := HighlightMentions("ask @bob about this", "@alice", true)
-	if !strings.Contains(got, "\033[1m@bob\033[0m") {
-		t.Errorf("expected bold @bob, got %q", got)
+	if !strings.Contains(got, "\033[1;32m@bob\033[0m") {
+		t.Errorf("expected bold+green @bob, got %q", got)
 	}
-	if strings.Contains(got, "\033[1;36m") {
-		t.Errorf("expected no cyan for non-self mention, got %q", got)
+	if strings.Contains(got, "\033[1;92m") {
+		t.Errorf("expected no bright-green for non-self mention, got %q", got)
 	}
 }
 
-func TestHighlightMentionsSelfCyan(t *testing.T) {
+func TestHighlightMentionsSelfBrightGreen(t *testing.T) {
 	got := HighlightMentions("waiting on @alice for review", "@alice", true)
-	if !strings.Contains(got, "\033[1;36m@alice\033[0m") {
-		t.Errorf("expected cyan+bold for self mention, got %q", got)
+	if !strings.Contains(got, "\033[1;92m@alice\033[0m") {
+		t.Errorf("expected bright-green for self mention, got %q", got)
 	}
 }
 
 func TestHighlightMentionsMixed(t *testing.T) {
 	got := HighlightMentions("@alice waiting on @bob", "@alice", true)
-	if !strings.Contains(got, "\033[1;36m@alice\033[0m") {
-		t.Errorf("expected cyan self-mention for @alice, got %q", got)
+	if !strings.Contains(got, "\033[1;92m@alice\033[0m") {
+		t.Errorf("expected bright-green self-mention for @alice, got %q", got)
 	}
-	if !strings.Contains(got, "\033[1m@bob\033[0m") {
-		t.Errorf("expected bold @bob, got %q", got)
+	if !strings.Contains(got, "\033[1;32m@bob\033[0m") {
+		t.Errorf("expected bold+green @bob, got %q", got)
 	}
 }
 

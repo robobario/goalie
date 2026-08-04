@@ -160,6 +160,7 @@ func Status(ctx AppContext) error {
 		return users[i] < users[j]
 	})
 
+	selfUsername, _ := resolveUsername(ctx)
 	now := time.Now().UTC()
 	for _, u := range users {
 		display.Section(u, ctx.Stdout, ctx.IsTTY)
@@ -171,7 +172,7 @@ func Status(ctx AppContext) error {
 			return ues[i].TS < ues[j].TS
 		})
 		for _, e := range ues {
-			fmt.Fprintf(ctx.Stdout, "  %s\n", display.FormatStatusEntry(e, now, ctx.IsTTY))
+			fmt.Fprintf(ctx.Stdout, "  %s\n", display.FormatStatusEntry(e, selfUsername, now, ctx.IsTTY))
 		}
 	}
 	return nil
@@ -196,6 +197,7 @@ func Summary(ctx AppContext, days int, user string) error {
 	if err := requireDataDir(ctx); err != nil {
 		return err
 	}
+	selfUsername, _ := resolveUsername(ctx)
 	var pattern string
 	if user != "" {
 		if strings.ContainsAny(user, "*?[") {
@@ -258,7 +260,7 @@ func Summary(ctx AppContext, days int, user string) error {
 		fmt.Fprintln(ctx.Stdout, display.FormatSummaryHeader(k.goal, k.task, k.username, ctx.IsTTY))
 		prevBlocked := false
 		for _, e := range groups[k] {
-			fmt.Fprintln(ctx.Stdout, display.FormatSummaryEntry(e, prevBlocked, now, ctx.IsTTY))
+			fmt.Fprintln(ctx.Stdout, display.FormatSummaryEntry(e, selfUsername, prevBlocked, now, ctx.IsTTY))
 			prevBlocked = e.Blocked
 		}
 	}

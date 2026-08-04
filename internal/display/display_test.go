@@ -70,7 +70,7 @@ func TestUsernameBoldTTY(t *testing.T) {
 
 func TestFormatEntryIncludesAtPrefix(t *testing.T) {
 	e := journal.Entry{TS: fixedTS, Note: "work", Username: "@alice"}
-	got := FormatEntry(e, fixedNow, false)
+	got := FormatEntry(e, "", fixedNow, false)
 	if !strings.HasPrefix(got, "@alice") {
 		t.Errorf("expected @alice prefix, got %q", got)
 	}
@@ -83,7 +83,7 @@ func TestFormatEntryUnblockedNoThread(t *testing.T) {
 		Blocked:  false,
 		Username: "@alice",
 	}
-	got := FormatEntry(e, fixedNow, false)
+	got := FormatEntry(e, "", fixedNow, false)
 	want := "@alice work - 1d ago"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
@@ -97,7 +97,7 @@ func TestFormatEntryBlocked(t *testing.T) {
 		Blocked:  true,
 		Username: "@bob",
 	}
-	got := FormatEntry(e, fixedNow, false)
+	got := FormatEntry(e, "", fixedNow, false)
 	if !strings.HasPrefix(got, "[BLOCKED]") {
 		t.Errorf("expected [BLOCKED] prefix, got %q", got)
 	}
@@ -108,10 +108,10 @@ func TestFormatEntryWithThread(t *testing.T) {
 		TS:       fixedTS,
 		Note:     "note",
 		Blocked:  false,
-		Task:   ptr("feat-x"),
+		Task:     ptr("feat-x"),
 		Username: "@carol",
 	}
-	got := FormatEntry(e, fixedNow, false)
+	got := FormatEntry(e, "", fixedNow, false)
 	want := "@carol feat-x note - 1d ago"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
@@ -125,7 +125,7 @@ func TestFormatStatusEntryWithGoalNoThread(t *testing.T) {
 		Blocked: false,
 		Goal:    ptr("GOAL"),
 	}
-	got := FormatStatusEntry(e, fixedNow, false)
+	got := FormatStatusEntry(e, "", fixedNow, false)
 	want := "(GOAL) note - 1d ago"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
@@ -139,7 +139,7 @@ func TestFormatStatusEntryBlockedWithGoal(t *testing.T) {
 		Blocked: true,
 		Goal:    ptr("GOAL"),
 	}
-	got := FormatStatusEntry(e, fixedNow, false)
+	got := FormatStatusEntry(e, "", fixedNow, false)
 	want := "[BLOCKED](GOAL) note - 1d ago"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
@@ -163,7 +163,7 @@ func TestFormatSummaryHeaderNoGoal(t *testing.T) {
 
 func TestFormatSummaryEntryNoStateChange(t *testing.T) {
 	e := journal.Entry{TS: fixedTS, Note: "steady progress", Blocked: false}
-	got := FormatSummaryEntry(e, false, fixedNow, false)
+	got := FormatSummaryEntry(e, "", false, fixedNow, false)
 	if got != "- steady progress — 1d ago" {
 		t.Errorf("got %q", got)
 	}
@@ -171,7 +171,7 @@ func TestFormatSummaryEntryNoStateChange(t *testing.T) {
 
 func TestFormatSummaryEntryBlockedStateChange(t *testing.T) {
 	e := journal.Entry{TS: fixedTS, Note: "hit a wall", Blocked: true}
-	got := FormatSummaryEntry(e, false, fixedNow, false)
+	got := FormatSummaryEntry(e, "", false, fixedNow, false)
 	if !strings.HasPrefix(got, "- [Blocked]") {
 		t.Errorf("expected [Blocked] prefix, got %q", got)
 	}
@@ -179,7 +179,7 @@ func TestFormatSummaryEntryBlockedStateChange(t *testing.T) {
 
 func TestFormatSummaryEntryUnblockedStateChange(t *testing.T) {
 	e := journal.Entry{TS: fixedTS, Note: "resolved", Blocked: false}
-	got := FormatSummaryEntry(e, true, fixedNow, false)
+	got := FormatSummaryEntry(e, "", true, fixedNow, false)
 	if !strings.HasPrefix(got, "- [Unblocked]") {
 		t.Errorf("expected [Unblocked] prefix, got %q", got)
 	}
@@ -187,7 +187,7 @@ func TestFormatSummaryEntryUnblockedStateChange(t *testing.T) {
 
 func TestFormatSummaryEntryBlockedNoChange(t *testing.T) {
 	e := journal.Entry{TS: fixedTS, Note: "still stuck", Blocked: true}
-	got := FormatSummaryEntry(e, true, fixedNow, false)
+	got := FormatSummaryEntry(e, "", true, fixedNow, false)
 	if strings.Contains(got, "[Blocked]") || strings.Contains(got, "[Unblocked]") {
 		t.Errorf("expected no label when state unchanged, got %q", got)
 	}
@@ -202,9 +202,50 @@ func TestFormatStatusEntryNoGoalNoThread(t *testing.T) {
 		Note:    "note",
 		Blocked: false,
 	}
-	got := FormatStatusEntry(e, fixedNow, false)
+	got := FormatStatusEntry(e, "", fixedNow, false)
 	want := "note - 1d ago"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestHighlightMentionsNoTTY(t *testing.T) {
+	got := HighlightMentions("waiting on @alice", "@alice", false)
+	if got != "waiting on @alice" {
+		t.Errorf("expected unchanged note in non-TTY, got %q", got)
+	}
+}
+
+func TestHighlightMentionsOtherUserBold(t *testing.T) {
+	got := HighlightMentions("ask @bob about this", "@alice", true)
+	if !strings.Contains(got, "\033[1m@bob\033[0m") {
+		t.Errorf("expected bold @bob, got %q", got)
+	}
+	if strings.Contains(got, "\033[1;36m") {
+		t.Errorf("expected no cyan for non-self mention, got %q", got)
+	}
+}
+
+func TestHighlightMentionsSelfCyan(t *testing.T) {
+	got := HighlightMentions("waiting on @alice for review", "@alice", true)
+	if !strings.Contains(got, "\033[1;36m@alice\033[0m") {
+		t.Errorf("expected cyan+bold for self mention, got %q", got)
+	}
+}
+
+func TestHighlightMentionsMixed(t *testing.T) {
+	got := HighlightMentions("@alice waiting on @bob", "@alice", true)
+	if !strings.Contains(got, "\033[1;36m@alice\033[0m") {
+		t.Errorf("expected cyan self-mention for @alice, got %q", got)
+	}
+	if !strings.Contains(got, "\033[1m@bob\033[0m") {
+		t.Errorf("expected bold @bob, got %q", got)
+	}
+}
+
+func TestHighlightMentionsNoMentions(t *testing.T) {
+	got := HighlightMentions("no mentions here", "@alice", true)
+	if got != "no mentions here" {
+		t.Errorf("expected unchanged note with no mentions, got %q", got)
 	}
 }

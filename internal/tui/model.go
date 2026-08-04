@@ -4,6 +4,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"goalie/internal/cli"
+	"goalie/internal/config"
 )
 
 type tab int
@@ -29,11 +30,22 @@ type Model struct {
 	update    updateModel
 }
 
+func resolveSelfUsername(ctx *cli.AppContext) string {
+	if ctx.Username != "" {
+		return ctx.Username
+	}
+	cfg, err := config.Load()
+	if err != nil || cfg == nil {
+		return ""
+	}
+	return cfg.Name
+}
+
 func initialModel(ctx *cli.AppContext) Model {
 	return Model{
 		ctx:       ctx,
 		activeTab: activityTab,
-		activity:  activityModel{},
+		activity:  activityModel{selfUsername: resolveSelfUsername(ctx)},
 		update:    updateModel{ctx: ctx},
 	}
 }

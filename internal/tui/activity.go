@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -13,13 +14,17 @@ import (
 	"goalie/internal/journal"
 )
 
-var blockedStyle       = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "124", Dark: "9"})
-var doneStyle          = lipgloss.NewStyle().Faint(true)
-var goalStyle          = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "27", Dark: "75"})
-var goalDescStyle      = lipgloss.NewStyle().Faint(true).Italic(true)
-var selectedItemStyle  = lipgloss.NewStyle().Bold(true)
-var taskTagStyle       = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "130", Dark: "208"})
-var usernameStyle      = lipgloss.NewStyle().Bold(true)
+var tuiMentionRe = regexp.MustCompile(`@[a-zA-Z0-9][a-zA-Z0-9-]{0,38}`)
+
+var blockedStyle      = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "124", Dark: "9"})
+var doneStyle         = lipgloss.NewStyle().Faint(true)
+var goalStyle         = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "27", Dark: "75"})
+var goalDescStyle     = lipgloss.NewStyle().Faint(true).Italic(true)
+var selectedItemStyle = lipgloss.NewStyle().Bold(true)
+var taskTagStyle      = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "130", Dark: "208"})
+var usernameStyle     = lipgloss.NewStyle().Bold(true)
+var mentionStyle      = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "20", Dark: "75"})
+var selfMentionStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "5", Dark: "13"})
 
 type entriesLoadedMsg struct {
 	entries []journal.Entry
@@ -27,12 +32,13 @@ type entriesLoadedMsg struct {
 }
 
 type activityModel struct {
-	entries    []journal.Entry
-	filtered   []journal.Entry
-	search     string
-	searchMode bool
-	err        error
-	loaded     bool
+	entries      []journal.Entry
+	filtered     []journal.Entry
+	search       string
+	searchMode   bool
+	err          error
+	loaded       bool
+	selfUsername string
 }
 
 func loadActivityCmd(ctx *cli.AppContext) tea.Cmd {
@@ -152,14 +158,23 @@ func (m activityModel) View() string {
 
 		sb.WriteString(usernameStyle.Render(username) + ":\n")
 		for _, e := range entries {
-			sb.WriteString("  " + formatActivityEntry(e, now) + "\n")
+			sb.WriteString("  " + formatActivityEntry(e, now, m.selfUsername) + "\n")
 		}
 	}
 
 	return sb.String()
 }
 
-func formatActivityEntry(e journal.Entry, now time.Time) string {
+func renderNoteWithMentions(note, selfUsername string) string {
+	return tuiMentionRe.ReplaceAllStringFunc(note, func(m string) string {
+		if selfUsername != "" && m == selfUsername {
+			return selfMentionStyle.Render(m)
+		}
+		return mentionStyle.Render(m)
+	})
+}
+
+func formatActivityEntry(e journal.Entry, now time.Time, selfUsername string) string {
 	var parts []string
 	if e.Done {
 		parts = append(parts, doneStyle.Render("[done]"))
@@ -174,7 +189,7 @@ func formatActivityEntry(e journal.Entry, now time.Time) string {
 	} else if e.Task != nil {
 		parts = append(parts, taskTagStyle.Render(*e.Task))
 	}
-	parts = append(parts, e.Note)
+	parts = append(parts, renderNoteWithMentions(e.Note, selfUsername))
 	return strings.Join(parts, " ") + " — " + ageString(e.TS, now)
 }
 

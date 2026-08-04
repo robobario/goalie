@@ -97,6 +97,37 @@ type updateEntryDoneMsg struct {
 	err error
 }
 
+type usernamesLoadedMsg struct {
+	usernames []string
+	err       error
+}
+
+type mentionCompletion struct {
+	active     bool
+	prefix     string
+	candidates []string
+	index      int
+}
+
+// atMentionSuffix returns the trailing @word in s (including the @),
+// or "" if s does not end with an @-mention token. Only ASCII
+// alphanumeric and hyphen characters are treated as mention-body bytes,
+// so multi-byte UTF-8 in the rest of the note is handled safely.
+func atMentionSuffix(s string) string {
+	i := len(s)
+	for i > 0 {
+		c := s[i-1]
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-') {
+			break
+		}
+		i--
+	}
+	if i == 0 || s[i-1] != '@' {
+		return ""
+	}
+	return s[i-1:]
+}
+
 type updateModel struct {
 	ctx      *cli.AppContext
 	username string
@@ -136,10 +167,20 @@ type updateModel struct {
 
 	width  int
 	height int
+
+	knownUsernames   []string
+	mentionCompletion mentionCompletion
 }
 
 func (m updateModel) Init() tea.Cmd {
-	return m.reloadTaskStatesCmd()
+	return tea.Batch(m.reloadTaskStatesCmd(), loadUsernamesCmd(m.ctx))
+}
+
+func loadUsernamesCmd(ctx *cli.AppContext) tea.Cmd {
+	return func() tea.Msg {
+		usernames, err := journal.KnownUsernames(ctx.DataDir)
+		return usernamesLoadedMsg{usernames: usernames, err: err}
+	}
 }
 
 // reloadTaskStatesCmd returns a command that reads the current task states from
@@ -259,6 +300,11 @@ func (m updateModel) Update(msg tea.Msg) (updateModel, tea.Cmd) {
 			return m, nil
 		}
 		m.taskPicker = newPicker(msg.tags).withPrefix("#")
+
+	case usernamesLoadedMsg:
+		if msg.err == nil {
+			m.knownUsernames = msg.usernames
+		}
 
 	case tea.KeyMsg:
 		switch m.phase {
@@ -435,18 +481,27 @@ func (m updateModel) handleEditPickingKey(msg tea.KeyMsg) (updateModel, tea.Cmd)
 func (m updateModel) handleEditNoteKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 	if msg.Paste {
 		m.editNoteInput += string(msg.Runes)
+		m.mentionCompletion = mentionCompletion{}
 		return m, nil
 	}
 	switch msg.String() {
 	case "esc":
+		m.mentionCompletion = mentionCompletion{}
 		m.phase = phaseMenu
 	case "enter":
+		m.mentionCompletion = mentionCompletion{}
 		m.editSub = editTask
+	case "tab":
+		note, mc := m.advanceMention(m.editNoteInput)
+		m.editNoteInput = note
+		m.mentionCompletion = mc
 	case "backspace":
+		m.mentionCompletion = mentionCompletion{}
 		if len(m.editNoteInput) > 0 {
 			m.editNoteInput = m.editNoteInput[:len(m.editNoteInput)-1]
 		}
 	default:
+		m.mentionCompletion = mentionCompletion{}
 		if len(msg.Runes) == 1 {
 			m.editNoteInput += string(msg.Runes)
 		}
@@ -570,17 +625,17 @@ func (m updateModel) viewEditNote() string {
 	if task != "" {
 		header = "Editing: " + taskTagStyle.Render(task)
 	}
-	return fmt.Sprintf("%s\n\nNote: %s_\n\nEnter to continue, Esc to cancel", header, m.editNoteInput)
+	return fmt.Sprintf("%s\n\nNote: %s_\n\nEnter to continue, Esc to cancel", header, renderNoteWithMentions(m.editNoteInput, m.username))
 }
 
 func (m updateModel) viewEditTask() string {
 	return fmt.Sprintf("Note: %s\n\nTask tag: %s_\n\nEnter to confirm (#hashtag required), Esc to cancel",
-		strings.TrimSpace(m.editNoteInput), taskTagStyle.Render(m.editTaskInput))
+		renderNoteWithMentions(strings.TrimSpace(m.editNoteInput), m.username), taskTagStyle.Render(m.editTaskInput))
 }
 
 func (m updateModel) viewEditBlockedDone() string {
 	return fmt.Sprintf("Note: %s\nTask: %s\n\nBlocked? [y]  Not blocked? [n]  Done? [d]  (Esc to cancel)",
-		strings.TrimSpace(m.editNoteInput), taskTagStyle.Render(m.editTaskInput))
+		renderNoteWithMentions(strings.TrimSpace(m.editNoteInput), m.username), taskTagStyle.Render(m.editTaskInput))
 }
 
 // viewGoalPicker renders the goal picker with goal IDs coloured and their
@@ -726,19 +781,60 @@ func (m updateModel) handleTaskUpdatePickingKey(msg tea.KeyMsg) (updateModel, te
 	return m, cmd
 }
 
+// advanceMention cycles @mention completions for note. If note ends with an
+// @word that matches known usernames, replaces that word with the next candidate
+// and returns the updated note and completion state. Returns note unchanged and
+// a zero completion when no candidates match.
+func (m updateModel) advanceMention(note string) (string, mentionCompletion) {
+	suffix := atMentionSuffix(note)
+	if suffix == "" {
+		return note, mentionCompletion{}
+	}
+	mc := m.mentionCompletion
+	// mc.prefix is stored lowercase; compare case-insensitively so that
+	// cycling still works after the completed username is inserted.
+	if mc.active && strings.HasPrefix(strings.ToLower(suffix[1:]), mc.prefix) {
+		mc.index = (mc.index + 1) % len(mc.candidates)
+	} else {
+		prefix := strings.ToLower(suffix[1:])
+		var candidates []string
+		for _, u := range m.knownUsernames {
+			// Strip a leading @ in case the stored username includes one.
+			u = strings.TrimPrefix(u, "@")
+			if strings.HasPrefix(strings.ToLower(u), prefix) {
+				candidates = append(candidates, u)
+			}
+		}
+		if len(candidates) == 0 {
+			return note, mentionCompletion{}
+		}
+		mc = mentionCompletion{active: true, prefix: prefix, candidates: candidates, index: 0}
+	}
+	stem := note[:len(note)-len(suffix)]
+	return stem + "@" + mc.candidates[mc.index], mc
+}
+
 func (m updateModel) handleTaskUpdateNoteKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 	if msg.Paste {
 		m.taskUpdateNote += string(msg.Runes)
+		m.mentionCompletion = mentionCompletion{}
 		return m, nil
 	}
 	switch msg.String() {
 	case "enter", "down":
+		m.mentionCompletion = mentionCompletion{}
 		m.taskUpdateSub = taskUpdateState
+	case "tab":
+		note, mc := m.advanceMention(m.taskUpdateNote)
+		m.taskUpdateNote = note
+		m.mentionCompletion = mc
 	case "backspace":
+		m.mentionCompletion = mentionCompletion{}
 		if len(m.taskUpdateNote) > 0 {
 			m.taskUpdateNote = m.taskUpdateNote[:len(m.taskUpdateNote)-1]
 		}
 	default:
+		m.mentionCompletion = mentionCompletion{}
 		if len(msg.Runes) == 1 {
 			m.taskUpdateNote += string(msg.Runes)
 		}
@@ -849,7 +945,7 @@ func (m updateModel) viewTaskUpdateForm() string {
 	sb.WriteString(header + "\n\n")
 
 	// Note field
-	noteLine := "Note: " + m.taskUpdateNote
+	noteLine := "Note: " + renderNoteWithMentions(m.taskUpdateNote, m.username)
 	if m.taskUpdateSub == taskUpdateNote {
 		noteLine += "_"
 	}
@@ -939,18 +1035,27 @@ func (m updateModel) handleNewTaskKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 	case newFormNote:
 		if msg.Paste {
 			m.newNoteInput += string(msg.Runes)
+			m.mentionCompletion = mentionCompletion{}
 			break
 		}
 		switch msg.String() {
 		case "enter":
+			m.mentionCompletion = mentionCompletion{}
 			m.newSub = newFormBlocked
 		case "up":
+			m.mentionCompletion = mentionCompletion{}
 			m.newSub = newFormTask
+		case "tab":
+			note, mc := m.advanceMention(m.newNoteInput)
+			m.newNoteInput = note
+			m.mentionCompletion = mc
 		case "backspace":
+			m.mentionCompletion = mentionCompletion{}
 			if len(m.newNoteInput) > 0 {
 				m.newNoteInput = m.newNoteInput[:len(m.newNoteInput)-1]
 			}
 		default:
+			m.mentionCompletion = mentionCompletion{}
 			if len(msg.Runes) == 1 {
 				m.newNoteInput += string(msg.Runes)
 			}
@@ -1033,9 +1138,9 @@ func (m updateModel) viewNewTask() string {
 
 	// Note field
 	if m.newSub == newFormNote {
-		sb.WriteString("\n> Note:  " + m.newNoteInput + "_\n")
+		sb.WriteString("\n> Note:  " + renderNoteWithMentions(m.newNoteInput, m.username) + "_\n")
 	} else {
-		sb.WriteString("\n  Note:  " + m.newNoteInput + "\n")
+		sb.WriteString("\n  Note:  " + renderNoteWithMentions(m.newNoteInput, m.username) + "\n")
 	}
 
 	// Blocked field

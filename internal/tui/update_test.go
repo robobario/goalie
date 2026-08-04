@@ -699,3 +699,256 @@ func TestExistingTaskInfoNoMatchDifferentGoal(t *testing.T) {
 	}
 }
 
+func tabKey() tea.KeyMsg {
+	return tea.KeyMsg{Type: tea.KeyTab}
+}
+
+func runeKey(r rune) tea.KeyMsg {
+	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}}
+}
+
+func TestAtMentionSuffix(t *testing.T) {
+	cases := []struct {
+		input string
+		want  string
+	}{
+		{"fixed bug for @rob", "@rob"},
+		{"@", "@"},
+		{"hello @", "@"},
+		{"no mention here", ""},
+		{"ends with space ", ""},
+		{"@alice-bob", "@alice-bob"},
+		{"note @rob extra", ""},
+		{"", ""},
+	}
+	for _, tc := range cases {
+		got := atMentionSuffix(tc.input)
+		if got != tc.want {
+			t.Errorf("atMentionSuffix(%q) = %q, want %q", tc.input, got, tc.want)
+		}
+	}
+}
+
+func TestUsernamesLoadedMsgStoresUsernames(t *testing.T) {
+	m := updateModel{}
+	m, _ = m.Update(usernamesLoadedMsg{usernames: []string{"alice", "bob"}})
+	if len(m.knownUsernames) != 2 {
+		t.Fatalf("expected 2 knownUsernames, got %d", len(m.knownUsernames))
+	}
+	if m.knownUsernames[0] != "alice" || m.knownUsernames[1] != "bob" {
+		t.Errorf("unexpected knownUsernames: %v", m.knownUsernames)
+	}
+}
+
+func TestUsernamesLoadedMsgIgnoresError(t *testing.T) {
+	m := updateModel{knownUsernames: []string{"alice"}}
+	m, _ = m.Update(usernamesLoadedMsg{err: errors.New("disk error")})
+	if len(m.knownUsernames) != 1 {
+		t.Errorf("expected knownUsernames unchanged on error, got %v", m.knownUsernames)
+	}
+}
+
+func TestTabCompletesAtMentionInTaskUpdateNote(t *testing.T) {
+	m := updateModel{
+		phase:          phaseTaskUpdate,
+		taskUpdateSub:  taskUpdateNote,
+		taskUpdateNote: "fixed for @ali",
+		knownUsernames: []string{"alice", "alicia"},
+	}
+	m, _ = m.Update(tabKey())
+	if m.taskUpdateNote != "fixed for @alice" {
+		t.Errorf("expected first completion, got %q", m.taskUpdateNote)
+	}
+	if !m.mentionCompletion.active {
+		t.Error("expected completion to be active")
+	}
+}
+
+func TestTabCyclesCandidatesInTaskUpdateNote(t *testing.T) {
+	m := updateModel{
+		phase:          phaseTaskUpdate,
+		taskUpdateSub:  taskUpdateNote,
+		taskUpdateNote: "fixed for @ali",
+		knownUsernames: []string{"alice", "alicia"},
+	}
+	m, _ = m.Update(tabKey())
+	m, _ = m.Update(tabKey())
+	if m.taskUpdateNote != "fixed for @alicia" {
+		t.Errorf("expected second candidate on second Tab, got %q", m.taskUpdateNote)
+	}
+	m, _ = m.Update(tabKey())
+	if m.taskUpdateNote != "fixed for @alice" {
+		t.Errorf("expected wrap back to first candidate, got %q", m.taskUpdateNote)
+	}
+}
+
+func TestTabNoMatchLeavesNoteUnchanged(t *testing.T) {
+	m := updateModel{
+		phase:          phaseTaskUpdate,
+		taskUpdateSub:  taskUpdateNote,
+		taskUpdateNote: "fixed for @xyz",
+		knownUsernames: []string{"alice", "bob"},
+	}
+	m, _ = m.Update(tabKey())
+	if m.taskUpdateNote != "fixed for @xyz" {
+		t.Errorf("expected note unchanged when no match, got %q", m.taskUpdateNote)
+	}
+	if m.mentionCompletion.active {
+		t.Error("expected completion inactive when no match")
+	}
+}
+
+func TestNonTabKeyResetsCompletion(t *testing.T) {
+	m := updateModel{
+		phase:          phaseTaskUpdate,
+		taskUpdateSub:  taskUpdateNote,
+		taskUpdateNote: "fixed for @robobario",
+		knownUsernames: []string{"robobario"},
+		mentionCompletion: mentionCompletion{
+			active:     true,
+			prefix:     "rob",
+			candidates: []string{"robobario"},
+			index:      0,
+		},
+	}
+	m, _ = m.Update(runeKey(' '))
+	if m.mentionCompletion.active {
+		t.Error("expected completion reset after non-tab key")
+	}
+}
+
+func TestTabCompletesEmptyPrefixMatchesAll(t *testing.T) {
+	m := updateModel{
+		phase:          phaseTaskUpdate,
+		taskUpdateSub:  taskUpdateNote,
+		taskUpdateNote: "ping @",
+		knownUsernames: []string{"alice", "bob"},
+	}
+	m, _ = m.Update(tabKey())
+	if m.taskUpdateNote != "ping @alice" {
+		t.Errorf("expected first user on empty prefix, got %q", m.taskUpdateNote)
+	}
+}
+
+func TestTabCompletesAtMentionInNewTaskNote(t *testing.T) {
+	m := updateModel{
+		phase:          phaseNewTask,
+		newSub:         newFormNote,
+		newNoteInput:   "blocked by @ali",
+		knownUsernames: []string{"alice"},
+	}
+	m, _ = m.Update(tabKey())
+	if m.newNoteInput != "blocked by @alice" {
+		t.Errorf("expected completion in new task note, got %q", m.newNoteInput)
+	}
+}
+
+func TestTabCompletesAtMentionInEditNote(t *testing.T) {
+	m := updateModel{
+		phase:         phaseEditEntry,
+		editSub:       editNote,
+		editNoteInput: "cc @ali",
+		knownUsernames: []string{"alice"},
+	}
+	m, _ = m.Update(tabKey())
+	if m.editNoteInput != "cc @alice" {
+		t.Errorf("expected completion in edit note, got %q", m.editNoteInput)
+	}
+}
+
+func TestTabWithNoAtSignLeavesNoteUnchanged(t *testing.T) {
+	m := updateModel{
+		phase:          phaseTaskUpdate,
+		taskUpdateSub:  taskUpdateNote,
+		taskUpdateNote: "no mention",
+		knownUsernames: []string{"alice"},
+	}
+	m, _ = m.Update(tabKey())
+	if m.taskUpdateNote != "no mention" {
+		t.Errorf("expected note unchanged when no @ suffix, got %q", m.taskUpdateNote)
+	}
+}
+
+func TestTabCompletionStripsLeadingAtFromUsername(t *testing.T) {
+	// KnownUsernames may return names with a leading @ if the config Name field
+	// includes one (e.g. "@SamBarker"). Completion must produce @SamBarker,
+	// not @@SamBarker.
+	m := updateModel{
+		phase:          phaseTaskUpdate,
+		taskUpdateSub:  taskUpdateNote,
+		taskUpdateNote: "ping @",
+		knownUsernames: []string{"@SamBarker"},
+	}
+	m, _ = m.Update(tabKey())
+	if m.taskUpdateNote != "ping @SamBarker" {
+		t.Errorf("expected @SamBarker (no double @), got %q", m.taskUpdateNote)
+	}
+}
+
+func TestTabCompletionIsCaseInsensitive(t *testing.T) {
+	// Prefix typed as uppercase should still match a lowercase stored username.
+	m := updateModel{
+		phase:          phaseTaskUpdate,
+		taskUpdateSub:  taskUpdateNote,
+		taskUpdateNote: "fixed by @S",
+		knownUsernames: []string{"sambarker"},
+	}
+	m, _ = m.Update(tabKey())
+	if m.taskUpdateNote != "fixed by @sambarker" {
+		t.Errorf("expected case-insensitive match, got %q", m.taskUpdateNote)
+	}
+}
+
+func TestTabCyclingAfterCaseInsensitiveCompletion(t *testing.T) {
+	// After completing @ali → @Alice, a second Tab should still cycle (not restart).
+	m := updateModel{
+		phase:          phaseTaskUpdate,
+		taskUpdateSub:  taskUpdateNote,
+		taskUpdateNote: "for @ali",
+		knownUsernames: []string{"Alice", "Alicia"},
+	}
+	m, _ = m.Update(tabKey()) // → @Alice
+	m, _ = m.Update(tabKey()) // → @Alicia (not a fresh start)
+	if m.taskUpdateNote != "for @Alicia" {
+		t.Errorf("expected second candidate after cycling, got %q", m.taskUpdateNote)
+	}
+}
+
+func TestMentionStyledInTaskUpdateNoteView(t *testing.T) {
+	m := updateModel{
+		phase:          phaseTaskUpdate,
+		taskUpdateSub:  taskUpdateNote,
+		taskUpdateSelected: activeTask{tag: "#impl"},
+		taskUpdateNote: "fixed with @alice",
+	}
+	view := m.viewTaskUpdateForm()
+	if !strings.Contains(view, "@alice") {
+		t.Errorf("expected @alice in task update note view; got:\n%s", view)
+	}
+}
+
+func TestMentionStyledInNewTaskNoteView(t *testing.T) {
+	m := updateModel{
+		phase:        phaseNewTask,
+		newSub:       newFormNote,
+		newNoteInput: "blocked by @bob",
+	}
+	view := m.viewNewTask()
+	if !strings.Contains(view, "@bob") {
+		t.Errorf("expected @bob in new task note view; got:\n%s", view)
+	}
+}
+
+func TestMentionStyledInEditNoteView(t *testing.T) {
+	m := updateModel{
+		phase:         phaseEditEntry,
+		editSub:       editNote,
+		editNoteInput: "reviewed by @carol",
+		editEntry:     journal.Entry{Task: strPtr("#impl")},
+	}
+	view := m.viewEditNote()
+	if !strings.Contains(view, "@carol") {
+		t.Errorf("expected @carol in edit note view; got:\n%s", view)
+	}
+}
+

@@ -270,6 +270,30 @@ func Collect(dataDir string, r git.Runner, days int, userPattern string, key []b
 	return entries, nil
 }
 
+// KnownUsernames returns all usernames found in journal filenames. It reads
+// only directory entries, not JSONL content, and does not run git pull.
+func KnownUsernames(dataDir string) ([]string, error) {
+	journalDir := filepath.Join(dataDir, "journal")
+	allFiles, err := filepath.Glob(filepath.Join(journalDir, "*.jsonl"))
+	if err != nil {
+		return nil, err
+	}
+	usernameSet := make(map[string]bool)
+	for _, file := range allFiles {
+		username, ok := usernameFromWeeklyFile(file)
+		if !ok {
+			continue
+		}
+		usernameSet[username] = true
+	}
+	usernames := make([]string, 0, len(usernameSet))
+	for u := range usernameSet {
+		usernames = append(usernames, u)
+	}
+	sort.Strings(usernames)
+	return usernames, nil
+}
+
 // CollectLatest returns the latest entry per (username, goal, task) key
 // within the last `days` days.
 func CollectLatest(dataDir string, r git.Runner, days int, key []byte) ([]Entry, error) {

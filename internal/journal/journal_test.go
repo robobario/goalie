@@ -698,3 +698,50 @@ func TestUpdateEntry(t *testing.T) {
 		}
 	})
 }
+
+func TestKnownUsernames(t *testing.T) {
+	t.Run("returns sorted usernames from journal filenames", func(t *testing.T) {
+		dir := t.TempDir()
+		journalDir := filepath.Join(dir, "journal")
+		if err := os.MkdirAll(journalDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range []string{
+			"zeus-2025-W01.jsonl",
+			"alice-2025-W01.jsonl",
+			"alice-2025-W02.jsonl",
+			"bob-2024-W52.jsonl",
+			"not-a-weekly-file.jsonl",
+		} {
+			f, err := os.Create(filepath.Join(journalDir, name))
+			if err != nil {
+				t.Fatal(err)
+			}
+			f.Close()
+		}
+
+		got, err := journal.KnownUsernames(dir)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		want := []string{"alice", "bob", "zeus"}
+		if strings.Join(got, ",") != strings.Join(want, ",") {
+			t.Errorf("got %v, want %v", got, want)
+		}
+	})
+
+	t.Run("returns empty slice when journal dir is empty", func(t *testing.T) {
+		dir := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(dir, "journal"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+
+		got, err := journal.KnownUsernames(dir)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(got) != 0 {
+			t.Errorf("expected empty slice, got %v", got)
+		}
+	})
+}

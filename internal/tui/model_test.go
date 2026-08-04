@@ -12,41 +12,41 @@ func newModel() Model {
 	return initialModel(&cli.AppContext{})
 }
 
-func TestTabFromActivityLandsOnUpdate(t *testing.T) {
+func TestShiftRightFromActivityLandsOnUpdate(t *testing.T) {
 	m := newModel()
-	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyShiftRight})
 	got := next.(Model)
 	if got.activeTab != updateTab {
-		t.Errorf("expected updateTab after Tab from activityTab, got %v", got.activeTab)
+		t.Errorf("expected updateTab after Shift+Right from activityTab, got %v", got.activeTab)
 	}
 }
 
-func TestShiftTabFromUpdateLandsOnActivity(t *testing.T) {
+func TestShiftLeftFromUpdateLandsOnActivity(t *testing.T) {
 	m := newModel()
 	m.activeTab = updateTab
-	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyShiftLeft})
 	got := next.(Model)
 	if got.activeTab != activityTab {
-		t.Errorf("expected activityTab after Shift+Tab from updateTab, got %v", got.activeTab)
+		t.Errorf("expected activityTab after Shift+Left from updateTab, got %v", got.activeTab)
 	}
 }
 
-func TestTabFromUpdateWrapsToActivity(t *testing.T) {
+func TestShiftRightFromUpdateWrapsToActivity(t *testing.T) {
 	m := newModel()
 	m.activeTab = updateTab
-	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyShiftRight})
 	got := next.(Model)
 	if got.activeTab != activityTab {
-		t.Errorf("expected activityTab after Tab from updateTab, got %v", got.activeTab)
+		t.Errorf("expected activityTab after Shift+Right from updateTab, got %v", got.activeTab)
 	}
 }
 
-func TestShiftTabFromActivityWrapsToUpdate(t *testing.T) {
+func TestShiftLeftFromActivityWrapsToUpdate(t *testing.T) {
 	m := newModel()
-	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyShiftLeft})
 	got := next.(Model)
 	if got.activeTab != updateTab {
-		t.Errorf("expected updateTab after Shift+Tab from activityTab, got %v", got.activeTab)
+		t.Errorf("expected updateTab after Shift+Left from activityTab, got %v", got.activeTab)
 	}
 }
 
@@ -86,11 +86,11 @@ func TestWindowSizeMsgStoresWidthAndHeight(t *testing.T) {
 	}
 }
 
-func TestTabToActivityTabTriggersRefresh(t *testing.T) {
+func TestShiftRightToActivityTabTriggersRefresh(t *testing.T) {
 	m := newModel()
 	m.activeTab = updateTab
 	m.activity.loaded = true
-	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyShiftRight})
 	got := next.(Model)
 	if got.activeTab != activityTab {
 		t.Fatalf("expected activityTab, got %v", got.activeTab)
@@ -103,23 +103,23 @@ func TestTabToActivityTabTriggersRefresh(t *testing.T) {
 	}
 }
 
-func TestShiftTabToActivityTabTriggersRefresh(t *testing.T) {
+func TestShiftLeftToActivityTabTriggersRefresh(t *testing.T) {
 	m := newModel()
 	m.activity.loaded = true
-	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyShiftLeft})
 	got := next.(Model)
 	if got.activeTab != updateTab {
 		t.Fatalf("expected updateTab, got %v", got.activeTab)
 	}
-	// shift+tab from activityTab goes to updateTab, not activityTab — no refresh
+	// shift+left from activityTab goes to updateTab, not activityTab — no refresh
 	if cmd != nil {
 		msg := cmd()
 		if _, ok := msg.(tea.QuitMsg); ok {
 			t.Error("unexpected quit command")
 		}
 	}
-	// now tab back to activityTab
-	next2, cmd2 := got.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+	// now shift+left back to activityTab
+	next2, cmd2 := got.Update(tea.KeyMsg{Type: tea.KeyShiftLeft})
 	got2 := next2.(Model)
 	if got2.activeTab != activityTab {
 		t.Fatalf("expected activityTab, got %v", got2.activeTab)
@@ -132,36 +132,36 @@ func TestShiftTabToActivityTabTriggersRefresh(t *testing.T) {
 	}
 }
 
-func TestTabFromUpdateMenuSwitchesToActivity(t *testing.T) {
-	// Regression test: Tab was silently consumed by the update model when
+func TestShiftRightFromUpdateMenuSwitchesToActivity(t *testing.T) {
+	// Regression test: Shift+Right was silently consumed by the update model when
 	// phase != phaseLoading, preventing the user from returning to the
 	// Activity tab.
 	m := newModel()
 	m.activeTab = updateTab
 	m.update.phase = phaseMenu // simulate fully-loaded update tab at the menu
-	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyShiftRight})
 	got := next.(Model)
 	if got.activeTab != activityTab {
-		t.Errorf("expected activityTab after Tab from update menu, got %v", got.activeTab)
+		t.Errorf("expected activityTab after Shift+Right from update menu, got %v", got.activeTab)
 	}
 }
 
-func TestShiftTabFromUpdateMenuSwitchesToActivity(t *testing.T) {
+func TestShiftLeftFromUpdateMenuSwitchesToActivity(t *testing.T) {
 	m := newModel()
 	m.activeTab = updateTab
 	m.update.phase = phaseMenu
-	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyShiftLeft})
 	got := next.(Model)
 	if got.activeTab != activityTab {
-		t.Errorf("expected activityTab after Shift+Tab from update menu, got %v", got.activeTab)
+		t.Errorf("expected activityTab after Shift+Left from update menu, got %v", got.activeTab)
 	}
 }
 
 func TestViewIncludesKeyHelpBar(t *testing.T) {
 	m := newModel()
 	view := m.View()
-	if !strings.Contains(view, "Tab") {
-		t.Errorf("expected key-help bar with Tab hint in view; got:\n%s", view)
+	if !strings.Contains(view, "Shift") {
+		t.Errorf("expected key-help bar with Shift hint in view; got:\n%s", view)
 	}
 	if !strings.Contains(view, "q: quit") {
 		t.Errorf("expected 'q: quit' in view key-help; got:\n%s", view)

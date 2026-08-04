@@ -59,7 +59,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if m.activeTab == updateTab && m.update.phase != phaseLoading &&
-			msg.String() != "tab" && msg.String() != "shift+tab" {
+			msg.String() != "shift+left" && msg.String() != "shift+right" {
 			var cmd tea.Cmd
 			m.update, cmd = m.update.Update(msg)
 			cmds = append(cmds, cmd)
@@ -74,13 +74,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
-		case "tab":
+		case "shift+right":
 			m.activeTab = (m.activeTab + 1) % 2
 			if m.activeTab == activityTab {
 				m.activity.loaded = false
 				cmds = append(cmds, loadActivityCmd(m.ctx))
 			}
-		case "shift+tab":
+		case "shift+left":
 			m.activeTab = (m.activeTab - 1 + 2) % 2
 			if m.activeTab == activityTab {
 				m.activity.loaded = false
@@ -120,6 +120,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.update, cmd = m.update.Update(msg)
 		cmds = append(cmds, cmd)
+	case usernamesLoadedMsg:
+		var cmd tea.Cmd
+		m.update, cmd = m.update.Update(msg)
+		cmds = append(cmds, cmd)
 	case editEntriesLoadedMsg:
 		var cmd tea.Cmd
 		m.update, cmd = m.update.Update(msg)
@@ -150,7 +154,7 @@ func (m Model) View() string {
 		body = m.update.View()
 	}
 
-	helpBar := helpBarStyle.Render("Tab/Shift-Tab: switch view  q: quit")
+	helpBar := helpBarStyle.Render("Shift-←/→: switch view  q: quit")
 	return lipgloss.JoinVertical(lipgloss.Left, tabBar, body, helpBar)
 }
 

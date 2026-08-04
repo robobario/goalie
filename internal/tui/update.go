@@ -143,14 +143,14 @@ type updateModel struct {
 	taskUpdatePicker    pickerModel
 	taskUpdateByDisplay map[string]activeTask
 	taskUpdateSelected  activeTask
-	taskUpdateNote      string
+	taskUpdateNote      noteInput
 	taskUpdateState     entryState
 
-	editSub      editSub
-	editEntries  []journal.Entry
-	editCursor   int
-	editEntry    journal.Entry
-	editNoteInput string
+	editSub       editSub
+	editEntries   []journal.Entry
+	editCursor    int
+	editEntry     journal.Entry
+	editNoteInput noteInput
 	editTaskInput string
 	editBlocked  bool
 	editDone     bool
@@ -161,7 +161,7 @@ type updateModel struct {
 	selectedGoal string
 	selectedTag  string
 	allGoals     []goals.Goal
-	newNoteInput string
+	newNoteInput noteInput
 	tagError     string
 	newUnblocked bool
 
@@ -465,7 +465,7 @@ func (m updateModel) handleEditPickingKey(msg tea.KeyMsg) (updateModel, tea.Cmd)
 	case "enter":
 		if len(m.editEntries) > 0 {
 			m.editEntry = m.editEntries[m.editCursor]
-			m.editNoteInput = m.editEntry.Note
+			m.editNoteInput = newNoteInput(m.editEntry.Note)
 			m.editTaskInput = ""
 			if m.editEntry.Task != nil {
 				m.editTaskInput = *m.editEntry.Task
@@ -480,7 +480,7 @@ func (m updateModel) handleEditPickingKey(msg tea.KeyMsg) (updateModel, tea.Cmd)
 
 func (m updateModel) handleEditNoteKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 	if msg.Paste {
-		m.editNoteInput += string(msg.Runes)
+		m.editNoteInput = m.editNoteInput.appendStr(string(msg.Runes))
 		m.mentionCompletion = mentionCompletion{}
 		return m, nil
 	}
@@ -492,18 +492,25 @@ func (m updateModel) handleEditNoteKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 		m.mentionCompletion = mentionCompletion{}
 		m.editSub = editTask
 	case "tab":
-		note, mc := m.advanceMention(m.editNoteInput)
-		m.editNoteInput = note
-		m.mentionCompletion = mc
+		if m.editNoteInput.atEnd() {
+			note, mc := m.advanceMention(m.editNoteInput.value)
+			m.editNoteInput.value = note
+			m.editNoteInput.cursor = len(note)
+			m.mentionCompletion = mc
+		}
+	case "left":
+		m.mentionCompletion = mentionCompletion{}
+		m.editNoteInput = m.editNoteInput.left()
+	case "right":
+		m.mentionCompletion = mentionCompletion{}
+		m.editNoteInput = m.editNoteInput.right()
 	case "backspace":
 		m.mentionCompletion = mentionCompletion{}
-		if len(m.editNoteInput) > 0 {
-			m.editNoteInput = m.editNoteInput[:len(m.editNoteInput)-1]
-		}
+		m.editNoteInput = m.editNoteInput.backspace()
 	default:
 		m.mentionCompletion = mentionCompletion{}
 		if len(msg.Runes) == 1 {
-			m.editNoteInput += string(msg.Runes)
+			m.editNoteInput = m.editNoteInput.insert(msg.Runes[0])
 		}
 	}
 	return m, nil
@@ -555,7 +562,7 @@ func (m updateModel) handleEditBlockedDoneKey(msg tea.KeyMsg) (updateModel, tea.
 
 func (m updateModel) submitEdit() (updateModel, tea.Cmd) {
 	updated := m.editEntry
-	updated.Note = strings.TrimSpace(m.editNoteInput)
+	updated.Note = strings.TrimSpace(m.editNoteInput.value)
 	updated.Blocked = m.editBlocked
 	updated.Done = m.editDone
 	task := m.editTaskInput
@@ -625,17 +632,17 @@ func (m updateModel) viewEditNote() string {
 	if task != "" {
 		header = "Editing: " + taskTagStyle.Render(task)
 	}
-	return fmt.Sprintf("%s\n\nNote: %s_\n\nEnter to continue, Esc to cancel", header, renderNoteWithMentions(m.editNoteInput, m.username))
+	return fmt.Sprintf("%s\n\nNote: %s\n\nEnter to continue, Esc to cancel", header, m.editNoteInput.view(m.username))
 }
 
 func (m updateModel) viewEditTask() string {
 	return fmt.Sprintf("Note: %s\n\nTask tag: %s_\n\nEnter to confirm (#hashtag required), Esc to cancel",
-		renderNoteWithMentions(strings.TrimSpace(m.editNoteInput), m.username), taskTagStyle.Render(m.editTaskInput))
+		renderNoteWithMentions(strings.TrimSpace(m.editNoteInput.value), m.username), taskTagStyle.Render(m.editTaskInput))
 }
 
 func (m updateModel) viewEditBlockedDone() string {
 	return fmt.Sprintf("Note: %s\nTask: %s\n\nBlocked? [y]  Not blocked? [n]  Done? [d]  (Esc to cancel)",
-		renderNoteWithMentions(strings.TrimSpace(m.editNoteInput), m.username), taskTagStyle.Render(m.editTaskInput))
+		renderNoteWithMentions(strings.TrimSpace(m.editNoteInput.value), m.username), taskTagStyle.Render(m.editTaskInput))
 }
 
 // viewGoalPicker renders the goal picker with goal IDs coloured and their
@@ -695,7 +702,7 @@ func (m updateModel) enterPhaseNewTask() (updateModel, tea.Cmd) {
 	m.goalPicker = pickerModel{}
 	m.selectedGoal = ""
 	m.selectedTag = ""
-	m.newNoteInput = ""
+	m.newNoteInput = noteInput{}
 	m.tagError = ""
 	m.newUnblocked = false
 	return m, m.loadGoalsCmd()
@@ -706,7 +713,7 @@ func (m updateModel) enterPhaseNewTask() (updateModel, tea.Cmd) {
 func (m updateModel) enterPhaseTaskUpdate() updateModel {
 	m.phase = phaseTaskUpdate
 	m.taskUpdateSub = taskUpdatePicking
-	m.taskUpdateNote = ""
+	m.taskUpdateNote = noteInput{}
 	m.taskUpdateState = entryUnblocked
 
 	now := time.Now().UTC()
@@ -769,7 +776,7 @@ func (m updateModel) handleTaskUpdatePickingKey(msg tea.KeyMsg) (updateModel, te
 	if wasSelected && selected != "" {
 		if task, ok := m.taskUpdateByDisplay[selected]; ok {
 			m.taskUpdateSelected = task
-			m.taskUpdateNote = ""
+			m.taskUpdateNote = noteInput{}
 			if task.state.Blocked {
 				m.taskUpdateState = entryBlocked
 			} else {
@@ -816,7 +823,7 @@ func (m updateModel) advanceMention(note string) (string, mentionCompletion) {
 
 func (m updateModel) handleTaskUpdateNoteKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 	if msg.Paste {
-		m.taskUpdateNote += string(msg.Runes)
+		m.taskUpdateNote = m.taskUpdateNote.appendStr(string(msg.Runes))
 		m.mentionCompletion = mentionCompletion{}
 		return m, nil
 	}
@@ -825,18 +832,25 @@ func (m updateModel) handleTaskUpdateNoteKey(msg tea.KeyMsg) (updateModel, tea.C
 		m.mentionCompletion = mentionCompletion{}
 		m.taskUpdateSub = taskUpdateState
 	case "tab":
-		note, mc := m.advanceMention(m.taskUpdateNote)
-		m.taskUpdateNote = note
-		m.mentionCompletion = mc
+		if m.taskUpdateNote.atEnd() {
+			note, mc := m.advanceMention(m.taskUpdateNote.value)
+			m.taskUpdateNote.value = note
+			m.taskUpdateNote.cursor = len(note)
+			m.mentionCompletion = mc
+		}
+	case "left":
+		m.mentionCompletion = mentionCompletion{}
+		m.taskUpdateNote = m.taskUpdateNote.left()
+	case "right":
+		m.mentionCompletion = mentionCompletion{}
+		m.taskUpdateNote = m.taskUpdateNote.right()
 	case "backspace":
 		m.mentionCompletion = mentionCompletion{}
-		if len(m.taskUpdateNote) > 0 {
-			m.taskUpdateNote = m.taskUpdateNote[:len(m.taskUpdateNote)-1]
-		}
+		m.taskUpdateNote = m.taskUpdateNote.backspace()
 	default:
 		m.mentionCompletion = mentionCompletion{}
 		if len(msg.Runes) == 1 {
-			m.taskUpdateNote += string(msg.Runes)
+			m.taskUpdateNote = m.taskUpdateNote.insert(msg.Runes[0])
 		}
 	}
 	return m, nil
@@ -862,7 +876,7 @@ func (m updateModel) handleTaskUpdateStateKey(msg tea.KeyMsg) (updateModel, tea.
 
 func (m updateModel) submitTaskUpdate() (updateModel, tea.Cmd) {
 	task := m.taskUpdateSelected
-	note := strings.TrimSpace(m.taskUpdateNote)
+	note := strings.TrimSpace(m.taskUpdateNote.value)
 	isBlocked := m.taskUpdateState == entryBlocked
 	isDone := m.taskUpdateState == entryDone
 
@@ -945,9 +959,11 @@ func (m updateModel) viewTaskUpdateForm() string {
 	sb.WriteString(header + "\n\n")
 
 	// Note field
-	noteLine := "Note: " + renderNoteWithMentions(m.taskUpdateNote, m.username)
+	var noteLine string
 	if m.taskUpdateSub == taskUpdateNote {
-		noteLine += "_"
+		noteLine = "Note: " + m.taskUpdateNote.view(m.username)
+	} else {
+		noteLine = "Note: " + renderNoteWithMentions(m.taskUpdateNote.value, m.username)
 	}
 	sb.WriteString(noteLine + "\n\n")
 
@@ -1034,7 +1050,7 @@ func (m updateModel) handleNewTaskKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 
 	case newFormNote:
 		if msg.Paste {
-			m.newNoteInput += string(msg.Runes)
+			m.newNoteInput = m.newNoteInput.appendStr(string(msg.Runes))
 			m.mentionCompletion = mentionCompletion{}
 			break
 		}
@@ -1046,18 +1062,25 @@ func (m updateModel) handleNewTaskKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 			m.mentionCompletion = mentionCompletion{}
 			m.newSub = newFormTask
 		case "tab":
-			note, mc := m.advanceMention(m.newNoteInput)
-			m.newNoteInput = note
-			m.mentionCompletion = mc
+			if m.newNoteInput.atEnd() {
+				note, mc := m.advanceMention(m.newNoteInput.value)
+				m.newNoteInput.value = note
+				m.newNoteInput.cursor = len(note)
+				m.mentionCompletion = mc
+			}
+		case "left":
+			m.mentionCompletion = mentionCompletion{}
+			m.newNoteInput = m.newNoteInput.left()
+		case "right":
+			m.mentionCompletion = mentionCompletion{}
+			m.newNoteInput = m.newNoteInput.right()
 		case "backspace":
 			m.mentionCompletion = mentionCompletion{}
-			if len(m.newNoteInput) > 0 {
-				m.newNoteInput = m.newNoteInput[:len(m.newNoteInput)-1]
-			}
+			m.newNoteInput = m.newNoteInput.backspace()
 		default:
 			m.mentionCompletion = mentionCompletion{}
 			if len(msg.Runes) == 1 {
-				m.newNoteInput += string(msg.Runes)
+				m.newNoteInput = m.newNoteInput.insert(msg.Runes[0])
 			}
 		}
 
@@ -1077,7 +1100,7 @@ func (m updateModel) handleNewTaskKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 }
 
 func (m updateModel) submitNewTask() (updateModel, tea.Cmd) {
-	note := strings.TrimSpace(m.newNoteInput)
+	note := strings.TrimSpace(m.newNoteInput.value)
 	isBlocked := !m.newUnblocked
 	tag := m.selectedTag
 	var goalPtr *string
@@ -1138,9 +1161,9 @@ func (m updateModel) viewNewTask() string {
 
 	// Note field
 	if m.newSub == newFormNote {
-		sb.WriteString("\n> Note:  " + renderNoteWithMentions(m.newNoteInput, m.username) + "_\n")
+		sb.WriteString("\n> Note:  " + m.newNoteInput.view(m.username) + "\n")
 	} else {
-		sb.WriteString("\n  Note:  " + renderNoteWithMentions(m.newNoteInput, m.username) + "\n")
+		sb.WriteString("\n  Note:  " + renderNoteWithMentions(m.newNoteInput.value, m.username) + "\n")
 	}
 
 	// Blocked field

@@ -54,8 +54,8 @@ func TestPasteIntoTaskUpdateNoteDoesNotAdvanceField(t *testing.T) {
 	}
 	// Pasting "enter" content should append, not advance the sub-phase.
 	m, _ = m.Update(pasteKey("hello"))
-	if m.taskUpdateNote != "hello" {
-		t.Errorf("expected note='hello', got %q", m.taskUpdateNote)
+	if m.taskUpdateNote.value != "hello" {
+		t.Errorf("expected note='hello', got %q", m.taskUpdateNote.value)
 	}
 	if m.taskUpdateSub != taskUpdateNote {
 		t.Errorf("expected to stay on taskUpdateNote, got %v", m.taskUpdateSub)
@@ -65,8 +65,8 @@ func TestPasteIntoTaskUpdateNoteDoesNotAdvanceField(t *testing.T) {
 func TestPasteIntoNewTaskNoteDoesNotAdvanceField(t *testing.T) {
 	m := updateModel{phase: phaseNewTask, newSub: newFormNote}
 	m, _ = m.Update(pasteKey("https://example.com/path"))
-	if m.newNoteInput != "https://example.com/path" {
-		t.Errorf("expected full URL in note; got %q", m.newNoteInput)
+	if m.newNoteInput.value != "https://example.com/path" {
+		t.Errorf("expected full URL in note; got %q", m.newNoteInput.value)
 	}
 	if m.newSub != newFormNote {
 		t.Errorf("expected to stay on newFormNote, got %v", m.newSub)
@@ -76,8 +76,8 @@ func TestPasteIntoNewTaskNoteDoesNotAdvanceField(t *testing.T) {
 func TestPasteIntoEditNoteDoesNotAdvanceField(t *testing.T) {
 	m := updateModel{phase: phaseEditEntry, editSub: editNote}
 	m, _ = m.Update(pasteKey("pasted text"))
-	if m.editNoteInput != "pasted text" {
-		t.Errorf("expected 'pasted text'; got %q", m.editNoteInput)
+	if m.editNoteInput.value != "pasted text" {
+		t.Errorf("expected 'pasted text'; got %q", m.editNoteInput.value)
 	}
 	if m.editSub != editNote {
 		t.Errorf("expected to stay on editNote, got %v", m.editSub)
@@ -304,7 +304,7 @@ func TestTaskUpdateNoteEnterAdvancesToState(t *testing.T) {
 	m := updateModel{
 		phase:          phaseTaskUpdate,
 		taskUpdateSub:  taskUpdateNote,
-		taskUpdateNote: "making progress",
+		taskUpdateNote: newNoteInput("making progress"),
 	}
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if m.taskUpdateSub != taskUpdateState {
@@ -404,8 +404,8 @@ func TestEditPickingEnterAdvancesToNote(t *testing.T) {
 	if m.editSub != editNote {
 		t.Errorf("expected editNote after Enter, got %v", m.editSub)
 	}
-	if m.editNoteInput != "fix this tpyo" {
-		t.Errorf("expected note pre-filled, got %q", m.editNoteInput)
+	if m.editNoteInput.value != "fix this tpyo" {
+		t.Errorf("expected note pre-filled, got %q", m.editNoteInput.value)
 	}
 }
 
@@ -413,7 +413,7 @@ func TestEditNoteEnterAdvancesToTask(t *testing.T) {
 	m := updateModel{
 		phase:         phaseEditEntry,
 		editSub:       editNote,
-		editNoteInput: "corrected note",
+		editNoteInput: newNoteInput("corrected note"),
 		editEntry:     journal.Entry{Task: strPtr("#impl")},
 		editTaskInput: "#impl",
 	}
@@ -519,10 +519,10 @@ func TestPickerFuzzyFilterAndSelect(t *testing.T) {
 
 func TestNewTaskSubmitGoesToMenu(t *testing.T) {
 	m := updateModel{
-		phase:       phaseNewTask,
-		newSub:      newFormBlocked,
-		selectedTag: "#impl",
-		newNoteInput: "some progress",
+		phase:        phaseNewTask,
+		newSub:       newFormBlocked,
+		selectedTag:  "#impl",
+		newNoteInput: newNoteInput("some progress"),
 	}
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
 	if m.phase != phaseMenu {
@@ -752,12 +752,12 @@ func TestTabCompletesAtMentionInTaskUpdateNote(t *testing.T) {
 	m := updateModel{
 		phase:          phaseTaskUpdate,
 		taskUpdateSub:  taskUpdateNote,
-		taskUpdateNote: "fixed for @ali",
+		taskUpdateNote: newNoteInput("fixed for @ali"),
 		knownUsernames: []string{"alice", "alicia"},
 	}
 	m, _ = m.Update(tabKey())
-	if m.taskUpdateNote != "fixed for @alice" {
-		t.Errorf("expected first completion, got %q", m.taskUpdateNote)
+	if m.taskUpdateNote.value != "fixed for @alice" {
+		t.Errorf("expected first completion, got %q", m.taskUpdateNote.value)
 	}
 	if !m.mentionCompletion.active {
 		t.Error("expected completion to be active")
@@ -768,17 +768,17 @@ func TestTabCyclesCandidatesInTaskUpdateNote(t *testing.T) {
 	m := updateModel{
 		phase:          phaseTaskUpdate,
 		taskUpdateSub:  taskUpdateNote,
-		taskUpdateNote: "fixed for @ali",
+		taskUpdateNote: newNoteInput("fixed for @ali"),
 		knownUsernames: []string{"alice", "alicia"},
 	}
 	m, _ = m.Update(tabKey())
 	m, _ = m.Update(tabKey())
-	if m.taskUpdateNote != "fixed for @alicia" {
-		t.Errorf("expected second candidate on second Tab, got %q", m.taskUpdateNote)
+	if m.taskUpdateNote.value != "fixed for @alicia" {
+		t.Errorf("expected second candidate on second Tab, got %q", m.taskUpdateNote.value)
 	}
 	m, _ = m.Update(tabKey())
-	if m.taskUpdateNote != "fixed for @alice" {
-		t.Errorf("expected wrap back to first candidate, got %q", m.taskUpdateNote)
+	if m.taskUpdateNote.value != "fixed for @alice" {
+		t.Errorf("expected wrap back to first candidate, got %q", m.taskUpdateNote.value)
 	}
 }
 
@@ -786,12 +786,12 @@ func TestTabNoMatchLeavesNoteUnchanged(t *testing.T) {
 	m := updateModel{
 		phase:          phaseTaskUpdate,
 		taskUpdateSub:  taskUpdateNote,
-		taskUpdateNote: "fixed for @xyz",
+		taskUpdateNote: newNoteInput("fixed for @xyz"),
 		knownUsernames: []string{"alice", "bob"},
 	}
 	m, _ = m.Update(tabKey())
-	if m.taskUpdateNote != "fixed for @xyz" {
-		t.Errorf("expected note unchanged when no match, got %q", m.taskUpdateNote)
+	if m.taskUpdateNote.value != "fixed for @xyz" {
+		t.Errorf("expected note unchanged when no match, got %q", m.taskUpdateNote.value)
 	}
 	if m.mentionCompletion.active {
 		t.Error("expected completion inactive when no match")
@@ -802,7 +802,7 @@ func TestNonTabKeyResetsCompletion(t *testing.T) {
 	m := updateModel{
 		phase:          phaseTaskUpdate,
 		taskUpdateSub:  taskUpdateNote,
-		taskUpdateNote: "fixed for @robobario",
+		taskUpdateNote: newNoteInput("fixed for @robobario"),
 		knownUsernames: []string{"robobario"},
 		mentionCompletion: mentionCompletion{
 			active:     true,
@@ -821,12 +821,12 @@ func TestTabCompletesEmptyPrefixMatchesAll(t *testing.T) {
 	m := updateModel{
 		phase:          phaseTaskUpdate,
 		taskUpdateSub:  taskUpdateNote,
-		taskUpdateNote: "ping @",
+		taskUpdateNote: newNoteInput("ping @"),
 		knownUsernames: []string{"alice", "bob"},
 	}
 	m, _ = m.Update(tabKey())
-	if m.taskUpdateNote != "ping @alice" {
-		t.Errorf("expected first user on empty prefix, got %q", m.taskUpdateNote)
+	if m.taskUpdateNote.value != "ping @alice" {
+		t.Errorf("expected first user on empty prefix, got %q", m.taskUpdateNote.value)
 	}
 }
 
@@ -834,25 +834,25 @@ func TestTabCompletesAtMentionInNewTaskNote(t *testing.T) {
 	m := updateModel{
 		phase:          phaseNewTask,
 		newSub:         newFormNote,
-		newNoteInput:   "blocked by @ali",
+		newNoteInput:   newNoteInput("blocked by @ali"),
 		knownUsernames: []string{"alice"},
 	}
 	m, _ = m.Update(tabKey())
-	if m.newNoteInput != "blocked by @alice" {
-		t.Errorf("expected completion in new task note, got %q", m.newNoteInput)
+	if m.newNoteInput.value != "blocked by @alice" {
+		t.Errorf("expected completion in new task note, got %q", m.newNoteInput.value)
 	}
 }
 
 func TestTabCompletesAtMentionInEditNote(t *testing.T) {
 	m := updateModel{
-		phase:         phaseEditEntry,
-		editSub:       editNote,
-		editNoteInput: "cc @ali",
+		phase:          phaseEditEntry,
+		editSub:        editNote,
+		editNoteInput:  newNoteInput("cc @ali"),
 		knownUsernames: []string{"alice"},
 	}
 	m, _ = m.Update(tabKey())
-	if m.editNoteInput != "cc @alice" {
-		t.Errorf("expected completion in edit note, got %q", m.editNoteInput)
+	if m.editNoteInput.value != "cc @alice" {
+		t.Errorf("expected completion in edit note, got %q", m.editNoteInput.value)
 	}
 }
 
@@ -860,12 +860,12 @@ func TestTabWithNoAtSignLeavesNoteUnchanged(t *testing.T) {
 	m := updateModel{
 		phase:          phaseTaskUpdate,
 		taskUpdateSub:  taskUpdateNote,
-		taskUpdateNote: "no mention",
+		taskUpdateNote: newNoteInput("no mention"),
 		knownUsernames: []string{"alice"},
 	}
 	m, _ = m.Update(tabKey())
-	if m.taskUpdateNote != "no mention" {
-		t.Errorf("expected note unchanged when no @ suffix, got %q", m.taskUpdateNote)
+	if m.taskUpdateNote.value != "no mention" {
+		t.Errorf("expected note unchanged when no @ suffix, got %q", m.taskUpdateNote.value)
 	}
 }
 
@@ -876,12 +876,12 @@ func TestTabCompletionStripsLeadingAtFromUsername(t *testing.T) {
 	m := updateModel{
 		phase:          phaseTaskUpdate,
 		taskUpdateSub:  taskUpdateNote,
-		taskUpdateNote: "ping @",
+		taskUpdateNote: newNoteInput("ping @"),
 		knownUsernames: []string{"@SamBarker"},
 	}
 	m, _ = m.Update(tabKey())
-	if m.taskUpdateNote != "ping @SamBarker" {
-		t.Errorf("expected @SamBarker (no double @), got %q", m.taskUpdateNote)
+	if m.taskUpdateNote.value != "ping @SamBarker" {
+		t.Errorf("expected @SamBarker (no double @), got %q", m.taskUpdateNote.value)
 	}
 }
 
@@ -890,12 +890,12 @@ func TestTabCompletionIsCaseInsensitive(t *testing.T) {
 	m := updateModel{
 		phase:          phaseTaskUpdate,
 		taskUpdateSub:  taskUpdateNote,
-		taskUpdateNote: "fixed by @S",
+		taskUpdateNote: newNoteInput("fixed by @S"),
 		knownUsernames: []string{"sambarker"},
 	}
 	m, _ = m.Update(tabKey())
-	if m.taskUpdateNote != "fixed by @sambarker" {
-		t.Errorf("expected case-insensitive match, got %q", m.taskUpdateNote)
+	if m.taskUpdateNote.value != "fixed by @sambarker" {
+		t.Errorf("expected case-insensitive match, got %q", m.taskUpdateNote.value)
 	}
 }
 
@@ -904,22 +904,22 @@ func TestTabCyclingAfterCaseInsensitiveCompletion(t *testing.T) {
 	m := updateModel{
 		phase:          phaseTaskUpdate,
 		taskUpdateSub:  taskUpdateNote,
-		taskUpdateNote: "for @ali",
+		taskUpdateNote: newNoteInput("for @ali"),
 		knownUsernames: []string{"Alice", "Alicia"},
 	}
 	m, _ = m.Update(tabKey()) // → @Alice
 	m, _ = m.Update(tabKey()) // → @Alicia (not a fresh start)
-	if m.taskUpdateNote != "for @Alicia" {
-		t.Errorf("expected second candidate after cycling, got %q", m.taskUpdateNote)
+	if m.taskUpdateNote.value != "for @Alicia" {
+		t.Errorf("expected second candidate after cycling, got %q", m.taskUpdateNote.value)
 	}
 }
 
 func TestMentionStyledInTaskUpdateNoteView(t *testing.T) {
 	m := updateModel{
-		phase:          phaseTaskUpdate,
-		taskUpdateSub:  taskUpdateNote,
+		phase:              phaseTaskUpdate,
+		taskUpdateSub:      taskUpdateNote,
 		taskUpdateSelected: activeTask{tag: "#impl"},
-		taskUpdateNote: "fixed with @alice",
+		taskUpdateNote:     newNoteInput("fixed with @alice"),
 	}
 	view := m.viewTaskUpdateForm()
 	if !strings.Contains(view, "@alice") {
@@ -931,7 +931,7 @@ func TestMentionStyledInNewTaskNoteView(t *testing.T) {
 	m := updateModel{
 		phase:        phaseNewTask,
 		newSub:       newFormNote,
-		newNoteInput: "blocked by @bob",
+		newNoteInput: newNoteInput("blocked by @bob"),
 	}
 	view := m.viewNewTask()
 	if !strings.Contains(view, "@bob") {
@@ -943,7 +943,7 @@ func TestMentionStyledInEditNoteView(t *testing.T) {
 	m := updateModel{
 		phase:         phaseEditEntry,
 		editSub:       editNote,
-		editNoteInput: "reviewed by @carol",
+		editNoteInput: newNoteInput("reviewed by @carol"),
 		editEntry:     journal.Entry{Task: strPtr("#impl")},
 	}
 	view := m.viewEditNote()

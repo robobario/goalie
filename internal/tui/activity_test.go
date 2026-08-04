@@ -136,7 +136,7 @@ func TestFormatActivityEntryGoalTaskCombined(t *testing.T) {
 		Goal: strPtr("ROUTING"),
 		Task: strPtr("#impl"),
 	}
-	got := formatActivityEntry(e, time.Now())
+	got := formatActivityEntry(e, time.Now(), "")
 	if !strings.Contains(got, "ROUTING") {
 		t.Errorf("expected goal in output; got %q", got)
 	}
@@ -156,7 +156,7 @@ func TestFormatActivityEntryGoalIncluded(t *testing.T) {
 		Note: "some work",
 		Goal: strPtr(goal),
 	}
-	got := formatActivityEntry(e, time.Now())
+	got := formatActivityEntry(e, time.Now(), "")
 	if !strings.Contains(got, goal) {
 		t.Errorf("expected goal %q in entry output; got %q", goal, got)
 	}
@@ -169,7 +169,7 @@ func TestFormatActivityEntryTaskTagIncluded(t *testing.T) {
 		Note: "some work",
 		Task: strPtr(tag),
 	}
-	got := formatActivityEntry(e, time.Now())
+	got := formatActivityEntry(e, time.Now(), "")
 	if !strings.Contains(got, tag) {
 		t.Errorf("expected task tag %q in entry output; got %q", tag, got)
 	}
@@ -182,7 +182,7 @@ func TestFormatActivityEntryDoneShowsLabel(t *testing.T) {
 		Done: true,
 		Task: strPtr("#impl"),
 	}
-	got := formatActivityEntry(e, time.Now())
+	got := formatActivityEntry(e, time.Now(), "")
 	if !strings.Contains(got, "[done]") {
 		t.Errorf("expected '[done]' in done entry; got %q", got)
 	}
@@ -197,12 +197,48 @@ func TestFormatActivityEntryBlockedShowsLabel(t *testing.T) {
 		Note:    "waiting",
 		Blocked: true,
 	}
-	got := formatActivityEntry(e, time.Now())
+	got := formatActivityEntry(e, time.Now(), "")
 	if !strings.Contains(got, "[BLOCKED]") {
 		t.Errorf("expected '[BLOCKED]' in blocked entry; got %q", got)
 	}
 	if strings.Contains(got, "[done]") {
 		t.Errorf("expected no '[done]' in blocked entry; got %q", got)
+	}
+}
+
+func TestFormatActivityEntryMentionHighlighted(t *testing.T) {
+	e := journal.Entry{
+		TS:   time.Now().Format(time.RFC3339),
+		Note: "waiting on @bob for review",
+	}
+	got := formatActivityEntry(e, time.Now(), "@alice")
+	if !strings.Contains(got, "@bob") {
+		t.Errorf("expected @bob in output; got %q", got)
+	}
+}
+
+func TestFormatActivityEntrySelfMentionPresent(t *testing.T) {
+	e := journal.Entry{
+		TS:   time.Now().Format(time.RFC3339),
+		Note: "ask @alice to approve",
+	}
+	got := formatActivityEntry(e, time.Now(), "@alice")
+	if !strings.Contains(got, "@alice") {
+		t.Errorf("expected @alice in output; got %q", got)
+	}
+}
+
+func TestRenderNoteWithMentionsSelf(t *testing.T) {
+	got := renderNoteWithMentions("waiting on @alice", "@alice")
+	if !strings.Contains(got, "@alice") {
+		t.Errorf("expected @alice in output; got %q", got)
+	}
+}
+
+func TestRenderNoteWithMentionsNoMentions(t *testing.T) {
+	got := renderNoteWithMentions("no mentions here", "@alice")
+	if got != "no mentions here" {
+		t.Errorf("expected unchanged note; got %q", got)
 	}
 }
 

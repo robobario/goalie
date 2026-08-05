@@ -148,6 +148,9 @@ func (m activityModel) View() string {
 
 	now := time.Now().UTC()
 
+	const entryIndent = "  "
+	const continuationExtraIndent = "  "
+
 	for _, username := range usernames {
 		entries := groups[username]
 		sort.Slice(entries, func(i, j int) bool {
@@ -159,10 +162,102 @@ func (m activityModel) View() string {
 
 		sb.WriteString(usernameStyle.Render(username) + ":\n")
 		for _, e := range entries {
-			sb.WriteString("  " + formatActivityEntry(e, now, m.selfUsername) + "\n")
+			// availableWidth is the column budget for content inside the entry indent.
+			availableWidth := m.width - len(entryIndent)
+			rendered := renderActivityEntry(e, now, m.selfUsername, availableWidth)
+			for i, line := range strings.Split(rendered, "\n") {
+				if i == 0 {
+					sb.WriteString(entryIndent + line + "\n")
+				} else {
+					sb.WriteString(entryIndent + continuationExtraIndent + line + "\n")
+				}
+			}
 		}
 	}
 
+	return sb.String()
+}
+
+// wrapWords splits plain text into lines of at most maxWidth characters.
+// Words longer than maxWidth appear on their own line unsplit.
+func wrapWords(text string, maxWidth int) []string {
+	if maxWidth <= 0 {
+		return []string{text}
+	}
+	words := strings.Fields(text)
+	if len(words) == 0 {
+		return []string{""}
+	}
+	var lines []string
+	var current strings.Builder
+	for _, w := range words {
+		if current.Len() == 0 {
+			current.WriteString(w)
+		} else if current.Len()+1+len(w) <= maxWidth {
+			current.WriteByte(' ')
+			current.WriteString(w)
+		} else {
+			lines = append(lines, current.String())
+			current.Reset()
+			current.WriteString(w)
+		}
+	}
+	if current.Len() > 0 {
+		lines = append(lines, current.String())
+	}
+	return lines
+}
+
+// renderActivityEntry formats an entry as a possibly multi-line string.
+// When availableWidth <= 0, no wrapping is applied. Continuation lines are
+// not indented here; the caller is responsible for adding extra indent to
+// lines after the first.
+func renderActivityEntry(e journal.Entry, now time.Time, selfUsername string, availableWidth int) string {
+	suffix := " — " + ageString(e.TS, now)
+
+	var prefixParts []string
+	if e.Done {
+		prefixParts = append(prefixParts, doneStyle.Render("[done]"))
+	} else if e.Blocked {
+		prefixParts = append(prefixParts, blockedStyle.Render("[BLOCKED]"))
+	}
+	if e.Goal != nil && e.Task != nil {
+		prefixParts = append(prefixParts, goalStyle.Render(*e.Goal)+taskTagStyle.Render(*e.Task))
+	} else if e.Goal != nil {
+		prefixParts = append(prefixParts, goalStyle.Render(*e.Goal))
+	} else if e.Task != nil {
+		prefixParts = append(prefixParts, taskTagStyle.Render(*e.Task))
+	}
+	prefix := strings.Join(prefixParts, " ")
+
+	prefixVisual := lipgloss.Width(prefix)
+	suffixVisual := lipgloss.Width(suffix)
+
+	noteWidth := availableWidth - suffixVisual
+	if prefixVisual > 0 {
+		noteWidth -= prefixVisual + 1 // space between prefix and note
+	}
+
+	if availableWidth <= 0 || noteWidth <= 0 {
+		return formatActivityEntry(e, now, selfUsername)
+	}
+
+	noteLines := wrapWords(e.Note, noteWidth)
+	var sb strings.Builder
+	for i, nl := range noteLines {
+		rendered := renderNoteWithMentions(nl, selfUsername)
+		if i == 0 {
+			if prefixVisual > 0 {
+				sb.WriteString(prefix + " " + rendered)
+			} else {
+				sb.WriteString(rendered)
+			}
+			sb.WriteString(suffix)
+		} else {
+			sb.WriteString("\n")
+			sb.WriteString(rendered)
+		}
+	}
 	return sb.String()
 }
 

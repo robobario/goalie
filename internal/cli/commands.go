@@ -167,6 +167,11 @@ func Status(ctx AppContext) error {
 	})
 
 	selfUsername, _ := resolveUsername(ctx)
+
+	const entryIndent = "  "
+	wrapWidth := loadWrapWidth()
+	availableWidth := wrapWidth - len(entryIndent)
+
 	for _, u := range users {
 		display.Section(u, ctx.Stdout, ctx.IsTTY)
 		ues := byUser[u]
@@ -177,10 +182,21 @@ func Status(ctx AppContext) error {
 			return ues[i].TS < ues[j].TS
 		})
 		for _, e := range ues {
-			fmt.Fprintf(ctx.Stdout, "  %s\n", display.FormatStatusEntry(e, selfUsername, now, ctx.IsTTY))
+			formatted := display.WrapStatusEntry(e, selfUsername, now, ctx.IsTTY, availableWidth)
+			for _, line := range strings.Split(formatted, "\n") {
+				fmt.Fprintf(ctx.Stdout, "%s%s\n", entryIndent, line)
+			}
 		}
 	}
 	return nil
+}
+
+func loadWrapWidth() int {
+	cfg, err := config.Load()
+	if err != nil || cfg == nil {
+		return config.DefaultWrapWidth
+	}
+	return cfg.EffectiveWrapWidth()
 }
 
 func hasBlocked(entries []journal.Entry) bool {

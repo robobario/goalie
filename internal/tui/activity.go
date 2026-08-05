@@ -39,6 +39,7 @@ type activityModel struct {
 	err          error
 	loaded       bool
 	selfUsername string
+	width        int
 }
 
 func loadActivityCmd(ctx *cli.AppContext) tea.Cmd {

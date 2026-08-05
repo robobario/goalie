@@ -139,10 +139,16 @@ func Status(ctx AppContext) error {
 		return nil
 	}
 
+	now := time.Now().UTC()
+	doneHideCutoff := journal.PriorBusinessDayStart(now)
+
 	byUser := make(map[string][]journal.Entry)
 	for _, e := range entries {
 		if e.Done {
-			continue
+			ts, err := time.Parse(time.RFC3339, e.TS)
+			if err != nil || ts.Before(doneHideCutoff) {
+				continue
+			}
 		}
 		byUser[e.Username] = append(byUser[e.Username], e)
 	}
@@ -161,7 +167,6 @@ func Status(ctx AppContext) error {
 	})
 
 	selfUsername, _ := resolveUsername(ctx)
-	now := time.Now().UTC()
 	for _, u := range users {
 		display.Section(u, ctx.Stdout, ctx.IsTTY)
 		ues := byUser[u]

@@ -302,7 +302,7 @@ func TestRenderActivityEntryWrapsLongNote(t *testing.T) {
 	}
 }
 
-func TestRenderActivityEntryContinuationLineHasNoSuffix(t *testing.T) {
+func TestRenderActivityEntrySuffixOnLastLine(t *testing.T) {
 	longNote := strings.Repeat("word ", 30)
 	longNote = strings.TrimSpace(longNote)
 	e := journal.Entry{
@@ -311,10 +311,22 @@ func TestRenderActivityEntryContinuationLineHasNoSuffix(t *testing.T) {
 	}
 	got := renderActivityEntry(e, time.Now(), "", 40)
 	lines := strings.Split(got, "\n")
-	// Only first line should contain the age suffix
-	for _, line := range lines[1:] {
+	if len(lines) < 2 {
+		t.Fatalf("expected multi-line output, got %q", got)
+	}
+	// First line must not carry the age suffix.
+	if strings.Contains(lines[0], "ago") {
+		t.Errorf("first line should not contain age suffix; got %q", lines[0])
+	}
+	// Last line must carry the age suffix.
+	last := lines[len(lines)-1]
+	if !strings.Contains(last, "ago") {
+		t.Errorf("last line should contain age suffix; got %q", last)
+	}
+	// Intermediate lines must not carry the suffix.
+	for _, line := range lines[1 : len(lines)-1] {
 		if strings.Contains(line, "ago") {
-			t.Errorf("continuation line should not contain age suffix; got %q", line)
+			t.Errorf("intermediate line should not contain age suffix; got %q", line)
 		}
 	}
 }

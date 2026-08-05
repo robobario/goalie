@@ -149,7 +149,6 @@ func (m activityModel) View() string {
 	now := time.Now().UTC()
 
 	const entryIndent = "  "
-	const continuationExtraIndent = "  "
 
 	for _, username := range usernames {
 		entries := groups[username]
@@ -165,12 +164,8 @@ func (m activityModel) View() string {
 			// availableWidth is the column budget for content inside the entry indent.
 			availableWidth := m.width - len(entryIndent)
 			rendered := renderActivityEntry(e, now, m.selfUsername, availableWidth)
-			for i, line := range strings.Split(rendered, "\n") {
-				if i == 0 {
-					sb.WriteString(entryIndent + line + "\n")
-				} else {
-					sb.WriteString(entryIndent + continuationExtraIndent + line + "\n")
-				}
+			for _, line := range strings.Split(rendered, "\n") {
+				sb.WriteString(entryIndent + line + "\n")
 			}
 		}
 	}
@@ -209,10 +204,12 @@ func wrapWords(text string, maxWidth int) []string {
 }
 
 // renderActivityEntry formats an entry as a possibly multi-line string.
-// When availableWidth <= 0, no wrapping is applied. Continuation lines are
-// not indented here; the caller is responsible for adding extra indent to
-// lines after the first.
+// When availableWidth <= 0 no wrapping is applied. Continuation lines are
+// indented by contIndent so the caller can add a uniform entry indent to
+// every line in the result. The age suffix appears at the end of the last line.
 func renderActivityEntry(e journal.Entry, now time.Time, selfUsername string, availableWidth int) string {
+	const contIndent = "  "
+
 	suffix := " — " + ageString(e.TS, now)
 
 	var prefixParts []string
@@ -233,32 +230,79 @@ func renderActivityEntry(e journal.Entry, now time.Time, selfUsername string, av
 	prefixVisual := lipgloss.Width(prefix)
 	suffixVisual := lipgloss.Width(suffix)
 
-	noteWidth := availableWidth - suffixVisual
+	// Maximum columns available for note content on the first line.
+	maxFirstLine := availableWidth
 	if prefixVisual > 0 {
-		noteWidth -= prefixVisual + 1 // space between prefix and note
+		maxFirstLine -= prefixVisual + 1 // space between prefix and note
 	}
 
-	if availableWidth <= 0 || noteWidth <= 0 {
+	if availableWidth <= 0 || maxFirstLine <= 0 {
 		return formatActivityEntry(e, now, selfUsername)
 	}
 
-	noteLines := wrapWords(e.Note, noteWidth)
+	// If the full note plus suffix fits on one line, keep it on one line.
+	if lipgloss.Width(e.Note)+suffixVisual <= maxFirstLine {
+		rendered := renderNoteWithMentions(e.Note, selfUsername)
+		if prefixVisual > 0 {
+			return prefix + " " + rendered + suffix
+		}
+		return rendered + suffix
+	}
+
+	// Multi-line: first line carries the prefix and opening note words (no suffix).
+	// Suffix moves to the end of the last continuation line.
+	firstChunk, remaining := takeFirstLine(e.Note, maxFirstLine)
+
 	var sb strings.Builder
-	for i, nl := range noteLines {
-		rendered := renderNoteWithMentions(nl, selfUsername)
-		if i == 0 {
-			if prefixVisual > 0 {
-				sb.WriteString(prefix + " " + rendered)
-			} else {
-				sb.WriteString(rendered)
-			}
-			sb.WriteString(suffix)
+	firstRendered := renderNoteWithMentions(firstChunk, selfUsername)
+	if prefixVisual > 0 && firstChunk != "" {
+		sb.WriteString(prefix + " " + firstRendered)
+	} else if prefixVisual > 0 {
+		sb.WriteString(prefix)
+	} else {
+		sb.WriteString(firstRendered)
+	}
+
+	contNoteWidth := availableWidth - len(contIndent)
+	contLines := wrapWords(remaining, contNoteWidth)
+	for i, cl := range contLines {
+		sb.WriteString("\n")
+		rendered := renderNoteWithMentions(cl, selfUsername)
+		if i == len(contLines)-1 {
+			sb.WriteString(contIndent + rendered + suffix)
 		} else {
-			sb.WriteString("\n")
-			sb.WriteString(rendered)
+			sb.WriteString(contIndent + rendered)
 		}
 	}
+
 	return sb.String()
+}
+
+// takeFirstLine returns (firstLine, remaining) by consuming as many complete
+// words from text as fit within maxWidth characters.
+func takeFirstLine(text string, maxWidth int) (string, string) {
+	if maxWidth <= 0 {
+		return "", text
+	}
+	words := strings.Fields(text)
+	var current strings.Builder
+	taken := 0
+	for i, w := range words {
+		if current.Len() == 0 {
+			if len(w) > maxWidth {
+				break
+			}
+			current.WriteString(w)
+			taken = i + 1
+		} else if current.Len()+1+len(w) <= maxWidth {
+			current.WriteByte(' ')
+			current.WriteString(w)
+			taken = i + 1
+		} else {
+			break
+		}
+	}
+	return current.String(), strings.Join(words[taken:], " ")
 }
 
 func renderNoteWithMentions(note, selfUsername string) string {

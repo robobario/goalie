@@ -242,6 +242,27 @@ func TestRenderNoteWithMentionsNoMentions(t *testing.T) {
 	}
 }
 
+func TestRenderNoteWithURLHighlighted(t *testing.T) {
+	got := renderNoteWithMentions("see https://example.com for details", "")
+	if !strings.Contains(got, "https://example.com") {
+		t.Errorf("expected URL in output; got %q", got)
+	}
+	// Plain text around the URL must survive.
+	if !strings.Contains(got, "see") || !strings.Contains(got, "for details") {
+		t.Errorf("surrounding text missing; got %q", got)
+	}
+}
+
+func TestRenderNoteURLAndMentionTogether(t *testing.T) {
+	got := renderNoteWithMentions("@bob see https://example.com", "@alice")
+	if !strings.Contains(got, "@bob") {
+		t.Errorf("expected @bob in output; got %q", got)
+	}
+	if !strings.Contains(got, "https://example.com") {
+		t.Errorf("expected URL in output; got %q", got)
+	}
+}
+
 func TestWrapWordsFitsOnOneLine(t *testing.T) {
 	got := wrapWords("short text", 80)
 	if len(got) != 1 || got[0] != "short text" {

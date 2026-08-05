@@ -14,7 +14,8 @@ import (
 	"goalie/internal/journal"
 )
 
-var tuiMentionRe = regexp.MustCompile(`@[a-zA-Z0-9][a-zA-Z0-9-]{0,38}`)
+// tuiNoteTokenRe matches URLs (https?://...) or @mentions in a single pass.
+var tuiNoteTokenRe = regexp.MustCompile(`https?://\S+|@[a-zA-Z0-9][a-zA-Z0-9-]{0,38}`)
 
 var blockedStyle      = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "124", Dark: "9"})
 var doneStyle         = lipgloss.NewStyle().Faint(true)
@@ -22,6 +23,7 @@ var goalStyle         = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Li
 var goalDescStyle     = lipgloss.NewStyle().Faint(true).Italic(true)
 var selectedItemStyle = lipgloss.NewStyle().Bold(true)
 var taskTagStyle      = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "130", Dark: "208"})
+var urlStyle         = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "136", Dark: "178"})
 var usernameStyle     = lipgloss.NewStyle().Bold(true)
 var mentionStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "28", Dark: "76"})
 var selfMentionStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "22", Dark: "82"})
@@ -304,7 +306,10 @@ func takeFirstLine(text string, maxWidth int) (string, string) {
 }
 
 func renderNoteWithMentions(note, selfUsername string) string {
-	return tuiMentionRe.ReplaceAllStringFunc(note, func(m string) string {
+	return tuiNoteTokenRe.ReplaceAllStringFunc(note, func(m string) string {
+		if strings.HasPrefix(m, "http") {
+			return urlStyle.Render(m)
+		}
 		if selfUsername != "" && m == selfUsername {
 			return selfMentionStyle.Render(m)
 		}

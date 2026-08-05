@@ -474,6 +474,7 @@ func TestActivityViewShowsRecentDoneEntry(t *testing.T) {
 	recentTS := time.Now().UTC().Format(time.RFC3339)
 	m := activityModel{
 		loaded: true,
+		width:  120,
 		entries: []journal.Entry{
 			{Note: "just finished", Username: "@alice", TS: recentTS, Done: true},
 		},

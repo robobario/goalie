@@ -216,9 +216,10 @@ func wrapWords(text string, maxWidth int) []string {
 	return lines
 }
 
-// renderActivityEntry formats an entry with the goal/task/status header on the
-// first line (with the age suffix) and the note indented on subsequent lines.
+// renderActivityEntry formats an entry as "• PREFIX - AGE - note..." with the
+// note wrapping to indented continuation lines.
 func renderActivityEntry(e journal.Entry, now time.Time, selfUsername string, availableWidth int) string {
+	const bullet = "•"
 	const contIndent = "  "
 
 	var prefixParts []string
@@ -235,31 +236,69 @@ func renderActivityEntry(e journal.Entry, now time.Time, selfUsername string, av
 		prefixParts = append(prefixParts, taskTagStyle.Render(*e.Task))
 	}
 	prefix := strings.Join(prefixParts, " ")
-
 	age := ageString(e.TS, now)
-	var header string
+
+	var fixedHeader string
 	if lipgloss.Width(prefix) > 0 {
-		header = prefix + " - " + age
+		fixedHeader = bullet + " " + prefix + " - " + age
 	} else {
-		header = "- " + age
+		fixedHeader = bullet + " - " + age
 	}
+
+	if strings.TrimSpace(e.Note) == "" {
+		return fixedHeader
+	}
+
+	lineLeader := fixedHeader + " - "
+	maxNoteOnFirstLine := availableWidth - lipgloss.Width(lineLeader)
+	contWidth := max(1, availableWidth-len(contIndent))
 
 	var sb strings.Builder
-	sb.WriteString(header)
-	if strings.TrimSpace(e.Note) != "" {
-		noteWidth := availableWidth - len(contIndent)
-		var noteLines []string
-		if noteWidth > 0 {
-			noteLines = wrapWords(e.Note, noteWidth)
-		} else {
-			noteLines = []string{e.Note}
+	if maxNoteOnFirstLine <= 0 {
+		sb.WriteString(fixedHeader)
+		for _, nl := range wrapWords(e.Note, contWidth) {
+			sb.WriteString("\n" + contIndent + renderNoteWithMentions(nl, selfUsername))
 		}
-		for _, nl := range noteLines {
-			sb.WriteString("\n")
-			sb.WriteString(contIndent + renderNoteWithMentions(nl, selfUsername))
-		}
+		return sb.String()
+	}
+
+	firstChunk, remaining := takeFirstLine(e.Note, maxNoteOnFirstLine)
+	if firstChunk != "" {
+		sb.WriteString(lineLeader + renderNoteWithMentions(firstChunk, selfUsername))
+	} else {
+		sb.WriteString(fixedHeader)
+	}
+	for _, cl := range wrapWords(remaining, contWidth) {
+		sb.WriteString("\n" + contIndent + renderNoteWithMentions(cl, selfUsername))
 	}
 	return sb.String()
+}
+
+// takeFirstLine consumes as many complete words from text as fit within
+// maxWidth and returns (firstLine, remaining).
+func takeFirstLine(text string, maxWidth int) (string, string) {
+	if maxWidth <= 0 {
+		return "", text
+	}
+	words := strings.Fields(text)
+	var current strings.Builder
+	taken := 0
+	for i, w := range words {
+		if current.Len() == 0 {
+			if len(w) > maxWidth {
+				break
+			}
+			current.WriteString(w)
+			taken = i + 1
+		} else if current.Len()+1+len(w) <= maxWidth {
+			current.WriteByte(' ')
+			current.WriteString(w)
+			taken = i + 1
+		} else {
+			break
+		}
+	}
+	return current.String(), strings.Join(words[taken:], " ")
 }
 
 func renderNoteWithMentions(note, selfUsername string) string {

@@ -41,12 +41,23 @@ func resolveSelfUsername(ctx *cli.AppContext) string {
 	return cfg.Name
 }
 
+func resolveWrapWidth() int {
+	cfg, err := config.Load()
+	if err != nil || cfg == nil {
+		return config.DefaultWrapWidth
+	}
+	return cfg.EffectiveWrapWidth()
+}
+
 func initialModel(ctx *cli.AppContext) Model {
 	return Model{
 		ctx:       ctx,
 		activeTab: activityTab,
-		activity:  activityModel{selfUsername: resolveSelfUsername(ctx)},
-		update:    updateModel{ctx: ctx},
+		activity: activityModel{
+			selfUsername: resolveSelfUsername(ctx),
+			wrapWidth:    resolveWrapWidth(),
+		},
+		update: updateModel{ctx: ctx},
 	}
 }
 

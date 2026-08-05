@@ -473,3 +473,51 @@ func TestActivityViewShowsRecentDoneEntry(t *testing.T) {
 		t.Errorf("expected recent done entry to be visible; got view:\n%s", view)
 	}
 }
+
+func TestActivityViewWrapWidthCapsAtConfiguredWidth(t *testing.T) {
+	// Terminal is 200 wide, wrapWidth set to 40. Lines should wrap at 40, not 200.
+	longNote := strings.Repeat("word ", 30)
+	longNote = strings.TrimSpace(longNote)
+	m := activityModel{
+		loaded:    true,
+		width:     200,
+		wrapWidth: 40,
+		entries:   []journal.Entry{{Note: longNote, Username: "@alice", TS: time.Now().Format(time.RFC3339)}},
+	}
+	m.filtered = m.entries
+	view := m.View()
+	lines := strings.Split(strings.TrimRight(view, "\n"), "\n")
+	entryLines := 0
+	for _, l := range lines {
+		if strings.HasPrefix(l, "  ") {
+			entryLines++
+		}
+	}
+	if entryLines < 2 {
+		t.Errorf("expected wrapping at wrapWidth=40 even with width=200, got %d entry lines; view:\n%s", entryLines, view)
+	}
+}
+
+func TestActivityViewWrapWidthDoesNotExceedTerminalWidth(t *testing.T) {
+	// wrapWidth > terminal width: terminal width governs.
+	longNote := strings.Repeat("word ", 30)
+	longNote = strings.TrimSpace(longNote)
+	m := activityModel{
+		loaded:    true,
+		width:     40,
+		wrapWidth: 200,
+		entries:   []journal.Entry{{Note: longNote, Username: "@alice", TS: time.Now().Format(time.RFC3339)}},
+	}
+	m.filtered = m.entries
+	view := m.View()
+	lines := strings.Split(strings.TrimRight(view, "\n"), "\n")
+	entryLines := 0
+	for _, l := range lines {
+		if strings.HasPrefix(l, "  ") {
+			entryLines++
+		}
+	}
+	if entryLines < 2 {
+		t.Errorf("expected wrapping at terminal width=40 when wrapWidth=200, got %d entry lines; view:\n%s", entryLines, view)
+	}
+}

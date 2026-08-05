@@ -40,6 +40,7 @@ type activityModel struct {
 	loaded       bool
 	selfUsername string
 	width        int
+	wrapWidth    int
 }
 
 func loadActivityCmd(ctx *cli.AppContext) tea.Cmd {
@@ -168,8 +169,13 @@ func (m activityModel) View() string {
 					continue
 				}
 			}
-			// availableWidth is the column budget for content inside the entry indent.
-			availableWidth := m.width - len(entryIndent)
+			// availableWidth is the column budget for content inside the entry indent,
+			// capped at wrapWidth to avoid very long lines on wide terminals.
+			effectiveWidth := m.width
+			if m.wrapWidth > 0 && m.wrapWidth < effectiveWidth {
+				effectiveWidth = m.wrapWidth
+			}
+			availableWidth := effectiveWidth - len(entryIndent)
 			rendered := renderActivityEntry(e, now, m.selfUsername, availableWidth)
 			for _, line := range strings.Split(rendered, "\n") {
 				sb.WriteString(entryIndent + line + "\n")

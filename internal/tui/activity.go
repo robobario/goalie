@@ -147,6 +147,7 @@ func (m activityModel) View() string {
 	sort.Strings(usernames)
 
 	now := time.Now().UTC()
+	doneHideCutoff := journal.PriorBusinessDayStart(now)
 
 	const entryIndent = "  "
 
@@ -161,6 +162,12 @@ func (m activityModel) View() string {
 
 		sb.WriteString(usernameStyle.Render(username) + ":\n")
 		for _, e := range entries {
+			if e.Done {
+				ts, err := time.Parse(time.RFC3339, e.TS)
+				if err == nil && ts.Before(doneHideCutoff) {
+					continue
+				}
+			}
 			// availableWidth is the column budget for content inside the entry indent.
 			availableWidth := m.width - len(entryIndent)
 			rendered := renderActivityEntry(e, now, m.selfUsername, availableWidth)

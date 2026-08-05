@@ -16,7 +16,7 @@ var UsernameRe = regexp.MustCompile(`^@[a-zA-Z0-9][a-zA-Z0-9-]{0,38}$`)
 
 func ValidUsername(s string) bool { return UsernameRe.MatchString(s) }
 
-const DefaultWrapWidth = 72
+const DefaultWrapWidth = 120
 
 type Config struct {
 	Name      string `json:"name"`

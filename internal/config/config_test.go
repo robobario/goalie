@@ -13,8 +13,8 @@ func intPtr(i int) *int { return &i }
 
 func TestEffectiveWrapWidthDefault(t *testing.T) {
 	cfg := &Config{Name: "test"}
-	if got := cfg.EffectiveWrapWidth(); got != 72 {
-		t.Errorf("got %d, want 72", got)
+	if got := cfg.EffectiveWrapWidth(); got != 120 {
+		t.Errorf("got %d, want 120", got)
 	}
 }
 

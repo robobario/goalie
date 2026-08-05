@@ -294,6 +294,18 @@ func TestRenderActivityEntryHeaderContainsAge(t *testing.T) {
 	}
 }
 
+func TestRenderActivityEntryEmptyNoteNoBlankLine(t *testing.T) {
+	e := journal.Entry{
+		TS:   time.Now().Format(time.RFC3339),
+		Note: "",
+		Goal: strPtr("PROJ"),
+	}
+	got := renderActivityEntry(e, time.Now(), "", 80)
+	if strings.Contains(got, "\n") {
+		t.Errorf("expected single header line for empty note, got %q", got)
+	}
+}
+
 func TestRenderActivityEntryWrapsLongNote(t *testing.T) {
 	longNote := strings.Repeat("word ", 30)
 	longNote = strings.TrimSpace(longNote)

@@ -244,19 +244,20 @@ func renderActivityEntry(e journal.Entry, now time.Time, selfUsername string, av
 		header = "- " + age
 	}
 
-	noteWidth := availableWidth - len(contIndent)
-	var noteLines []string
-	if noteWidth > 0 {
-		noteLines = wrapWords(e.Note, noteWidth)
-	} else {
-		noteLines = []string{e.Note}
-	}
-
 	var sb strings.Builder
 	sb.WriteString(header)
-	for _, nl := range noteLines {
-		sb.WriteString("\n")
-		sb.WriteString(contIndent + renderNoteWithMentions(nl, selfUsername))
+	if strings.TrimSpace(e.Note) != "" {
+		noteWidth := availableWidth - len(contIndent)
+		var noteLines []string
+		if noteWidth > 0 {
+			noteLines = wrapWords(e.Note, noteWidth)
+		} else {
+			noteLines = []string{e.Note}
+		}
+		for _, nl := range noteLines {
+			sb.WriteString("\n")
+			sb.WriteString(contIndent + renderNoteWithMentions(nl, selfUsername))
+		}
 	}
 	return sb.String()
 }

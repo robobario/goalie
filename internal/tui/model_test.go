@@ -168,14 +168,14 @@ func TestViewIncludesKeyHelpBar(t *testing.T) {
 	}
 }
 
-func TestWindowSizeMsgNotForwardedToActivityChild(t *testing.T) {
-	// activityModel has no width/height field; this test documents that
-	// WindowSizeMsg is stored on the top-level Model only and is not
-	// propagated to the child activity model.
+func TestWindowSizeMsgPropagatedToActivityChild(t *testing.T) {
 	m := newModel()
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 	got := next.(Model)
 	if got.width != 80 || got.height != 24 {
 		t.Errorf("top-level model should record width=80 height=24, got %d %d", got.width, got.height)
+	}
+	if got.activity.width != 80 {
+		t.Errorf("activity model should receive width=80 from WindowSizeMsg, got %d", got.activity.width)
 	}
 }

@@ -242,6 +242,145 @@ func TestRenderNoteWithMentionsNoMentions(t *testing.T) {
 	}
 }
 
+func TestWrapWordsFitsOnOneLine(t *testing.T) {
+	got := wrapWords("short text", 80)
+	if len(got) != 1 || got[0] != "short text" {
+		t.Errorf("expected single line, got %v", got)
+	}
+}
+
+func TestWrapWordsWrapsAtWordBoundary(t *testing.T) {
+	got := wrapWords("one two three four five", 11)
+	// "one two" = 7, "three four" = 10, "five" = 4
+	if len(got) < 2 {
+		t.Fatalf("expected multiple lines, got %v", got)
+	}
+	for _, line := range got {
+		if len(line) > 11 {
+			t.Errorf("line %q exceeds maxWidth 11", line)
+		}
+	}
+}
+
+func TestWrapWordsZeroWidthNoWrap(t *testing.T) {
+	got := wrapWords("some text", 0)
+	if len(got) != 1 || got[0] != "some text" {
+		t.Errorf("expected no-op for zero width, got %v", got)
+	}
+}
+
+func TestWrapWordsEmptyString(t *testing.T) {
+	got := wrapWords("", 80)
+	if len(got) != 1 || got[0] != "" {
+		t.Errorf("expected single empty string, got %v", got)
+	}
+}
+
+func TestRenderActivityEntryNoWrapWhenNarrowWidth(t *testing.T) {
+	e := journal.Entry{
+		TS:   time.Now().Format(time.RFC3339),
+		Note: "some note",
+		Goal: strPtr("PROJ"),
+	}
+	// availableWidth <= 0 falls back to formatActivityEntry (single line)
+	got := renderActivityEntry(e, time.Now(), "", 0)
+	if strings.Contains(got, "\n") {
+		t.Errorf("expected single line for zero width, got %q", got)
+	}
+}
+
+func TestRenderActivityEntryWrapsLongNote(t *testing.T) {
+	longNote := strings.Repeat("word ", 30)
+	longNote = strings.TrimSpace(longNote)
+	e := journal.Entry{
+		TS:   time.Now().Format(time.RFC3339),
+		Note: longNote,
+	}
+	got := renderActivityEntry(e, time.Now(), "", 40)
+	if !strings.Contains(got, "\n") {
+		t.Errorf("expected multi-line output for long note at width 40, got %q", got)
+	}
+}
+
+func TestRenderActivityEntrySuffixOnLastLine(t *testing.T) {
+	longNote := strings.Repeat("word ", 30)
+	longNote = strings.TrimSpace(longNote)
+	e := journal.Entry{
+		TS:   time.Now().Format(time.RFC3339),
+		Note: longNote,
+	}
+	got := renderActivityEntry(e, time.Now(), "", 40)
+	lines := strings.Split(got, "\n")
+	if len(lines) < 2 {
+		t.Fatalf("expected multi-line output, got %q", got)
+	}
+	// First line must not carry the age suffix.
+	if strings.Contains(lines[0], "ago") {
+		t.Errorf("first line should not contain age suffix; got %q", lines[0])
+	}
+	// Last line must carry the age suffix.
+	last := lines[len(lines)-1]
+	if !strings.Contains(last, "ago") {
+		t.Errorf("last line should contain age suffix; got %q", last)
+	}
+	// Intermediate lines must not carry the suffix.
+	for _, line := range lines[1 : len(lines)-1] {
+		if strings.Contains(line, "ago") {
+			t.Errorf("intermediate line should not contain age suffix; got %q", line)
+		}
+	}
+}
+
+func TestActivityViewWrapsLongEntry(t *testing.T) {
+	longNote := strings.Repeat("word ", 40)
+	longNote = strings.TrimSpace(longNote)
+	m := activityModel{
+		loaded:  true,
+		width:   40,
+		entries: []journal.Entry{{Note: longNote, Username: "@alice", TS: time.Now().Format(time.RFC3339)}},
+	}
+	m.filtered = m.entries
+	view := m.View()
+	lines := strings.Split(strings.TrimRight(view, "\n"), "\n")
+	// At width 40, a 200-char note must span more than one display line.
+	entryLines := 0
+	for _, l := range lines {
+		if strings.HasPrefix(l, "  ") {
+			entryLines++
+		}
+	}
+	if entryLines < 2 {
+		t.Errorf("expected at least 2 indented entry lines for wrapped note, got %d; view:\n%s", entryLines, view)
+	}
+}
+
+func TestActivityViewContinuationIndentDeeper(t *testing.T) {
+	longNote := strings.Repeat("word ", 40)
+	longNote = strings.TrimSpace(longNote)
+	m := activityModel{
+		loaded:  true,
+		width:   40,
+		entries: []journal.Entry{{Note: longNote, Username: "@alice", TS: time.Now().Format(time.RFC3339)}},
+	}
+	m.filtered = m.entries
+	view := m.View()
+	lines := strings.Split(strings.TrimRight(view, "\n"), "\n")
+	var firstEntry, continuation string
+	for _, l := range lines {
+		if strings.HasPrefix(l, "    ") && continuation == "" {
+			continuation = l
+		} else if strings.HasPrefix(l, "  ") && !strings.HasPrefix(l, "    ") && firstEntry == "" {
+			firstEntry = l
+		}
+	}
+	if firstEntry == "" {
+		t.Fatal("expected a 2-space-indented entry line")
+	}
+	if continuation == "" {
+		t.Fatal("expected a 4-space-indented continuation line")
+	}
+}
+
 func makeLoadedModel(entries []journal.Entry) activityModel {
 	m := activityModel{}
 	m, _ = m.Update(entriesLoadedMsg{entries: entries})

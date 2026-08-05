@@ -84,7 +84,7 @@ func TestFormatEntryUnblockedNoThread(t *testing.T) {
 		Username: "@alice",
 	}
 	got := FormatEntry(e, "", fixedNow, false)
-	want := "@alice work - 1d ago"
+	want := "@alice work - yesterday"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -112,7 +112,7 @@ func TestFormatEntryWithThread(t *testing.T) {
 		Username: "@carol",
 	}
 	got := FormatEntry(e, "", fixedNow, false)
-	want := "@carol feat-x note - 1d ago"
+	want := "@carol feat-x note - yesterday"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -126,7 +126,7 @@ func TestFormatStatusEntryWithGoalNoThread(t *testing.T) {
 		Goal:    ptr("GOAL"),
 	}
 	got := FormatStatusEntry(e, "", fixedNow, false)
-	want := "(GOAL) note - 1d ago"
+	want := "(GOAL) note - yesterday"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -140,7 +140,7 @@ func TestFormatStatusEntryBlockedWithGoal(t *testing.T) {
 		Goal:    ptr("GOAL"),
 	}
 	got := FormatStatusEntry(e, "", fixedNow, false)
-	want := "[BLOCKED](GOAL) note - 1d ago"
+	want := "[BLOCKED](GOAL) note - yesterday"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -164,7 +164,7 @@ func TestFormatSummaryHeaderNoGoal(t *testing.T) {
 func TestFormatSummaryEntryNoStateChange(t *testing.T) {
 	e := journal.Entry{TS: fixedTS, Note: "steady progress", Blocked: false}
 	got := FormatSummaryEntry(e, "", false, fixedNow, false)
-	if got != "- steady progress — 1d ago" {
+	if got != "- steady progress — yesterday" {
 		t.Errorf("got %q", got)
 	}
 }
@@ -203,7 +203,7 @@ func TestFormatStatusEntryNoGoalNoThread(t *testing.T) {
 		Blocked: false,
 	}
 	got := FormatStatusEntry(e, "", fixedNow, false)
-	want := "note - 1d ago"
+	want := "note - yesterday"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -253,7 +253,7 @@ func TestHighlightMentionsNoMentions(t *testing.T) {
 func TestWrapStatusEntryShortNoteFitsOnOneLine(t *testing.T) {
 	e := journal.Entry{TS: fixedTS, Note: "short note", Blocked: false}
 	got := WrapStatusEntry(e, "", fixedNow, false, 50)
-	want := "short note - 1d ago"
+	want := "short note - yesterday"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -268,11 +268,11 @@ func TestWrapStatusEntryLongNoteWraps(t *testing.T) {
 		t.Errorf("expected wrapped output, got single line: %q", got)
 	}
 	// Age suffix appears on last line only.
-	if !strings.Contains(lines[len(lines)-1], "1d ago") {
+	if !strings.Contains(lines[len(lines)-1], "yesterday") {
 		t.Errorf("expected age on last line, got %q", lines[len(lines)-1])
 	}
 	for _, l := range lines[:len(lines)-1] {
-		if strings.Contains(l, "1d ago") {
+		if strings.Contains(l, "yesterday") {
 			t.Errorf("age appeared on non-last line: %q", l)
 		}
 	}
@@ -320,5 +320,34 @@ func TestWrapStatusEntryBlockedPrefix(t *testing.T) {
 	got := WrapStatusEntry(e, "", fixedNow, false, 50)
 	if !strings.HasPrefix(got, "[BLOCKED]") {
 		t.Errorf("expected [BLOCKED] prefix, got %q", got)
+	}
+}
+
+func TestAgeString(t *testing.T) {
+	base := time.Date(2024, 3, 10, 12, 0, 0, 0, time.UTC)
+	cases := []struct {
+		name string
+		ts   time.Time
+		want string
+	}{
+		{"minutes", base.Add(-30 * time.Minute), "30m ago"},
+		{"hours same day", base.Add(-5 * time.Hour), "5h ago"},
+		{"yesterday", base.Add(-24 * time.Hour), "yesterday"},
+		{"two days", base.Add(-48 * time.Hour), "2d ago"},
+		{"invalid ts", time.Time{}, "?d ago"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var ts string
+			if tc.ts.IsZero() {
+				ts = "not-a-timestamp"
+			} else {
+				ts = tc.ts.Format(time.RFC3339)
+			}
+			got := ageString(ts, base)
+			if got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
 	}
 }

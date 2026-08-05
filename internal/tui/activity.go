@@ -40,6 +40,7 @@ type activityModel struct {
 	loaded       bool
 	selfUsername string
 	width        int
+	wrapWidth    int
 }
 
 func loadActivityCmd(ctx *cli.AppContext) tea.Cmd {
@@ -168,8 +169,13 @@ func (m activityModel) View() string {
 					continue
 				}
 			}
-			// availableWidth is the column budget for content inside the entry indent.
-			availableWidth := m.width - len(entryIndent)
+			// availableWidth is the column budget for content inside the entry indent,
+			// capped at wrapWidth to avoid very long lines on wide terminals.
+			effectiveWidth := m.width
+			if m.wrapWidth > 0 && m.wrapWidth < effectiveWidth {
+				effectiveWidth = m.wrapWidth
+			}
+			availableWidth := effectiveWidth - len(entryIndent)
 			rendered := renderActivityEntry(e, now, m.selfUsername, availableWidth)
 			for _, line := range strings.Split(rendered, "\n") {
 				sb.WriteString(entryIndent + line + "\n")
@@ -210,14 +216,11 @@ func wrapWords(text string, maxWidth int) []string {
 	return lines
 }
 
-// renderActivityEntry formats an entry as a possibly multi-line string.
-// When availableWidth <= 0 no wrapping is applied. Continuation lines are
-// indented by contIndent so the caller can add a uniform entry indent to
-// every line in the result. The age suffix appears at the end of the last line.
+// renderActivityEntry formats an entry as "• PREFIX - AGE - note..." with the
+// note wrapping to indented continuation lines.
 func renderActivityEntry(e journal.Entry, now time.Time, selfUsername string, availableWidth int) string {
+	const bullet = "•"
 	const contIndent = "  "
-
-	suffix := " — " + ageString(e.TS, now)
 
 	var prefixParts []string
 	if e.Done {
@@ -233,60 +236,48 @@ func renderActivityEntry(e journal.Entry, now time.Time, selfUsername string, av
 		prefixParts = append(prefixParts, taskTagStyle.Render(*e.Task))
 	}
 	prefix := strings.Join(prefixParts, " ")
+	age := ageString(e.TS, now)
 
-	prefixVisual := lipgloss.Width(prefix)
-	suffixVisual := lipgloss.Width(suffix)
-
-	// Maximum columns available for note content on the first line.
-	maxFirstLine := availableWidth
-	if prefixVisual > 0 {
-		maxFirstLine -= prefixVisual + 1 // space between prefix and note
+	var fixedHeader string
+	if lipgloss.Width(prefix) > 0 {
+		fixedHeader = bullet + " " + prefix + " - " + age
+	} else {
+		fixedHeader = bullet + " - " + age
 	}
 
-	if availableWidth <= 0 || maxFirstLine <= 0 {
-		return formatActivityEntry(e, now, selfUsername)
+	if strings.TrimSpace(e.Note) == "" {
+		return fixedHeader
 	}
 
-	// If the full note plus suffix fits on one line, keep it on one line.
-	if lipgloss.Width(e.Note)+suffixVisual <= maxFirstLine {
-		rendered := renderNoteWithMentions(e.Note, selfUsername)
-		if prefixVisual > 0 {
-			return prefix + " " + rendered + suffix
-		}
-		return rendered + suffix
-	}
-
-	// Multi-line: first line carries the prefix and opening note words (no suffix).
-	// Suffix moves to the end of the last continuation line.
-	firstChunk, remaining := takeFirstLine(e.Note, maxFirstLine)
+	lineLeader := fixedHeader + " - "
+	maxNoteOnFirstLine := availableWidth - lipgloss.Width(lineLeader)
+	contWidth := max(1, availableWidth-len(contIndent))
 
 	var sb strings.Builder
-	firstRendered := renderNoteWithMentions(firstChunk, selfUsername)
-	if prefixVisual > 0 && firstChunk != "" {
-		sb.WriteString(prefix + " " + firstRendered)
-	} else if prefixVisual > 0 {
-		sb.WriteString(prefix)
-	} else {
-		sb.WriteString(firstRendered)
+	if maxNoteOnFirstLine <= 0 {
+		sb.WriteString(fixedHeader)
+		for _, nl := range wrapWords(e.Note, contWidth) {
+			sb.WriteString("\n" + contIndent + renderNoteWithMentions(nl, selfUsername))
+		}
+		return sb.String()
 	}
 
-	contNoteWidth := availableWidth - len(contIndent)
-	contLines := wrapWords(remaining, contNoteWidth)
-	for i, cl := range contLines {
-		sb.WriteString("\n")
-		rendered := renderNoteWithMentions(cl, selfUsername)
-		if i == len(contLines)-1 {
-			sb.WriteString(contIndent + rendered + suffix)
-		} else {
-			sb.WriteString(contIndent + rendered)
+	firstChunk, remaining := takeFirstLine(e.Note, maxNoteOnFirstLine)
+	if firstChunk != "" {
+		sb.WriteString(lineLeader + renderNoteWithMentions(firstChunk, selfUsername))
+	} else {
+		sb.WriteString(fixedHeader)
+	}
+	if remaining != "" {
+		for _, cl := range wrapWords(remaining, contWidth) {
+			sb.WriteString("\n" + contIndent + renderNoteWithMentions(cl, selfUsername))
 		}
 	}
-
 	return sb.String()
 }
 
-// takeFirstLine returns (firstLine, remaining) by consuming as many complete
-// words from text as fit within maxWidth characters.
+// takeFirstLine consumes as many complete words from text as fit within
+// maxWidth and returns (firstLine, remaining).
 func takeFirstLine(text string, maxWidth int) (string, string) {
 	if maxWidth <= 0 {
 		return "", text

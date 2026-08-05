@@ -249,3 +249,76 @@ func TestHighlightMentionsNoMentions(t *testing.T) {
 		t.Errorf("expected unchanged note with no mentions, got %q", got)
 	}
 }
+
+func TestWrapStatusEntryShortNoteFitsOnOneLine(t *testing.T) {
+	e := journal.Entry{TS: fixedTS, Note: "short note", Blocked: false}
+	got := WrapStatusEntry(e, "", fixedNow, false, 50)
+	want := "short note - 1d ago"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestWrapStatusEntryLongNoteWraps(t *testing.T) {
+	// Note is long enough to force wrapping at width 30.
+	e := journal.Entry{TS: fixedTS, Note: "one two three four five six seven", Blocked: false}
+	got := WrapStatusEntry(e, "", fixedNow, false, 30)
+	lines := strings.Split(got, "\n")
+	if len(lines) < 2 {
+		t.Errorf("expected wrapped output, got single line: %q", got)
+	}
+	// Age suffix appears on last line only.
+	if !strings.Contains(lines[len(lines)-1], "1d ago") {
+		t.Errorf("expected age on last line, got %q", lines[len(lines)-1])
+	}
+	for _, l := range lines[:len(lines)-1] {
+		if strings.Contains(l, "1d ago") {
+			t.Errorf("age appeared on non-last line: %q", l)
+		}
+	}
+}
+
+func TestWrapStatusEntryContinuationLinesIndented(t *testing.T) {
+	e := journal.Entry{TS: fixedTS, Note: "one two three four five six seven eight nine ten", Blocked: false}
+	got := WrapStatusEntry(e, "", fixedNow, false, 25)
+	lines := strings.Split(got, "\n")
+	if len(lines) < 2 {
+		t.Errorf("expected wrapped output")
+	}
+	for _, l := range lines[1:] {
+		if !strings.HasPrefix(l, "  ") {
+			t.Errorf("continuation line not indented: %q", l)
+		}
+	}
+}
+
+func TestWrapStatusEntryZeroWidthFallback(t *testing.T) {
+	e := journal.Entry{TS: fixedTS, Note: "note", Blocked: false}
+	wrapped := WrapStatusEntry(e, "", fixedNow, false, 0)
+	plain := FormatStatusEntry(e, "", fixedNow, false)
+	if wrapped != plain {
+		t.Errorf("expected fallback to FormatStatusEntry, got %q", wrapped)
+	}
+}
+
+func TestWrapStatusEntryWithGoalAndTask(t *testing.T) {
+	e := journal.Entry{
+		TS:      fixedTS,
+		Note:    "short",
+		Goal:    ptr("GOAL"),
+		Task:    ptr("#impl"),
+		Blocked: false,
+	}
+	got := WrapStatusEntry(e, "", fixedNow, false, 50)
+	if !strings.Contains(got, "(GOAL)") || !strings.Contains(got, "#impl") {
+		t.Errorf("expected goal and task in output, got %q", got)
+	}
+}
+
+func TestWrapStatusEntryBlockedPrefix(t *testing.T) {
+	e := journal.Entry{TS: fixedTS, Note: "stuck", Blocked: true}
+	got := WrapStatusEntry(e, "", fixedNow, false, 50)
+	if !strings.HasPrefix(got, "[BLOCKED]") {
+		t.Errorf("expected [BLOCKED] prefix, got %q", got)
+	}
+}

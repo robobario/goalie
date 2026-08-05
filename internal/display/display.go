@@ -120,6 +120,120 @@ func FormatStatusEntry(e journal.Entry, selfUsername string, now time.Time, tty 
 	return taskPart + note + " - " + age
 }
 
+// WrapStatusEntry formats a status entry, wrapping the note at availableWidth
+// characters. availableWidth is the column budget after any caller-applied
+// indent. When availableWidth <= 0 it falls back to the unwrapped format.
+func WrapStatusEntry(e journal.Entry, selfUsername string, now time.Time, tty bool, availableWidth int) string {
+	age := ageString(e.TS, now)
+	suffix := " - " + age
+
+	goalPart := ""
+	if e.Goal != nil {
+		goalPart = "(" + *e.Goal + ")"
+	}
+	taskPart := ""
+	if e.Task != nil {
+		taskPart = *e.Task + " "
+	}
+
+	// prefix mirrors FormatStatusEntry's structure and always ends with a space
+	// when non-empty, so prefix+note produces the correct rendered form.
+	var prefix, prefixPlain string
+	if e.Blocked {
+		prefix = Red("[BLOCKED]", tty) + goalPart + " " + taskPart
+		prefixPlain = "[BLOCKED]" + goalPart + " " + taskPart
+	} else if goalPart != "" {
+		prefix = goalPart + " " + taskPart
+		prefixPlain = goalPart + " " + taskPart
+	} else if taskPart != "" {
+		prefix = taskPart
+		prefixPlain = taskPart
+	}
+
+	maxFirstLine := availableWidth - len(prefixPlain)
+
+	if availableWidth <= 0 || maxFirstLine <= 0 {
+		return FormatStatusEntry(e, selfUsername, now, tty)
+	}
+
+	notePlain := e.Note
+	if len(notePlain)+len(suffix) <= maxFirstLine {
+		return prefix + HighlightMentions(notePlain, selfUsername, tty) + suffix
+	}
+
+	const contIndent = "  "
+	firstChunk, remaining := takeFirstLine(notePlain, maxFirstLine)
+
+	var sb strings.Builder
+	sb.WriteString(prefix + HighlightMentions(firstChunk, selfUsername, tty))
+
+	contNoteWidth := availableWidth - len(contIndent)
+	contLines := wrapWords(remaining, contNoteWidth)
+	for i, cl := range contLines {
+		sb.WriteString("\n")
+		rendered := HighlightMentions(cl, selfUsername, tty)
+		if i == len(contLines)-1 {
+			sb.WriteString(contIndent + rendered + suffix)
+		} else {
+			sb.WriteString(contIndent + rendered)
+		}
+	}
+	return sb.String()
+}
+
+func wrapWords(text string, maxWidth int) []string {
+	if maxWidth <= 0 {
+		return []string{text}
+	}
+	words := strings.Fields(text)
+	if len(words) == 0 {
+		return []string{""}
+	}
+	var lines []string
+	var current strings.Builder
+	for _, w := range words {
+		if current.Len() == 0 {
+			current.WriteString(w)
+		} else if current.Len()+1+len(w) <= maxWidth {
+			current.WriteByte(' ')
+			current.WriteString(w)
+		} else {
+			lines = append(lines, current.String())
+			current.Reset()
+			current.WriteString(w)
+		}
+	}
+	if current.Len() > 0 {
+		lines = append(lines, current.String())
+	}
+	return lines
+}
+
+func takeFirstLine(text string, maxWidth int) (string, string) {
+	if maxWidth <= 0 {
+		return "", text
+	}
+	words := strings.Fields(text)
+	var current strings.Builder
+	taken := 0
+	for i, w := range words {
+		if current.Len() == 0 {
+			if len(w) > maxWidth {
+				break
+			}
+			current.WriteString(w)
+			taken = i + 1
+		} else if current.Len()+1+len(w) <= maxWidth {
+			current.WriteByte(' ')
+			current.WriteString(w)
+			taken = i + 1
+		} else {
+			break
+		}
+	}
+	return current.String(), strings.Join(words[taken:], " ")
+}
+
 func ageString(ts string, now time.Time) string {
 	parsed, err := time.Parse(time.RFC3339, ts)
 	if err != nil {

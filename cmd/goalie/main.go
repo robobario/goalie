@@ -224,7 +224,41 @@ func main() {
 	}
 
 	motdCmd.AddCommand(motdSetCmd)
-	root.AddCommand(initCmd, logCmd, statusCmd, summaryCmd, updateCmd, goalCmd, keyCmd, motdCmd)
+
+	skillsCmd := &cobra.Command{
+		Use:   "skills",
+		Short: "Manage Claude Code skills",
+	}
+
+	skillsInstallCmd := &cobra.Command{
+		Use:   "install",
+		Short: "Install Claude Code skills to ~/.claude/commands/",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cli.SkillsInstall(ctx)
+		},
+	}
+
+	skillsUpdateCmd := &cobra.Command{
+		Use:   "update",
+		Short: "Update installed Claude Code skills (overwrites existing)",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cli.SkillsUpdate(ctx)
+		},
+	}
+
+	skillsRemoveCmd := &cobra.Command{
+		Use:   "remove",
+		Short: "Remove installed Claude Code skills from ~/.claude/commands/",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cli.SkillsRemove(ctx)
+		},
+	}
+
+	skillsCmd.AddCommand(skillsInstallCmd, skillsUpdateCmd, skillsRemoveCmd)
+	root.AddCommand(initCmd, logCmd, statusCmd, summaryCmd, updateCmd, goalCmd, keyCmd, motdCmd, skillsCmd)
 
 	if err := root.Execute(); err != nil {
 		var exitErr *cli.ExitError

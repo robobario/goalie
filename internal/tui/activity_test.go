@@ -294,6 +294,19 @@ func TestRenderActivityEntryHeaderContainsAge(t *testing.T) {
 	}
 }
 
+func TestRenderActivityEntryShortNoteNoBlankLine(t *testing.T) {
+	// When the note fits on the first line, no blank continuation line should appear.
+	e := journal.Entry{
+		TS:   time.Now().Format(time.RFC3339),
+		Note: "short note",
+		Goal: strPtr("PROJ"),
+	}
+	got := renderActivityEntry(e, time.Now(), "", 120)
+	if strings.Contains(got, "\n") {
+		t.Errorf("expected single line when note fits, got %q", got)
+	}
+}
+
 func TestRenderActivityEntryEmptyNoteNoBlankLine(t *testing.T) {
 	e := journal.Entry{
 		TS:   time.Now().Format(time.RFC3339),

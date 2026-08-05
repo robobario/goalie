@@ -268,8 +268,10 @@ func renderActivityEntry(e journal.Entry, now time.Time, selfUsername string, av
 	} else {
 		sb.WriteString(fixedHeader)
 	}
-	for _, cl := range wrapWords(remaining, contWidth) {
-		sb.WriteString("\n" + contIndent + renderNoteWithMentions(cl, selfUsername))
+	if remaining != "" {
+		for _, cl := range wrapWords(remaining, contWidth) {
+			sb.WriteString("\n" + contIndent + renderNoteWithMentions(cl, selfUsername))
+		}
 	}
 	return sb.String()
 }

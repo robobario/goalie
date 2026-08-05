@@ -276,16 +276,21 @@ func TestWrapWordsEmptyString(t *testing.T) {
 	}
 }
 
-func TestRenderActivityEntryNoWrapWhenNarrowWidth(t *testing.T) {
+func TestRenderActivityEntryHeaderContainsAge(t *testing.T) {
 	e := journal.Entry{
 		TS:   time.Now().Format(time.RFC3339),
 		Note: "some note",
 		Goal: strPtr("PROJ"),
 	}
-	// availableWidth <= 0 falls back to formatActivityEntry (single line)
 	got := renderActivityEntry(e, time.Now(), "", 0)
-	if strings.Contains(got, "\n") {
-		t.Errorf("expected single line for zero width, got %q", got)
+	lines := strings.Split(got, "\n")
+	// Header is always the first line and must contain the age.
+	if !strings.Contains(lines[0], "ago") {
+		t.Errorf("expected age on first (header) line, got %q", lines[0])
+	}
+	// Note must appear on subsequent lines.
+	if len(lines) < 2 {
+		t.Errorf("expected header + note lines, got %q", got)
 	}
 }
 
@@ -302,7 +307,7 @@ func TestRenderActivityEntryWrapsLongNote(t *testing.T) {
 	}
 }
 
-func TestRenderActivityEntrySuffixOnLastLine(t *testing.T) {
+func TestRenderActivityEntryAgeOnFirstLine(t *testing.T) {
 	longNote := strings.Repeat("word ", 30)
 	longNote = strings.TrimSpace(longNote)
 	e := journal.Entry{
@@ -312,21 +317,15 @@ func TestRenderActivityEntrySuffixOnLastLine(t *testing.T) {
 	got := renderActivityEntry(e, time.Now(), "", 40)
 	lines := strings.Split(got, "\n")
 	if len(lines) < 2 {
-		t.Fatalf("expected multi-line output, got %q", got)
+		t.Fatalf("expected header + note lines, got %q", got)
 	}
-	// First line must not carry the age suffix.
-	if strings.Contains(lines[0], "ago") {
-		t.Errorf("first line should not contain age suffix; got %q", lines[0])
+	// Age must be on the first (header) line only.
+	if !strings.Contains(lines[0], "ago") {
+		t.Errorf("expected age on first line; got %q", lines[0])
 	}
-	// Last line must carry the age suffix.
-	last := lines[len(lines)-1]
-	if !strings.Contains(last, "ago") {
-		t.Errorf("last line should contain age suffix; got %q", last)
-	}
-	// Intermediate lines must not carry the suffix.
-	for _, line := range lines[1 : len(lines)-1] {
+	for _, line := range lines[1:] {
 		if strings.Contains(line, "ago") {
-			t.Errorf("intermediate line should not contain age suffix; got %q", line)
+			t.Errorf("age should not appear on note lines; got %q", line)
 		}
 	}
 }

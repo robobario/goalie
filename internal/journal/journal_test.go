@@ -745,3 +745,50 @@ func TestKnownUsernames(t *testing.T) {
 		}
 	})
 }
+
+func TestPriorBusinessDayStart(t *testing.T) {
+	midnight := func(year int, month time.Month, day int) time.Time {
+		return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
+	}
+
+	cases := []struct {
+		name string
+		now  time.Time
+		want time.Time
+	}{
+		{
+			name: "Tuesday returns Monday",
+			now:  time.Date(2026, 8, 4, 15, 0, 0, 0, time.UTC), // Tuesday
+			want: midnight(2026, 8, 3),                          // Monday
+		},
+		{
+			name: "Monday returns Friday",
+			now:  time.Date(2026, 8, 3, 9, 0, 0, 0, time.UTC), // Monday
+			want: midnight(2026, 7, 31),                        // Friday
+		},
+		{
+			name: "Wednesday returns Tuesday",
+			now:  time.Date(2026, 8, 5, 0, 0, 0, 0, time.UTC), // Wednesday
+			want: midnight(2026, 8, 4),                         // Tuesday
+		},
+		{
+			name: "Saturday returns Friday",
+			now:  time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC), // Saturday
+			want: midnight(2026, 7, 31),                         // Friday
+		},
+		{
+			name: "Sunday returns Friday",
+			now:  time.Date(2026, 8, 2, 12, 0, 0, 0, time.UTC), // Sunday
+			want: midnight(2026, 7, 31),                         // Friday
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := journal.PriorBusinessDayStart(tc.now)
+			if !got.Equal(tc.want) {
+				t.Errorf("PriorBusinessDayStart(%v) = %v, want %v", tc.now, got, tc.want)
+			}
+		})
+	}
+}

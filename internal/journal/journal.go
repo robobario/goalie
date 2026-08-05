@@ -460,3 +460,13 @@ func readEntries(path, username string, key []byte) ([]Entry, error) {
 	}
 	return entries, scanner.Err()
 }
+
+// PriorBusinessDayStart returns midnight UTC of the most recent working day
+// before now. Saturdays and Sundays are skipped, so Monday returns Friday.
+func PriorBusinessDayStart(now time.Time) time.Time {
+	day := now.UTC().AddDate(0, 0, -1)
+	for day.Weekday() == time.Saturday || day.Weekday() == time.Sunday {
+		day = day.AddDate(0, 0, -1)
+	}
+	return time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, time.UTC)
+}

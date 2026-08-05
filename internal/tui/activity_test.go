@@ -443,3 +443,33 @@ func TestUpdateTypingFiltersEntries(t *testing.T) {
 		}
 	}
 }
+
+func TestActivityViewHidesOldDoneEntry(t *testing.T) {
+	oldTS := time.Now().UTC().AddDate(0, 0, -7).Format(time.RFC3339)
+	m := activityModel{
+		loaded: true,
+		entries: []journal.Entry{
+			{Note: "old done task", Username: "@alice", TS: oldTS, Done: true},
+		},
+	}
+	m.filtered = m.entries
+	view := m.View()
+	if strings.Contains(view, "old done task") {
+		t.Errorf("expected old done entry to be hidden; got view:\n%s", view)
+	}
+}
+
+func TestActivityViewShowsRecentDoneEntry(t *testing.T) {
+	recentTS := time.Now().UTC().Format(time.RFC3339)
+	m := activityModel{
+		loaded: true,
+		entries: []journal.Entry{
+			{Note: "just finished", Username: "@alice", TS: recentTS, Done: true},
+		},
+	}
+	m.filtered = m.entries
+	view := m.View()
+	if !strings.Contains(view, "just finished") {
+		t.Errorf("expected recent done entry to be visible; got view:\n%s", view)
+	}
+}

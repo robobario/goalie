@@ -16,8 +16,18 @@ var UsernameRe = regexp.MustCompile(`^@[a-zA-Z0-9][a-zA-Z0-9-]{0,38}$`)
 
 func ValidUsername(s string) bool { return UsernameRe.MatchString(s) }
 
+const defaultWrapWidth = 72
+
 type Config struct {
-	Name string `json:"name"`
+	Name      string `json:"name"`
+	WrapWidth *int   `json:"wrap_width,omitempty"`
+}
+
+func (c *Config) EffectiveWrapWidth() int {
+	if c.WrapWidth == nil {
+		return defaultWrapWidth
+	}
+	return *c.WrapWidth
 }
 
 var ErrNotInitialised = errors.New("goalie not initialised: run 'goalie init <repo-url>' first")

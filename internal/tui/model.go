@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"goalie/internal/cli"
@@ -35,6 +37,7 @@ type Model struct {
 	activity  activityModel
 	update    updateModel
 	motd      string
+	wrapWidth int
 }
 
 func resolveSelfUsername(ctx *cli.AppContext) string {
@@ -57,15 +60,41 @@ func resolveWrapWidth() int {
 }
 
 func initialModel(ctx *cli.AppContext) Model {
+	ww := resolveWrapWidth()
 	return Model{
 		ctx:       ctx,
 		activeTab: activityTab,
+		wrapWidth: ww,
 		activity: activityModel{
 			selfUsername: resolveSelfUsername(ctx),
-			wrapWidth:    resolveWrapWidth(),
+			wrapWidth:    ww,
 		},
 		update: updateModel{ctx: ctx},
 	}
+}
+
+func wrapMotd(text string, termWidth, wrapWidth int) string {
+	const prefix = "#MOTD - "
+	const contIndent = "        " // 8 spaces, matching len(prefix)
+
+	effectiveWidth := termWidth
+	if wrapWidth > 0 && (effectiveWidth <= 0 || wrapWidth < effectiveWidth) {
+		effectiveWidth = wrapWidth
+	}
+	if effectiveWidth <= 0 || len(prefix)+len(text) <= effectiveWidth {
+		return prefix + text
+	}
+
+	maxFirst := effectiveWidth - len(prefix)
+	firstChunk, remaining := takeFirstLine(text, maxFirst)
+
+	var sb strings.Builder
+	sb.WriteString(prefix + firstChunk)
+	contWidth := effectiveWidth - len(contIndent)
+	for _, cl := range wrapWords(remaining, contWidth) {
+		sb.WriteString("\n" + contIndent + cl)
+	}
+	return sb.String()
 }
 
 func loadMotdCmd(ctx *cli.AppContext) tea.Cmd {
@@ -185,7 +214,7 @@ func (m Model) View() string {
 	helpBar := helpBarStyle.Render("Shift-←/→: switch view  q: quit")
 	parts := []string{tabBar}
 	if m.motd != "" {
-		parts = append(parts, motdStyle.Render("#MOTD - "+m.motd))
+		parts = append(parts, motdStyle.Render(wrapMotd(m.motd, m.width, m.wrapWidth)))
 	}
 	parts = append(parts, body, helpBar)
 	return lipgloss.JoinVertical(lipgloss.Left, parts...)

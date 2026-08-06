@@ -131,6 +131,10 @@ func Status(ctx AppContext) error {
 	if err := requireDataDir(ctx); err != nil {
 		return err
 	}
+	if motdText, ok, err := motd.Latest(ctx.DataDir, ctx.EncryptionKey); err == nil && ok {
+		wrapWidth := loadWrapWidth()
+		fmt.Fprintln(ctx.Stdout, display.FormatMotd(motdText, ctx.IsTTY, wrapWidth))
+	}
 	entries, err := journal.CollectLatest(ctx.DataDir, ctx.Git, 7, ctx.EncryptionKey)
 	if err != nil {
 		return err

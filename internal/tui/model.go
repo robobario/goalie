@@ -113,7 +113,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if m.activeTab == updateTab && m.update.phase != phaseLoading &&
-			msg.String() != "shift+left" && msg.String() != "shift+right" {
+			msg.String() != "shift+left" && msg.String() != "shift+right" &&
+			msg.String() != "ctrl+shift+left" && msg.String() != "ctrl+shift+right" {
 			var cmd tea.Cmd
 			m.update, cmd = m.update.Update(msg)
 			cmds = append(cmds, cmd)
@@ -128,13 +129,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
-		case "shift+right":
+		case "shift+right", "ctrl+shift+right":
 			m.activeTab = (m.activeTab + 1) % 2
 			if m.activeTab == activityTab {
 				m.activity.loaded = false
 				cmds = append(cmds, loadActivityCmd(m.ctx))
 			}
-		case "shift+left":
+		case "shift+left", "ctrl+shift+left":
 			m.activeTab = (m.activeTab - 1 + 2) % 2
 			if m.activeTab == activityTab {
 				m.activity.loaded = false

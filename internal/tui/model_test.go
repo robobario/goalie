@@ -157,6 +157,83 @@ func TestShiftLeftFromUpdateMenuSwitchesToActivity(t *testing.T) {
 	}
 }
 
+func TestCtrlShiftRightFromActivityLandsOnUpdate(t *testing.T) {
+	m := newModel()
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlShiftRight})
+	got := next.(Model)
+	if got.activeTab != updateTab {
+		t.Errorf("expected updateTab after Ctrl+Shift+Right from activityTab, got %v", got.activeTab)
+	}
+}
+
+func TestCtrlShiftLeftFromUpdateLandsOnActivity(t *testing.T) {
+	m := newModel()
+	m.activeTab = updateTab
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlShiftLeft})
+	got := next.(Model)
+	if got.activeTab != activityTab {
+		t.Errorf("expected activityTab after Ctrl+Shift+Left from updateTab, got %v", got.activeTab)
+	}
+}
+
+func TestCtrlShiftRightFromUpdateWrapsToActivity(t *testing.T) {
+	m := newModel()
+	m.activeTab = updateTab
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlShiftRight})
+	got := next.(Model)
+	if got.activeTab != activityTab {
+		t.Errorf("expected activityTab after Ctrl+Shift+Right from updateTab, got %v", got.activeTab)
+	}
+}
+
+func TestCtrlShiftLeftFromActivityWrapsToUpdate(t *testing.T) {
+	m := newModel()
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlShiftLeft})
+	got := next.(Model)
+	if got.activeTab != updateTab {
+		t.Errorf("expected updateTab after Ctrl+Shift+Left from activityTab, got %v", got.activeTab)
+	}
+}
+
+func TestCtrlShiftRightToActivityTabTriggersRefresh(t *testing.T) {
+	m := newModel()
+	m.activeTab = updateTab
+	m.activity.loaded = true
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlShiftRight})
+	got := next.(Model)
+	if got.activeTab != activityTab {
+		t.Fatalf("expected activityTab, got %v", got.activeTab)
+	}
+	if got.activity.loaded {
+		t.Error("expected activity.loaded=false after switching to activity tab")
+	}
+	if cmd == nil {
+		t.Error("expected a refresh command when switching to activity tab")
+	}
+}
+
+func TestCtrlShiftRightFromUpdateMenuSwitchesToActivity(t *testing.T) {
+	m := newModel()
+	m.activeTab = updateTab
+	m.update.phase = phaseMenu
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlShiftRight})
+	got := next.(Model)
+	if got.activeTab != activityTab {
+		t.Errorf("expected activityTab after Ctrl+Shift+Right from update menu, got %v", got.activeTab)
+	}
+}
+
+func TestCtrlShiftLeftFromUpdateMenuSwitchesToActivity(t *testing.T) {
+	m := newModel()
+	m.activeTab = updateTab
+	m.update.phase = phaseMenu
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlShiftLeft})
+	got := next.(Model)
+	if got.activeTab != activityTab {
+		t.Errorf("expected activityTab after Ctrl+Shift+Left from update menu, got %v", got.activeTab)
+	}
+}
+
 func TestViewIncludesKeyHelpBar(t *testing.T) {
 	m := newModel()
 	view := m.View()

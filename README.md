@@ -6,6 +6,8 @@ Add shared goals, then create tasks using hashtags. Log updates to show whether 
 
 Own your data. Your goals and updates are stored in the git server you point `goalie` at. Every team member writes updates to the shared git server, so no server to maintain, you can piggyback off your established Git authentication and authorization.
 
+<img width="1200" height="675" alt="Image" src="https://github.com/user-attachments/assets/d87b1095-823e-4431-a3ca-3aa8e34d5a17" />
+
 ## Installation
 
 **Prerequisites:** git.

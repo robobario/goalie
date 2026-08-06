@@ -11,6 +11,7 @@ import (
 	"goalie/internal/display"
 	"goalie/internal/goals"
 	"goalie/internal/journal"
+	"goalie/internal/motd"
 )
 
 func requireDataDir(ctx AppContext) error {
@@ -197,6 +198,29 @@ func loadWrapWidth() int {
 		return config.DefaultWrapWidth
 	}
 	return cfg.EffectiveWrapWidth()
+}
+
+func MotdShow(ctx AppContext) error {
+	if err := requireDataDir(ctx); err != nil {
+		return err
+	}
+	text, ok, err := motd.Latest(ctx.DataDir, ctx.EncryptionKey)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		fmt.Fprintln(ctx.Stdout, "No MOTD set.")
+		return nil
+	}
+	fmt.Fprintln(ctx.Stdout, text)
+	return nil
+}
+
+func MotdSet(ctx AppContext, text string) error {
+	if err := requireDataDir(ctx); err != nil {
+		return err
+	}
+	return motd.Save(ctx.DataDir, ctx.Git, text, ctx.EncryptionKey)
 }
 
 func hasBlocked(entries []journal.Entry) bool {

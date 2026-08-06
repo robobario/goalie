@@ -232,7 +232,7 @@ func main() {
 
 	skillsInstallCmd := &cobra.Command{
 		Use:   "install",
-		Short: "Install Claude Code skills to ~/.claude/commands/",
+		Short: "Install Claude Code skills to ~/.claude/skills/",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cli.SkillsInstall(ctx)
@@ -250,7 +250,7 @@ func main() {
 
 	skillsRemoveCmd := &cobra.Command{
 		Use:   "remove",
-		Short: "Remove installed Claude Code skills from ~/.claude/commands/",
+		Short: "Remove installed Claude Code skills from ~/.claude/skills/",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cli.SkillsRemove(ctx)

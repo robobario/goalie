@@ -2,5 +2,5 @@ package claude
 
 import "embed"
 
-//go:embed commands
+//go:embed skills
 var Skills embed.FS

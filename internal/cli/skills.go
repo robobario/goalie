@@ -10,7 +10,7 @@ import (
 )
 
 func SkillsInstall(ctx AppContext) error {
-	dest, err := claudeCommandsDir()
+	dest, err := claudeSkillsDir()
 	if err != nil {
 		return err
 	}
@@ -18,7 +18,7 @@ func SkillsInstall(ctx AppContext) error {
 }
 
 func SkillsUpdate(ctx AppContext) error {
-	dest, err := claudeCommandsDir()
+	dest, err := claudeSkillsDir()
 	if err != nil {
 		return err
 	}
@@ -26,34 +26,37 @@ func SkillsUpdate(ctx AppContext) error {
 }
 
 func SkillsRemove(ctx AppContext) error {
-	dest, err := claudeCommandsDir()
+	dest, err := claudeSkillsDir()
 	if err != nil {
 		return err
 	}
 	return removeSkills(ctx, dest)
 }
 
-func claudeCommandsDir() (string, error) {
+func claudeSkillsDir() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".claude", "commands"), nil
+	return filepath.Join(home, ".claude", "skills"), nil
 }
 
 func installSkills(ctx AppContext, dest string, overwrite bool) error {
-	if err := os.MkdirAll(dest, 0o755); err != nil {
-		return err
-	}
-	return fs.WalkDir(claudeembed.Skills, "commands", func(path string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
+	return fs.WalkDir(claudeembed.Skills, "skills", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
 			return err
 		}
-		name := filepath.Base(path)
-		target := filepath.Join(dest, name)
+		rel, _ := filepath.Rel("skills", path)
+		if rel == "." {
+			return nil
+		}
+		target := filepath.Join(dest, rel)
+		if d.IsDir() {
+			return os.MkdirAll(target, 0o755)
+		}
 		if !overwrite {
 			if _, statErr := os.Stat(target); statErr == nil {
-				fmt.Fprintf(ctx.Stdout, "skipping %s (already installed; use 'goalie skills update' to overwrite)\n", name)
+				fmt.Fprintf(ctx.Stdout, "skipping %s (already installed; use 'goalie skills update' to overwrite)\n", rel)
 				return nil
 			}
 		}
@@ -64,26 +67,30 @@ func installSkills(ctx AppContext, dest string, overwrite bool) error {
 		if err := os.WriteFile(target, data, 0o644); err != nil {
 			return err
 		}
-		fmt.Fprintf(ctx.Stdout, "installed %s → %s\n", name, target)
+		fmt.Fprintf(ctx.Stdout, "installed %s → %s\n", rel, target)
 		return nil
 	})
 }
 
 func removeSkills(ctx AppContext, dest string) error {
-	return fs.WalkDir(claudeembed.Skills, "commands", func(path string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
+	entries, err := claudeembed.Skills.ReadDir("skills")
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		target := filepath.Join(dest, entry.Name())
+		_, statErr := os.Stat(target)
+		if os.IsNotExist(statErr) {
+			fmt.Fprintf(ctx.Stdout, "%s not installed\n", entry.Name())
+			continue
+		}
+		if err := os.RemoveAll(target); err != nil {
 			return err
 		}
-		name := filepath.Base(path)
-		target := filepath.Join(dest, name)
-		if err := os.Remove(target); err != nil {
-			if os.IsNotExist(err) {
-				fmt.Fprintf(ctx.Stdout, "%s not installed\n", name)
-				return nil
-			}
-			return err
-		}
-		fmt.Fprintf(ctx.Stdout, "removed %s\n", target)
-		return nil
-	})
+		fmt.Fprintf(ctx.Stdout, "removed %s\n", entry.Name())
+	}
+	return nil
 }

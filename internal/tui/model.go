@@ -22,7 +22,7 @@ var (
 	inactiveTabStyle = lipgloss.NewStyle().Padding(0, 2)
 	tabBarStyle      = lipgloss.NewStyle().MarginBottom(1)
 	helpBarStyle     = lipgloss.NewStyle().Faint(true).MarginTop(1)
-	motdStyle        = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "30", Dark: "14"}).MarginBottom(1)
+	motdStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("6")).MarginBottom(1)
 )
 
 type motdLoadedMsg struct {

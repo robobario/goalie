@@ -5,6 +5,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"goalie/internal/cli"
 	"goalie/internal/config"
+	"goalie/internal/motd"
 )
 
 type tab int
@@ -19,7 +20,12 @@ var (
 	inactiveTabStyle = lipgloss.NewStyle().Padding(0, 2)
 	tabBarStyle      = lipgloss.NewStyle().MarginBottom(1)
 	helpBarStyle     = lipgloss.NewStyle().Faint(true).MarginTop(1)
+	motdStyle        = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "30", Dark: "14"}).MarginBottom(1)
 )
+
+type motdLoadedMsg struct {
+	text string
+}
 
 type Model struct {
 	ctx       *cli.AppContext
@@ -28,6 +34,7 @@ type Model struct {
 	height    int
 	activity  activityModel
 	update    updateModel
+	motd      string
 }
 
 func resolveSelfUsername(ctx *cli.AppContext) string {
@@ -61,8 +68,15 @@ func initialModel(ctx *cli.AppContext) Model {
 	}
 }
 
+func loadMotdCmd(ctx *cli.AppContext) tea.Cmd {
+	return func() tea.Msg {
+		text, _, _ := motd.Latest(ctx.DataDir, ctx.EncryptionKey)
+		return motdLoadedMsg{text: text}
+	}
+}
+
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(loadActivityCmd(m.ctx), m.update.Init())
+	return tea.Batch(loadActivityCmd(m.ctx), loadMotdCmd(m.ctx), m.update.Init())
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -144,6 +158,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.update, cmd = m.update.Update(msg)
 		cmds = append(cmds, cmd)
+	case motdLoadedMsg:
+		m.motd = msg.text
 	}
 	return m, tea.Batch(cmds...)
 }
@@ -167,7 +183,12 @@ func (m Model) View() string {
 	}
 
 	helpBar := helpBarStyle.Render("Shift-←/→: switch view  q: quit")
-	return lipgloss.JoinVertical(lipgloss.Left, tabBar, body, helpBar)
+	parts := []string{tabBar}
+	if m.motd != "" {
+		parts = append(parts, motdStyle.Render("#MOTD - "+m.motd))
+	}
+	parts = append(parts, body, helpBar)
+	return lipgloss.JoinVertical(lipgloss.Left, parts...)
 }
 
 func Run(ctx *cli.AppContext) error {

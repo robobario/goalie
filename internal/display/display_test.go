@@ -35,6 +35,57 @@ func TestRedTTYFalse(t *testing.T) {
 	}
 }
 
+func TestTealNoTTY(t *testing.T) {
+	if got := Teal("hello", false); got != "hello" {
+		t.Errorf("got %q, want %q", got, "hello")
+	}
+}
+
+func TestTealTTY(t *testing.T) {
+	want := "\033[36mhello\033[0m"
+	if got := Teal("hello", true); got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestFormatMotdNoWrap(t *testing.T) {
+	got := FormatMotd("short text", false, 120)
+	if got != "#MOTD - short text" {
+		t.Errorf("got %q", got)
+	}
+}
+
+func TestFormatMotdTealTTY(t *testing.T) {
+	got := FormatMotd("hi", true, 120)
+	want := "\033[36m#MOTD - hi\033[0m"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestFormatMotdWraps(t *testing.T) {
+	// prefix is 8 chars, so with wrapWidth=20 first line gets 12 chars of text
+	got := FormatMotd("one two three four", false, 20)
+	lines := strings.Split(got, "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 lines, got %d: %v", len(lines), lines)
+	}
+	if lines[0] != "#MOTD - one two" {
+		t.Errorf("line 0: got %q", lines[0])
+	}
+	if !strings.HasPrefix(lines[1], "        ") {
+		t.Errorf("continuation line should have 8-space indent, got %q", lines[1])
+	}
+}
+
+func TestFormatMotdNoWrapWidth(t *testing.T) {
+	long := strings.Repeat("x", 200)
+	got := FormatMotd(long, false, 0)
+	if got != "#MOTD - "+long {
+		t.Errorf("expected no wrapping when wrapWidth=0")
+	}
+}
+
 func TestSection(t *testing.T) {
 	var buf bytes.Buffer
 	Section("Team", &buf, false)

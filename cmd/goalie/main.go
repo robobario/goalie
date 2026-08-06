@@ -204,7 +204,27 @@ func main() {
 	}
 
 	keyCmd.AddCommand(keyInitCmd, keyImportCmd)
-	root.AddCommand(initCmd, logCmd, statusCmd, summaryCmd, updateCmd, goalCmd, keyCmd)
+
+	motdCmd := &cobra.Command{
+		Use:   "motd",
+		Short: "Show the team message of the day",
+		Args:  cobra.NoArgs,
+		RunE: requireKey(keyErr, func(cmd *cobra.Command, args []string) error {
+			return cli.MotdShow(ctx)
+		}),
+	}
+
+	motdSetCmd := &cobra.Command{
+		Use:   "set <text>",
+		Short: "Publish a new message of the day",
+		Args:  cobra.ExactArgs(1),
+		RunE: requireKey(keyErr, func(cmd *cobra.Command, args []string) error {
+			return cli.MotdSet(ctx, args[0])
+		}),
+	}
+
+	motdCmd.AddCommand(motdSetCmd)
+	root.AddCommand(initCmd, logCmd, statusCmd, summaryCmd, updateCmd, goalCmd, keyCmd, motdCmd)
 
 	if err := root.Execute(); err != nil {
 		var exitErr *cli.ExitError

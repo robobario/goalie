@@ -12,6 +12,36 @@ import (
 
 var mentionRe = regexp.MustCompile(`@[a-zA-Z0-9][a-zA-Z0-9-]{0,38}`)
 
+func Teal(s string, tty bool) string {
+	if !tty {
+		return s
+	}
+	return "\033[36m" + s + "\033[0m"
+}
+
+// FormatMotd formats text as a #MOTD line, teal-coloured when tty is true,
+// wrapped at wrapWidth with continuation lines indented to align with the text.
+func FormatMotd(text string, tty bool, wrapWidth int) string {
+	const prefix = "#MOTD - "
+	const contIndent = "        " // 8 spaces, matching len(prefix)
+
+	if wrapWidth <= 0 || len(prefix)+len(text) <= wrapWidth {
+		return Teal(prefix+text, tty)
+	}
+
+	maxFirst := wrapWidth - len(prefix)
+	firstChunk, remaining := takeFirstLine(text, maxFirst)
+
+	var sb strings.Builder
+	sb.WriteString(Teal(prefix+firstChunk, tty))
+	contWidth := wrapWidth - len(contIndent)
+	for _, cl := range wrapWords(remaining, contWidth) {
+		sb.WriteString("\n")
+		sb.WriteString(Teal(contIndent+cl, tty))
+	}
+	return sb.String()
+}
+
 func Bold(s string, tty bool) string {
 	if !tty {
 		return s

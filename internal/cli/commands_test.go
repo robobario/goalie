@@ -151,7 +151,7 @@ func TestStatusHidesOldDoneEntries(t *testing.T) {
 		{"ts": ts(-6), "note": "all done", "task": "#impl", "goal": "ROUTING", "blocked": false, "done": true},
 	}, ctx.EncryptionKey)
 
-	if err := cli.Status(ctx); err != nil {
+	if err := cli.Status(ctx, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if strings.Contains(stdout.String(), "all done") {
@@ -168,7 +168,7 @@ func TestStatusShowsRecentDoneEntries(t *testing.T) {
 		{"ts": ts(0), "note": "just finished", "task": "#impl", "goal": "ROUTING", "blocked": false, "done": true},
 	}, ctx.EncryptionKey)
 
-	if err := cli.Status(ctx); err != nil {
+	if err := cli.Status(ctx, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(stdout.String(), "just finished") {
@@ -185,7 +185,7 @@ func TestStatusShowsNonDoneEntries(t *testing.T) {
 		{"ts": ts(-1), "note": "still going", "task": "#impl", "goal": "ROUTING", "blocked": false, "done": false},
 	}, ctx.EncryptionKey)
 
-	if err := cli.Status(ctx); err != nil {
+	if err := cli.Status(ctx, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(stdout.String(), "still going") {
@@ -202,7 +202,7 @@ func TestStatusEntriesWithinWindowAreShown(t *testing.T) {
 		{"ts": ts(-1), "note": "recent work", "goal": nil, "blocked": false, "task": nil},
 	}, ctx.EncryptionKey)
 
-	if err := cli.Status(ctx); err != nil {
+	if err := cli.Status(ctx, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(stdout.String(), "recent work") {
@@ -219,7 +219,7 @@ func TestStatusBlockedEntryShowsBlockedPrefix(t *testing.T) {
 		{"ts": ts(-1), "note": "stalled", "goal": nil, "blocked": true, "task": nil},
 	}, ctx.EncryptionKey)
 
-	if err := cli.Status(ctx); err != nil {
+	if err := cli.Status(ctx, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(stdout.String(), "[BLOCKED]") {
@@ -233,11 +233,25 @@ func TestStatusNoEntriesPrintsMessage(t *testing.T) {
 	journalDir := filepath.Join(ctx.DataDir, "journal")
 	os.MkdirAll(journalDir, 0o755)
 
-	if err := cli.Status(ctx); err != nil {
+	if err := cli.Status(ctx, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(stdout.String(), "No entries in the last 7 days.") {
+	if !strings.Contains(stdout.String(), "No entries in the last 8 days.") {
 		t.Errorf("expected no-entries message:\n%s", stdout.String())
+	}
+}
+
+func TestStatusDaysFlagOverridesDefault(t *testing.T) {
+	ctx, stdout, _ := newCtx(t)
+
+	journalDir := filepath.Join(ctx.DataDir, "journal")
+	os.MkdirAll(journalDir, 0o755)
+
+	if err := cli.Status(ctx, 3); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "No entries in the last 3 days.") {
+		t.Errorf("expected 3-day message:\n%s", stdout.String())
 	}
 }
 

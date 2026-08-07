@@ -11,6 +11,20 @@ import (
 
 func intPtr(i int) *int { return &i }
 
+func TestEffectiveStatusDaysDefault(t *testing.T) {
+	cfg := &Config{Name: "test"}
+	if got := cfg.EffectiveStatusDays(); got != DefaultStatusDays {
+		t.Errorf("got %d, want %d", got, DefaultStatusDays)
+	}
+}
+
+func TestEffectiveStatusDaysCustom(t *testing.T) {
+	cfg := &Config{Name: "test", StatusDays: intPtr(14)}
+	if got := cfg.EffectiveStatusDays(); got != 14 {
+		t.Errorf("got %d, want 14", got)
+	}
+}
+
 func TestEffectiveWrapWidthDefault(t *testing.T) {
 	cfg := &Config{Name: "test"}
 	if got := cfg.EffectiveWrapWidth(); got != 120 {

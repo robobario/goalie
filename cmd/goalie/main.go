@@ -65,6 +65,7 @@ func main() {
 	var logBlocked bool
 	var logDone bool
 	var logTask string
+	var statusDays int
 	var summaryDays int
 	var summaryUser string
 
@@ -116,12 +117,13 @@ func main() {
 
 	statusCmd := &cobra.Command{
 		Use:   "status",
-		Short: "Morning standup view: latest entry per user×goal×task, last 7 days",
+		Short: "Morning standup view: latest entry per user×goal×task (default last 8 days)",
 		Args:  cobra.NoArgs,
 		RunE: requireKey(keyErr, func(cmd *cobra.Command, args []string) error {
-			return cli.Status(ctx)
+			return cli.Status(ctx, statusDays)
 		}),
 	}
+	statusCmd.Flags().IntVar(&statusDays, "days", 0, "Number of days to include (0 = use config, default 8)")
 
 	summaryCmd := &cobra.Command{
 		Use:   "summary",

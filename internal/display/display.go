@@ -7,10 +7,61 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"goalie/internal/journal"
 )
 
 var mentionRe = regexp.MustCompile(`@[a-zA-Z0-9][a-zA-Z0-9-]{0,38}`)
+
+// statusNoteTokenRe matches URLs or @mentions in a single pass, like the TUI.
+var statusNoteTokenRe = regexp.MustCompile(`https?://\S+|@[a-zA-Z0-9][a-zA-Z0-9-]{0,38}`)
+
+var (
+	statusGoalStyle        = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "27", Dark: "75"})
+	statusTaskTagStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "130", Dark: "208"})
+	statusBlockedStyle     = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "124", Dark: "9"})
+	statusMentionStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "28", Dark: "76"})
+	statusSelfMentionStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "22", Dark: "82"})
+	statusURLStyle         = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "136", Dark: "178"})
+)
+
+func applyGoalStyle(s string, tty bool) string {
+	if !tty {
+		return s
+	}
+	return statusGoalStyle.Render(s)
+}
+
+func applyTaskTagStyle(s string, tty bool) string {
+	if !tty {
+		return s
+	}
+	return statusTaskTagStyle.Render(s)
+}
+
+func applyStatusBlockedStyle(s string, tty bool) string {
+	if !tty {
+		return s
+	}
+	return statusBlockedStyle.Render(s)
+}
+
+// highlightStatusNoteTokens applies colour to URLs and @mentions, matching
+// the TUI's renderNoteWithMentions behaviour.
+func highlightStatusNoteTokens(note, selfUsername string, tty bool) string {
+	if !tty {
+		return note
+	}
+	return statusNoteTokenRe.ReplaceAllStringFunc(note, func(m string) string {
+		if strings.HasPrefix(m, "http") {
+			return statusURLStyle.Render(m)
+		}
+		if selfUsername != "" && m == selfUsername {
+			return statusSelfMentionStyle.Render(m)
+		}
+		return statusMentionStyle.Render(m)
+	})
+}
 
 func Teal(s string, tty bool) string {
 	if !tty {
@@ -144,18 +195,32 @@ func goalTaskCombo(e journal.Entry) string {
 	return ""
 }
 
+// goalTaskComboStyled returns the styled rendering and its plain-text equivalent.
+func goalTaskComboStyled(e journal.Entry, tty bool) (styled, plain string) {
+	if e.Goal != nil && e.Task != nil {
+		return applyGoalStyle(*e.Goal, tty) + applyTaskTagStyle(*e.Task, tty), *e.Goal + *e.Task
+	}
+	if e.Goal != nil {
+		return applyGoalStyle(*e.Goal, tty), *e.Goal
+	}
+	if e.Task != nil {
+		return applyTaskTagStyle(*e.Task, tty), *e.Task
+	}
+	return "", ""
+}
+
 func FormatStatusEntry(e journal.Entry, selfUsername string, now time.Time, tty bool) string {
 	age := ageString(e.TS, now)
-	combo := goalTaskCombo(e)
-	note := HighlightMentions(e.Note, selfUsername, tty)
-	if e.Blocked && combo != "" {
-		return Red("[BLOCKED]", tty) + " " + combo + " " + note + " - " + age
+	comboStyled, comboPlain := goalTaskComboStyled(e, tty)
+	note := highlightStatusNoteTokens(e.Note, selfUsername, tty)
+	if e.Blocked && comboPlain != "" {
+		return applyStatusBlockedStyle("[BLOCKED]", tty) + " " + comboStyled + " " + note + " - " + age
 	}
 	if e.Blocked {
-		return Red("[BLOCKED]", tty) + " " + note + " - " + age
+		return applyStatusBlockedStyle("[BLOCKED]", tty) + " " + note + " - " + age
 	}
-	if combo != "" {
-		return combo + " " + note + " - " + age
+	if comboPlain != "" {
+		return comboStyled + " " + note + " - " + age
 	}
 	return note + " - " + age
 }
@@ -167,20 +232,20 @@ func WrapStatusEntry(e journal.Entry, selfUsername string, now time.Time, tty bo
 	age := ageString(e.TS, now)
 	suffix := " - " + age
 
-	combo := goalTaskCombo(e)
+	comboStyled, comboPlain := goalTaskComboStyled(e, tty)
 
 	// prefix always ends with a space when non-empty so prefix+note renders correctly.
 	// prefixPlain is the unstyled equivalent used for column-width maths.
 	var prefix, prefixPlain string
-	if e.Blocked && combo != "" {
-		prefix = Red("[BLOCKED]", tty) + " " + combo + " "
-		prefixPlain = "[BLOCKED] " + combo + " "
+	if e.Blocked && comboPlain != "" {
+		prefix = applyStatusBlockedStyle("[BLOCKED]", tty) + " " + comboStyled + " "
+		prefixPlain = "[BLOCKED] " + comboPlain + " "
 	} else if e.Blocked {
-		prefix = Red("[BLOCKED]", tty) + " "
+		prefix = applyStatusBlockedStyle("[BLOCKED]", tty) + " "
 		prefixPlain = "[BLOCKED] "
-	} else if combo != "" {
-		prefix = combo + " "
-		prefixPlain = combo + " "
+	} else if comboPlain != "" {
+		prefix = comboStyled + " "
+		prefixPlain = comboPlain + " "
 	}
 
 	maxFirstLine := availableWidth - len(prefixPlain)
@@ -191,20 +256,20 @@ func WrapStatusEntry(e journal.Entry, selfUsername string, now time.Time, tty bo
 
 	notePlain := e.Note
 	if len(notePlain)+len(suffix) <= maxFirstLine {
-		return prefix + HighlightMentions(notePlain, selfUsername, tty) + suffix
+		return prefix + highlightStatusNoteTokens(notePlain, selfUsername, tty) + suffix
 	}
 
 	const contIndent = "  "
 	firstChunk, remaining := takeFirstLine(notePlain, maxFirstLine)
 
 	var sb strings.Builder
-	sb.WriteString(prefix + HighlightMentions(firstChunk, selfUsername, tty))
+	sb.WriteString(prefix + highlightStatusNoteTokens(firstChunk, selfUsername, tty))
 
 	contNoteWidth := availableWidth - len(contIndent)
 	contLines := wrapWords(remaining, contNoteWidth)
 	for i, cl := range contLines {
 		sb.WriteString("\n")
-		rendered := HighlightMentions(cl, selfUsername, tty)
+		rendered := highlightStatusNoteTokens(cl, selfUsername, tty)
 		if i == len(contLines)-1 {
 			sb.WriteString(contIndent + rendered + suffix)
 		} else {

@@ -374,6 +374,59 @@ func TestWrapStatusEntryBlockedPrefix(t *testing.T) {
 	}
 }
 
+func TestFormatStatusEntryTTYGoalTaskPreservesContent(t *testing.T) {
+	e := journal.Entry{
+		TS:      fixedTS,
+		Note:    "note",
+		Goal:    ptr("ROUTING"),
+		Task:    ptr("#impl"),
+		Blocked: false,
+	}
+	got := FormatStatusEntry(e, "", fixedNow, true)
+	if !strings.Contains(got, "ROUTING") {
+		t.Errorf("expected goal ID in TTY output, got %q", got)
+	}
+	if !strings.Contains(got, "#impl") {
+		t.Errorf("expected task tag in TTY output, got %q", got)
+	}
+	if !strings.Contains(got, "note") || !strings.Contains(got, "yesterday") {
+		t.Errorf("expected note and age in TTY output, got %q", got)
+	}
+}
+
+func TestFormatStatusEntryTTYBlockedPreservesContent(t *testing.T) {
+	e := journal.Entry{TS: fixedTS, Note: "stuck", Blocked: true}
+	got := FormatStatusEntry(e, "", fixedNow, true)
+	if !strings.Contains(got, "[BLOCKED]") {
+		t.Errorf("expected [BLOCKED] text in TTY output, got %q", got)
+	}
+	if !strings.Contains(got, "stuck") {
+		t.Errorf("expected note in TTY output, got %q", got)
+	}
+}
+
+func TestHighlightStatusNoteTokensURLPreserved(t *testing.T) {
+	got := highlightStatusNoteTokens("see https://example.com for details", "", true)
+	if !strings.Contains(got, "https://example.com") {
+		t.Errorf("expected URL preserved in output, got %q", got)
+	}
+}
+
+func TestHighlightStatusNoteTokensNoTTY(t *testing.T) {
+	note := "see https://example.com and @alice"
+	got := highlightStatusNoteTokens(note, "@alice", false)
+	if got != note {
+		t.Errorf("expected unchanged note in non-TTY, got %q", got)
+	}
+}
+
+func TestHighlightStatusNoteTokensMentionPreserved(t *testing.T) {
+	got := highlightStatusNoteTokens("waiting on @alice", "@alice", true)
+	if !strings.Contains(got, "@alice") {
+		t.Errorf("expected @alice preserved in output, got %q", got)
+	}
+}
+
 func TestAgeString(t *testing.T) {
 	base := time.Date(2024, 3, 10, 12, 0, 0, 0, time.UTC)
 	cases := []struct {

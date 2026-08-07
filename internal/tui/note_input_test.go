@@ -181,3 +181,39 @@ func TestNoteInputViewCursorAtStart(t *testing.T) {
 		t.Errorf("expected '_hello', got %q", got)
 	}
 }
+
+func TestNoteInputViewWrappedNoWrap(t *testing.T) {
+	n := newNoteInput("hello world")
+	got := n.viewWrapped("", 20)
+	if got != "hello world_" {
+		t.Errorf("expected 'hello world_', got %q", got)
+	}
+}
+
+func TestNoteInputViewWrappedBreaksAtWordBoundary(t *testing.T) {
+	// "one two three" with maxWidth=7: "one two" fits (7), "three" on next line
+	n := newNoteInput("one two three")
+	got := n.viewWrapped("", 7)
+	want := "one two\nthree_"
+	if got != want {
+		t.Errorf("expected %q, got %q", want, got)
+	}
+}
+
+func TestNoteInputViewWrappedCursorOnSecondLine(t *testing.T) {
+	// cursor in "three", maxWidth=7
+	n := newNoteInput("one two three")
+	n.cursor = 8 // start of "three"
+	got := n.viewWrapped("", 7)
+	want := "one two\n_three"
+	if got != want {
+		t.Errorf("expected %q, got %q", want, got)
+	}
+}
+
+func TestNoteInputViewWrappedFallsBackWhenMaxWidthZero(t *testing.T) {
+	n := newNoteInput("hello")
+	if n.viewWrapped("", 0) != n.view("") {
+		t.Error("expected viewWrapped with maxWidth=0 to equal view()")
+	}
+}

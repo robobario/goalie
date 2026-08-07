@@ -335,6 +335,21 @@ func renderNoteWithMentions(note, selfUsername string) string {
 	})
 }
 
+// renderNoteWrapped word-wraps value at maxWidth then applies mention/URL
+// highlighting to each line. When maxWidth <= 0 the note is rendered as a
+// single line, matching the behaviour of renderNoteWithMentions directly.
+func renderNoteWrapped(value, username string, maxWidth int) string {
+	if maxWidth <= 0 {
+		return renderNoteWithMentions(value, username)
+	}
+	lines := wrapWords(value, maxWidth)
+	parts := make([]string, len(lines))
+	for i, line := range lines {
+		parts[i] = renderNoteWithMentions(line, username)
+	}
+	return strings.Join(parts, "\n")
+}
+
 func formatActivityEntry(e journal.Entry, now time.Time, selfUsername string) string {
 	var parts []string
 	if e.Done {

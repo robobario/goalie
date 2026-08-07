@@ -43,6 +43,7 @@ type activityModel struct {
 	selfUsername string
 	width        int
 	wrapWidth    int
+	nonDoneDays  int
 }
 
 func loadActivityCmd(ctx *cli.AppContext) tea.Cmd {
@@ -168,6 +169,12 @@ func (m activityModel) View() string {
 			if e.Done {
 				ts, err := time.Parse(time.RFC3339, e.TS)
 				if err == nil && ts.Before(doneHideCutoff) {
+					continue
+				}
+			}
+			if !e.Done && m.nonDoneDays > 0 {
+				ts, err := time.Parse(time.RFC3339, e.TS)
+				if err == nil && ts.Before(now.Add(-time.Duration(m.nonDoneDays)*24*time.Hour)) {
 					continue
 				}
 			}

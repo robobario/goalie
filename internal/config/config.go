@@ -17,10 +17,12 @@ var UsernameRe = regexp.MustCompile(`^@[a-zA-Z0-9][a-zA-Z0-9-]{0,38}$`)
 func ValidUsername(s string) bool { return UsernameRe.MatchString(s) }
 
 const DefaultWrapWidth = 120
+const DefaultStatusDays = 8
 
 type Config struct {
-	Name      string `json:"name"`
-	WrapWidth *int   `json:"wrap_width,omitempty"`
+	Name       string `json:"name"`
+	WrapWidth  *int   `json:"wrap_width,omitempty"`
+	StatusDays *int   `json:"status_days,omitempty"`
 }
 
 func (c *Config) EffectiveWrapWidth() int {
@@ -28,6 +30,13 @@ func (c *Config) EffectiveWrapWidth() int {
 		return DefaultWrapWidth
 	}
 	return *c.WrapWidth
+}
+
+func (c *Config) EffectiveStatusDays() int {
+	if c.StatusDays == nil {
+		return DefaultStatusDays
+	}
+	return *c.StatusDays
 }
 
 var ErrNotInitialised = errors.New("goalie not initialised: run 'goalie init <repo-url>' first")

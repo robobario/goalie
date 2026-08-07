@@ -253,33 +253,38 @@ func TestInteractiveUpdateRecentThreadShown(t *testing.T) {
 			recentEntry("#mythread", nil, "some work", 1),
 		}, key)
 	})
-	if !strings.Contains(out, "Your other recently active tasks (last 7d):") {
-		t.Errorf("recent threads header not in output:\n%s", out)
+	if !strings.Contains(out, "Your active tasks:") {
+		t.Errorf("active tasks header not in output:\n%s", out)
 	}
 	if !strings.Contains(out, "#mythread") {
 		t.Errorf("thread not in output:\n%s", out)
 	}
 }
 
-func TestInteractiveUpdateOldThreadNotShown(t *testing.T) {
-	out, _ := runUpdate(t, "n\n", func(dataDir string, key []byte) {
+func TestInteractiveUpdateOldThreadShown(t *testing.T) {
+	// Tasks older than 7 days must still appear — users should see all non-done
+	// tasks regardless of age so they are motivated to mark them done.
+	out, _ := runUpdate(t, "n\nn\n", func(dataDir string, key []byte) {
 		writeJournalEntries(t, dataDir, "testuser", []map[string]any{
 			recentEntry("#oldthread", nil, "old work", 10),
 		}, key)
 	})
-	if strings.Contains(out, "Your other recently active tasks (last 7d):") {
-		t.Errorf("old thread should not appear in recent section:\n%s", out)
+	if !strings.Contains(out, "Your active tasks:") {
+		t.Errorf("expected active tasks header in output:\n%s", out)
+	}
+	if !strings.Contains(out, "#oldthread") {
+		t.Errorf("expected old thread to appear in active tasks:\n%s", out)
 	}
 }
 
-func TestInteractiveUpdateBlockedThreadNotInRecentList(t *testing.T) {
+func TestInteractiveUpdateBlockedThreadNotInActiveList(t *testing.T) {
 	out, _ := runUpdate(t, "n\nn\n", func(dataDir string, key []byte) {
 		writeJournalEntries(t, dataDir, "testuser", []map[string]any{
 			blockedEntry(nil, "#blocked", "some blocker"),
 		}, key)
 	})
-	if strings.Contains(out, "Your other recently active tasks (last 7d):") {
-		t.Errorf("blocked thread should not appear in recent section:\n%s", out)
+	if strings.Contains(out, "Your active tasks:") {
+		t.Errorf("blocked thread should not appear in active tasks section:\n%s", out)
 	}
 }
 
@@ -409,7 +414,10 @@ func TestInteractiveUpdateNewThreadWithNoGoal(t *testing.T) {
 }
 
 func TestInteractiveUpdateExistingThreadsShownInNewPhase(t *testing.T) {
-	out, ctx := runUpdate(t, "y\n1\n1\nn\nwhat I worked on\nn\n", func(dataDir string, key []byte) {
+	// The 10-day-old task now appears in Active tasks (no date limit), so the
+	// first prompt is "Do you want to update any of these?" — answer n to skip
+	// to the New tasks phase where existing task tags are offered.
+	out, ctx := runUpdate(t, "n\ny\n1\n1\nn\nwhat I worked on\nn\n", func(dataDir string, key []byte) {
 		addOpenGoal(t, dataDir, "ROUTING", key)
 		writeJournalEntries(t, dataDir, "testuser", []map[string]any{
 			recentEntry("#routing-impl", strPtr("ROUTING"), "old note", 10),

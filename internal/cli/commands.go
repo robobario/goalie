@@ -127,20 +127,28 @@ func Log(ctx AppContext, note, goalID string, blocked, done bool, task string) e
 	}, ctx.EncryptionKey)
 }
 
-func Status(ctx AppContext) error {
+func Status(ctx AppContext, days int) error {
 	if err := requireDataDir(ctx); err != nil {
 		return err
+	}
+	if days <= 0 {
+		cfg, err := config.Load()
+		if err != nil {
+			days = config.DefaultStatusDays
+		} else {
+			days = cfg.EffectiveStatusDays()
+		}
 	}
 	if motdText, ok, err := motd.Latest(ctx.DataDir, ctx.EncryptionKey); err == nil && ok {
 		wrapWidth := loadWrapWidth()
 		fmt.Fprintln(ctx.Stdout, display.FormatMotd(motdText, ctx.IsTTY, wrapWidth))
 	}
-	entries, err := journal.CollectLatest(ctx.DataDir, ctx.Git, 7, ctx.EncryptionKey)
+	entries, err := journal.CollectLatest(ctx.DataDir, ctx.Git, days, ctx.EncryptionKey)
 	if err != nil {
 		return err
 	}
 	if len(entries) == 0 {
-		fmt.Fprint(ctx.Stdout, "No entries in the last 7 days.\n")
+		fmt.Fprintf(ctx.Stdout, "No entries in the last %d days.\n", days)
 		return nil
 	}
 

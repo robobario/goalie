@@ -7,7 +7,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"goalie/internal/config"
 	"goalie/internal/display"
@@ -125,17 +124,9 @@ func InteractiveUpdate(ctx *AppContext) error {
 		}
 	}
 
-	cutoff := time.Now().UTC().Add(-7 * 24 * time.Hour)
 	var recent []recentTask
 	for tag, state := range states {
-		if state.Blocked || state.TS == "" {
-			continue
-		}
-		ts, parseErr := time.Parse(time.RFC3339, state.TS)
-		if parseErr != nil {
-			continue
-		}
-		if ts.Before(cutoff) {
+		if state.Blocked || state.Done || state.TS == "" {
 			continue
 		}
 		recent = append(recent, recentTask{tag: tag, state: state})
@@ -145,10 +136,10 @@ func InteractiveUpdate(ctx *AppContext) error {
 		return recent[i].state.TS > recent[j].state.TS
 	})
 
-	display.Section("Recent tasks (last 7d)", ctx.Stdout, ctx.IsTTY)
+	display.Section("Active tasks", ctx.Stdout, ctx.IsTTY)
 
 	if len(recent) > 0 {
-		fmt.Fprint(ctx.Stdout, "Your other recently active tasks (last 7d):\n")
+		fmt.Fprint(ctx.Stdout, "Your active tasks:\n")
 		for i, item := range recent {
 			if item.state.Goal != nil {
 				fmt.Fprintf(ctx.Stdout, "  %d. %s - %s - %s\n", i+1, *item.state.Goal, item.tag, item.state.Note)

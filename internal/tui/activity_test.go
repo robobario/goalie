@@ -489,6 +489,56 @@ func TestUpdateTypingFiltersEntries(t *testing.T) {
 	}
 }
 
+func TestActivityViewHidesOldNonDoneEntryWhenNonDoneDaysSet(t *testing.T) {
+	oldTS := time.Now().UTC().AddDate(0, 0, -10).Format(time.RFC3339)
+	m := activityModel{
+		loaded:      true,
+		nonDoneDays: 8,
+		entries: []journal.Entry{
+			{Note: "old active task", Username: "@alice", TS: oldTS, Done: false},
+		},
+	}
+	m.filtered = m.entries
+	view := m.View()
+	if strings.Contains(view, "old active task") {
+		t.Errorf("expected old non-done entry hidden when nonDoneDays=8; got view:\n%s", view)
+	}
+}
+
+func TestActivityViewShowsRecentNonDoneEntryWhenNonDoneDaysSet(t *testing.T) {
+	recentTS := time.Now().UTC().AddDate(0, 0, -3).Format(time.RFC3339)
+	m := activityModel{
+		loaded:      true,
+		width:       120,
+		nonDoneDays: 8,
+		entries: []journal.Entry{
+			{Note: "active task", Username: "@alice", TS: recentTS, Done: false},
+		},
+	}
+	m.filtered = m.entries
+	view := m.View()
+	if !strings.Contains(view, "active task") {
+		t.Errorf("expected recent non-done entry visible when nonDoneDays=8; got view:\n%s", view)
+	}
+}
+
+func TestActivityViewShowsOldNonDoneEntryWhenNonDoneDaysZero(t *testing.T) {
+	oldTS := time.Now().UTC().AddDate(0, 0, -20).Format(time.RFC3339)
+	m := activityModel{
+		loaded:      true,
+		width:       120,
+		nonDoneDays: 0,
+		entries: []journal.Entry{
+			{Note: "old task no limit", Username: "@alice", TS: oldTS, Done: false},
+		},
+	}
+	m.filtered = m.entries
+	view := m.View()
+	if !strings.Contains(view, "old task no limit") {
+		t.Errorf("expected old non-done entry visible when nonDoneDays=0; got view:\n%s", view)
+	}
+}
+
 func TestActivityViewHidesOldDoneEntry(t *testing.T) {
 	oldTS := time.Now().UTC().AddDate(0, 0, -7).Format(time.RFC3339)
 	m := activityModel{

@@ -78,7 +78,7 @@ func initialModel(ctx *cli.AppContext) Model {
 			wrapWidth:    ww,
 			nonDoneDays:  resolveStatusDays(),
 		},
-		update: updateModel{ctx: ctx},
+		update: updateModel{ctx: ctx, wrapWidth: ww},
 	}
 }
 
@@ -165,6 +165,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.activity.width = msg.Width
+		m.update.width = msg.Width
 	case entriesLoadedMsg:
 		var cmd tea.Cmd
 		m.activity, cmd = m.activity.Update(msg)

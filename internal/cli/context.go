@@ -15,4 +15,5 @@ type AppContext struct {
 	IsTTY         bool
 	Username      string // if non-empty, skip config.Load
 	EncryptionKey []byte
+	SchemaVersion string
 }

@@ -12,6 +12,7 @@ import (
 	"sort"
 	"time"
 
+	"goalie/internal/clock"
 	"goalie/internal/crypto"
 	"goalie/internal/git"
 )
@@ -72,7 +73,7 @@ func Add(dataDir string, r git.Runner, id, description string, key []byte) error
 		ID:          id,
 		Description: description,
 		State:       "open",
-		Created:     time.Now().UTC().Format(time.RFC3339),
+		Created:     clock.Now().Format(time.RFC3339),
 	}
 	data, err := json.MarshalIndent(g, "", "  ")
 	if err != nil {

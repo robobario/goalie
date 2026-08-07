@@ -29,7 +29,7 @@ cp goalie-darwin-amd64 ~/bin/goalie
 chmod +x ~/bin/goalie
 ```
 
-To keep goalie up to date, replace the binary with a newer build.
+To keep goalie up to date, replace the binary with a newer build. Goalie warns once per day if a team member is running a newer data schema version, and refuses to start if a major schema version upgrade requires migration.
 
 By default goalie stores all data under `~/.goalie`. Set the `GOALIE_HOME` environment variable to use a different directory.
 
@@ -144,6 +144,7 @@ goalie summary [--days N] [--user NAME|GLOB]
                                     # Entries grouped as stories per goal/task/user, last N days (default 7)
 goalie status                       # Morning standup view: latest entry per user×goal×task, last 7 days
 goalie update                       # Interactive end-of-day review: update tasks, log new activity
+goalie export                       # Dump all data as JSONL (one entity per line) for debugging and schema compatibility testing
 goalie --version                    # Print version and exit
 ```
 

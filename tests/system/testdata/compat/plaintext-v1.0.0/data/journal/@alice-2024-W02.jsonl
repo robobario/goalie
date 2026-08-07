@@ -1,0 +1,2 @@
+{"id":"a0000000-0000-0000-0000-000000000001","ts":"2024-01-08T10:00:00Z","goal":"ROUTING","note":"started the work","blocked":false,"task":"#impl","schema_version":"1.0.0"}
+{"id":"a0000000-0000-0000-0000-000000000002","ts":"2024-01-08T11:00:00Z","goal":"ROUTING","note":"blocked on code review","blocked":true,"task":"#impl","schema_version":"1.0.0"}

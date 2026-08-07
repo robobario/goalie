@@ -562,6 +562,9 @@ func (m updateModel) submitEdit() (updateModel, tea.Cmd) {
 	updated.Done = m.editDone
 	task := m.editTaskInput
 	updated.Task = &task
+	if m.ctx != nil {
+		updated.SchemaVersion = m.ctx.SchemaVersion
+	}
 
 	original := m.editEntry
 	ctx := m.ctx
@@ -875,15 +878,20 @@ func (m updateModel) submitTaskUpdate() (updateModel, tea.Cmd) {
 	isBlocked := m.taskUpdateState == entryBlocked
 	isDone := m.taskUpdateState == entryDone
 
-	entry := journal.Entry{
-		Goal:    task.state.Goal,
-		Note:    note,
-		Blocked: isBlocked,
-		Done:    isDone,
-		Task:    &task.tag,
-	}
 	ctx := m.ctx
 	username := m.username
+	var schemaVersion string
+	if ctx != nil {
+		schemaVersion = ctx.SchemaVersion
+	}
+	entry := journal.Entry{
+		Goal:          task.state.Goal,
+		Note:          note,
+		Blocked:       isBlocked,
+		Done:          isDone,
+		Task:          &task.tag,
+		SchemaVersion: schemaVersion,
+	}
 	cmd := func() tea.Msg {
 		err := journal.Append(ctx.DataDir, ctx.Git, username, entry, ctx.EncryptionKey)
 		return appendDoneMsg{err: err}
@@ -1103,14 +1111,19 @@ func (m updateModel) submitNewTask() (updateModel, tea.Cmd) {
 		g := m.selectedGoal
 		goalPtr = &g
 	}
-	entry := journal.Entry{
-		Goal:    goalPtr,
-		Note:    note,
-		Blocked: isBlocked,
-		Task:    &tag,
-	}
 	ctx := m.ctx
 	username := m.username
+	var schemaVersion string
+	if ctx != nil {
+		schemaVersion = ctx.SchemaVersion
+	}
+	entry := journal.Entry{
+		Goal:          goalPtr,
+		Note:          note,
+		Blocked:       isBlocked,
+		Task:          &tag,
+		SchemaVersion: schemaVersion,
+	}
 	cmd := func() tea.Msg {
 		err := journal.Append(ctx.DataDir, ctx.Git, username, entry, ctx.EncryptionKey)
 		return appendDoneMsg{err: err}

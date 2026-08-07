@@ -3,13 +3,17 @@ package tui
 import (
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"goalie/internal/cli"
+	"goalie/internal/journal"
 )
 
 func newModel() Model {
-	return initialModel(&cli.AppContext{})
+	m := initialModel(&cli.AppContext{})
+	m.syncing = false
+	return m
 }
 
 func TestShiftRightFromActivityLandsOnUpdate(t *testing.T) {
@@ -242,6 +246,103 @@ func TestViewIncludesKeyHelpBar(t *testing.T) {
 	}
 	if !strings.Contains(view, "q: quit") {
 		t.Errorf("expected 'q: quit' in view key-help; got:\n%s", view)
+	}
+}
+
+func TestInitialModelStartsSyncing(t *testing.T) {
+	m := initialModel(&cli.AppContext{})
+	if !m.syncing {
+		t.Error("expected initial model to start in syncing state")
+	}
+}
+
+func TestSyncingBlocksKeyInput(t *testing.T) {
+	m := initialModel(&cli.AppContext{})
+	// syncing: true — key input other than quit must be swallowed
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyShiftRight})
+	got := next.(Model)
+	if got.activeTab != activityTab {
+		t.Error("tab should not change while syncing")
+	}
+	if cmd != nil {
+		t.Error("expected nil cmd while syncing on non-quit key")
+	}
+}
+
+func TestSyncingAllowsQuit(t *testing.T) {
+	m := initialModel(&cli.AppContext{})
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+	if cmd == nil {
+		t.Fatal("expected quit cmd while syncing on ctrl+c")
+	}
+	if _, ok := cmd().(tea.QuitMsg); !ok {
+		t.Error("expected tea.QuitMsg from ctrl+c while syncing")
+	}
+}
+
+func TestEntriesLoadedWithPulledAtClearsSyncing(t *testing.T) {
+	m := initialModel(&cli.AppContext{})
+	if !m.syncing {
+		t.Fatal("expected syncing=true at startup")
+	}
+	next, _ := m.Update(entriesLoadedMsg{
+		entries:  []journal.Entry{},
+		pulledAt: time.Now(),
+	})
+	got := next.(Model)
+	if got.syncing {
+		t.Error("expected syncing=false after entriesLoadedMsg with non-zero pulledAt")
+	}
+}
+
+func TestEntriesLoadedWithoutPulledAtKeepsSyncing(t *testing.T) {
+	m := initialModel(&cli.AppContext{})
+	m.syncing = true
+	next, _ := m.Update(entriesLoadedMsg{
+		entries: []journal.Entry{},
+		// pulledAt is zero — local read, should not clear syncing
+	})
+	got := next.(Model)
+	if !got.syncing {
+		t.Error("expected syncing=true when entriesLoadedMsg has zero pulledAt")
+	}
+}
+
+func TestTabSwitchToActivityTriggersSyncWhenPullDue(t *testing.T) {
+	m := newModel()
+	m.activeTab = updateTab
+	m.update.phase = phaseMenu
+	// lastPulledAt is zero so pull is due
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyShiftRight})
+	got := next.(Model)
+	if !got.syncing {
+		t.Error("expected syncing=true when switching to activity and pull is due")
+	}
+	if cmd == nil {
+		t.Error("expected a load command after switching to activity")
+	}
+}
+
+func TestTabSwitchToActivitySkipsSyncWhenRecentlyPulled(t *testing.T) {
+	m := newModel()
+	m.activeTab = updateTab
+	m.update.phase = phaseMenu
+	m.activity.lastPulledAt = time.Now() // just pulled
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyShiftRight})
+	got := next.(Model)
+	if got.syncing {
+		t.Error("expected syncing=false when pull was recent")
+	}
+	if cmd == nil {
+		t.Error("expected a local-read command after switching to activity")
+	}
+}
+
+func TestSyncingViewShowsSyncMessage(t *testing.T) {
+	m := initialModel(&cli.AppContext{})
+	view := m.View()
+	if !strings.Contains(view, "Syncing") {
+		t.Errorf("expected 'Syncing' in view while syncing; got:\n%s", view)
 	}
 }
 

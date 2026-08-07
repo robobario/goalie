@@ -609,6 +609,84 @@ func TestCollectLatest(t *testing.T) {
 	})
 }
 
+func TestCollectLatestLocal(t *testing.T) {
+	t.Run("only latest entry per user-goal-thread key is returned", func(t *testing.T) {
+		dir := t.TempDir()
+		key := testKey()
+		writeEntries(t, dir, currentWeekFile("alice"), []journal.Entry{
+			{TS: relTS(-3), Note: "earlier note", Goal: strPtr("ROUTING"), Task: strPtr("#impl")},
+			{TS: relTS(-1), Note: "later note", Goal: strPtr("ROUTING"), Task: strPtr("#impl")},
+		}, key)
+
+		entries, err := journal.CollectLatestLocal(dir, 7, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(entries) != 1 {
+			t.Fatalf("expected 1 entry, got %d", len(entries))
+		}
+		if entries[0].Note != "later note" {
+			t.Errorf("expected 'later note', got %q", entries[0].Note)
+		}
+	})
+
+	t.Run("different users same thread both returned", func(t *testing.T) {
+		dir := t.TempDir()
+		key := testKey()
+		writeEntries(t, dir, currentWeekFile("alice"), []journal.Entry{
+			{TS: relTS(-1), Note: "alice note", Goal: strPtr("ROUTING"), Task: strPtr("#impl")},
+		}, key)
+		writeEntries(t, dir, currentWeekFile("bob"), []journal.Entry{
+			{TS: relTS(-1), Note: "bob note", Goal: strPtr("ROUTING"), Task: strPtr("#impl")},
+		}, key)
+
+		entries, err := journal.CollectLatestLocal(dir, 7, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(entries) != 2 {
+			t.Fatalf("expected 2 entries, got %d", len(entries))
+		}
+		notes := map[string]bool{entries[0].Note: true, entries[1].Note: true}
+		if !notes["alice note"] || !notes["bob note"] {
+			t.Errorf("expected both alice and bob notes, got %v", notes)
+		}
+	})
+
+	t.Run("entries outside window excluded", func(t *testing.T) {
+		dir := t.TempDir()
+		key := testKey()
+		writeEntries(t, dir, currentWeekFile("alice"), []journal.Entry{
+			{TS: relTS(-6), Note: "within window", Goal: strPtr("ROUTING")},
+			{TS: relTS(-8), Note: "outside window", Goal: strPtr("ROUTING")},
+		}, key)
+
+		entries, err := journal.CollectLatestLocal(dir, 7, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(entries) != 1 || entries[0].Note != "within window" {
+			t.Errorf("expected only 'within window', got %v", entries)
+		}
+	})
+
+	t.Run("reads from local files without git runner", func(t *testing.T) {
+		dir := t.TempDir()
+		key := testKey()
+		writeEntries(t, dir, currentWeekFile("alice"), []journal.Entry{
+			{TS: relTS(-1), Note: "local note", Task: strPtr("#impl")},
+		}, key)
+
+		entries, err := journal.CollectLatestLocal(dir, 7, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(entries) != 1 || entries[0].Note != "local note" {
+			t.Errorf("expected 'local note', got %v", entries)
+		}
+	})
+}
+
 func TestUpdateEntry(t *testing.T) {
 	t.Run("replaces note in-place", func(t *testing.T) {
 		dir := t.TempDir()

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -38,6 +39,7 @@ type Model struct {
 	update    updateModel
 	motd      string
 	wrapWidth int
+	syncing   bool
 }
 
 func resolveSelfUsername(ctx *cli.AppContext) string {
@@ -73,6 +75,7 @@ func initialModel(ctx *cli.AppContext) Model {
 		ctx:       ctx,
 		activeTab: activityTab,
 		wrapWidth: ww,
+		syncing:   true,
 		activity: activityModel{
 			selfUsername: resolveSelfUsername(ctx),
 			wrapWidth:    ww,
@@ -114,13 +117,19 @@ func loadMotdCmd(ctx *cli.AppContext) tea.Cmd {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(loadActivityCmd(m.ctx), loadMotdCmd(m.ctx), m.update.Init())
+	return tea.Batch(loadActivityCmd(m.ctx, true), loadMotdCmd(m.ctx), m.update.Init())
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		if m.syncing {
+			if msg.String() == "ctrl+c" || msg.String() == "q" {
+				return m, tea.Quit
+			}
+			return m, nil
+		}
 		if m.activeTab == updateTab && m.update.phase != phaseLoading &&
 			msg.String() != "shift+left" && msg.String() != "shift+right" &&
 			msg.String() != "ctrl+shift+left" && msg.String() != "ctrl+shift+right" {
@@ -141,14 +150,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "shift+right", "ctrl+shift+right":
 			m.activeTab = (m.activeTab + 1) % 2
 			if m.activeTab == activityTab {
+				doPull := time.Since(m.activity.lastPulledAt) >= activityFetchInterval
 				m.activity.loaded = false
-				cmds = append(cmds, loadActivityCmd(m.ctx))
+				m.syncing = doPull
+				cmds = append(cmds, loadActivityCmd(m.ctx, doPull))
 			}
 		case "shift+left", "ctrl+shift+left":
 			m.activeTab = (m.activeTab - 1 + 2) % 2
 			if m.activeTab == activityTab {
+				doPull := time.Since(m.activity.lastPulledAt) >= activityFetchInterval
 				m.activity.loaded = false
-				cmds = append(cmds, loadActivityCmd(m.ctx))
+				m.syncing = doPull
+				cmds = append(cmds, loadActivityCmd(m.ctx, doPull))
 			}
 		default:
 			if m.activeTab == activityTab {
@@ -169,6 +182,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.activity, cmd = m.activity.Update(msg)
 		cmds = append(cmds, cmd)
+		if !msg.pulledAt.IsZero() {
+			m.syncing = false
+		}
 	case taskStatesLoadedMsg:
 		var cmd tea.Cmd
 		m.update, cmd = m.update.Update(msg)
@@ -215,7 +231,9 @@ func (m Model) View() string {
 	tabBar := tabBarStyle.Render(lipgloss.JoinHorizontal(lipgloss.Top, activityHeader, updateHeader))
 
 	var body string
-	if m.activeTab == activityTab {
+	if m.syncing {
+		body = "Syncing with remote..."
+	} else if m.activeTab == activityTab {
 		body = m.activity.View()
 	} else {
 		body = m.update.View()

@@ -297,12 +297,17 @@ func KnownUsernames(dataDir string) ([]string, error) {
 }
 
 // CollectLatest returns the latest entry per (username, goal, task) key
-// within the last `days` days.
+// within the last `days` days. It runs git pull before reading.
 func CollectLatest(dataDir string, r git.Runner, days int, key []byte) ([]Entry, error) {
 	if err := r.Run([]string{"pull"}, dataDir); err != nil {
 		return nil, err
 	}
+	return CollectLatestLocal(dataDir, days, key)
+}
 
+// CollectLatestLocal returns the latest entry per (username, goal, task) key
+// within the last `days` days, reading only from local files without pulling.
+func CollectLatestLocal(dataDir string, days int, key []byte) ([]Entry, error) {
 	now := time.Now().UTC()
 	cutoff := now.Add(-time.Duration(days) * 24 * time.Hour)
 	journalDir := filepath.Join(dataDir, "journal")

@@ -14,6 +14,8 @@ import (
 	"goalie/internal/journal"
 )
 
+const activityFetchInterval = time.Minute
+
 // tuiNoteTokenRe matches URLs (https?://...) or @mentions in a single pass.
 var tuiNoteTokenRe = regexp.MustCompile(`https?://\S+|@[a-zA-Z0-9][a-zA-Z0-9-]{0,38}`)
 
@@ -29,26 +31,32 @@ var mentionStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Adapti
 var selfMentionStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "22", Dark: "82"})
 
 type entriesLoadedMsg struct {
-	entries []journal.Entry
-	err     error
+	entries  []journal.Entry
+	err      error
+	pulledAt time.Time // non-zero when a git pull was performed
 }
 
 type activityModel struct {
-	entries      []journal.Entry
-	filtered     []journal.Entry
-	search       string
-	searchMode   bool
-	err          error
-	loaded       bool
-	selfUsername string
-	width        int
-	wrapWidth    int
-	nonDoneDays  int
+	entries       []journal.Entry
+	filtered      []journal.Entry
+	search        string
+	searchMode    bool
+	err           error
+	loaded        bool
+	lastPulledAt  time.Time
+	selfUsername  string
+	width         int
+	wrapWidth     int
+	nonDoneDays   int
 }
 
-func loadActivityCmd(ctx *cli.AppContext) tea.Cmd {
+func loadActivityCmd(ctx *cli.AppContext, doPull bool) tea.Cmd {
 	return func() tea.Msg {
-		entries, err := journal.CollectLatest(ctx.DataDir, ctx.Git, 30, ctx.EncryptionKey)
+		if doPull {
+			entries, err := journal.CollectLatest(ctx.DataDir, ctx.Git, 30, ctx.EncryptionKey)
+			return entriesLoadedMsg{entries: entries, err: err, pulledAt: time.Now()}
+		}
+		entries, err := journal.CollectLatestLocal(ctx.DataDir, 30, ctx.EncryptionKey)
 		return entriesLoadedMsg{entries: entries, err: err}
 	}
 }
@@ -86,6 +94,9 @@ func (m activityModel) Update(msg tea.Msg) (activityModel, tea.Cmd) {
 		m.err = msg.err
 		m.entries = msg.entries
 		m.filtered = FilterEntries(m.entries, m.search)
+		if !msg.pulledAt.IsZero() {
+			m.lastPulledAt = msg.pulledAt
+		}
 	case tea.KeyMsg:
 		if msg.Paste {
 			m.searchMode = true

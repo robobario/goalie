@@ -59,6 +59,14 @@ func resolveWrapWidth() int {
 	return cfg.EffectiveWrapWidth()
 }
 
+func resolveStatusDays() int {
+	cfg, err := config.Load()
+	if err != nil || cfg == nil {
+		return config.DefaultStatusDays
+	}
+	return cfg.EffectiveStatusDays()
+}
+
 func initialModel(ctx *cli.AppContext) Model {
 	ww := resolveWrapWidth()
 	return Model{
@@ -68,6 +76,7 @@ func initialModel(ctx *cli.AppContext) Model {
 		activity: activityModel{
 			selfUsername: resolveSelfUsername(ctx),
 			wrapWidth:    ww,
+			nonDoneDays:  resolveStatusDays(),
 		},
 		update: updateModel{ctx: ctx},
 	}

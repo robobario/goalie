@@ -622,6 +622,23 @@ func (m updateModel) viewEditPicking() string {
 	return sb.String()
 }
 
+// noteContentWidth returns the number of columns available for note content
+// when the label prefix occupies prefixLen columns. It caps at wrapWidth when
+// configured, matching the behaviour of the activity view.
+func (m updateModel) noteContentWidth(prefixLen int) int {
+	if m.width <= 0 {
+		return 0
+	}
+	effective := m.width
+	if m.wrapWidth > 0 && m.wrapWidth < effective {
+		effective = m.wrapWidth
+	}
+	if effective <= prefixLen {
+		return 0
+	}
+	return effective - prefixLen
+}
+
 func (m updateModel) viewEditNote() string {
 	task := ""
 	if m.editEntry.Task != nil {
@@ -631,17 +648,20 @@ func (m updateModel) viewEditNote() string {
 	if task != "" {
 		header = "Editing: " + taskTagStyle.Render(task)
 	}
-	return fmt.Sprintf("%s\n\nNote: %s\n\nEnter to continue, Esc to cancel", header, m.editNoteInput.view(m.username))
+	noteView := strings.ReplaceAll(m.editNoteInput.viewWrapped(m.username, m.noteContentWidth(6)), "\n", "\n      ")
+	return fmt.Sprintf("%s\n\nNote: %s\n\nEnter to continue, Esc to cancel", header, noteView)
 }
 
 func (m updateModel) viewEditTask() string {
+	noteView := strings.ReplaceAll(renderNoteWrapped(strings.TrimSpace(m.editNoteInput.value), m.username, m.noteContentWidth(6)), "\n", "\n      ")
 	return fmt.Sprintf("Note: %s\n\nTask tag: %s_\n\nEnter to confirm (#hashtag required), Esc to cancel",
-		renderNoteWithMentions(strings.TrimSpace(m.editNoteInput.value), m.username), taskTagStyle.Render(m.editTaskInput))
+		noteView, taskTagStyle.Render(m.editTaskInput))
 }
 
 func (m updateModel) viewEditBlockedDone() string {
+	noteView := strings.ReplaceAll(renderNoteWrapped(strings.TrimSpace(m.editNoteInput.value), m.username, m.noteContentWidth(6)), "\n", "\n      ")
 	return fmt.Sprintf("Note: %s\nTask: %s\n\nBlocked? [y]  Not blocked? [n]  Done? [d]  (Esc to cancel)",
-		renderNoteWithMentions(strings.TrimSpace(m.editNoteInput.value), m.username), taskTagStyle.Render(m.editTaskInput))
+		noteView, taskTagStyle.Render(m.editTaskInput))
 }
 
 // viewGoalPicker renders the goal picker with goal IDs coloured and their
@@ -963,13 +983,16 @@ func (m updateModel) viewTaskUpdateForm() string {
 	sb.WriteString(header + "\n\n")
 
 	// Note field
-	var noteLine string
+	const notePrefix = "Note: "
+	const noteIndent = "      "
+	noteWidth := m.noteContentWidth(len(notePrefix))
+	var noteView string
 	if m.taskUpdateSub == taskUpdateNote {
-		noteLine = "Note: " + m.taskUpdateNote.view(m.username)
+		noteView = strings.ReplaceAll(m.taskUpdateNote.viewWrapped(m.username, noteWidth), "\n", "\n"+noteIndent)
 	} else {
-		noteLine = "Note: " + renderNoteWithMentions(m.taskUpdateNote.value, m.username)
+		noteView = strings.ReplaceAll(renderNoteWrapped(m.taskUpdateNote.value, m.username, noteWidth), "\n", "\n"+noteIndent)
 	}
-	sb.WriteString(noteLine + "\n\n")
+	sb.WriteString(notePrefix + noteView + "\n\n")
 
 	// State selector
 	var stateParts []string
@@ -1169,10 +1192,14 @@ func (m updateModel) viewNewTask() string {
 	}
 
 	// Note field
+	const newNoteIndent = "         " // 9 spaces, aligns with content after "> Note:  "
+	newNoteWidth := m.noteContentWidth(9)
 	if m.newSub == newFormNote {
-		sb.WriteString("\n> Note:  " + m.newNoteInput.view(m.username) + "\n")
+		noteView := strings.ReplaceAll(m.newNoteInput.viewWrapped(m.username, newNoteWidth), "\n", "\n"+newNoteIndent)
+		sb.WriteString("\n> Note:  " + noteView + "\n")
 	} else {
-		sb.WriteString("\n  Note:  " + renderNoteWithMentions(m.newNoteInput.value, m.username) + "\n")
+		noteView := strings.ReplaceAll(renderNoteWrapped(m.newNoteInput.value, m.username, newNoteWidth), "\n", "\n"+newNoteIndent)
+		sb.WriteString("\n  Note:  " + noteView + "\n")
 	}
 
 	// Blocked field

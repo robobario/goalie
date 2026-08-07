@@ -952,3 +952,75 @@ func TestMentionStyledInEditNoteView(t *testing.T) {
 	}
 }
 
+func TestNoteContentWidthNoPropagation(t *testing.T) {
+	m := updateModel{width: 0}
+	if got := m.noteContentWidth(6); got != 0 {
+		t.Errorf("expected 0 when width not set, got %d", got)
+	}
+}
+
+func TestNoteContentWidthCapsAtWrapWidth(t *testing.T) {
+	m := updateModel{width: 200, wrapWidth: 80}
+	if got := m.noteContentWidth(6); got != 74 {
+		t.Errorf("expected 74 (80-6), got %d", got)
+	}
+}
+
+func TestNoteContentWidthUsesTerminalWhenNoWrapWidth(t *testing.T) {
+	m := updateModel{width: 100, wrapWidth: 0}
+	if got := m.noteContentWidth(6); got != 94 {
+		t.Errorf("expected 94 (100-6), got %d", got)
+	}
+}
+
+func TestEditNoteViewWrapsLongNote(t *testing.T) {
+	long := "one two three four five six seven eight nine ten"
+	m := updateModel{
+		phase:         phaseEditEntry,
+		editSub:       editNote,
+		editNoteInput: newNoteInput(long),
+		editEntry:     journal.Entry{},
+		width:         20,
+	}
+	view := m.viewEditNote()
+	// With width=20 and prefix "Note: " (6 chars), content width is 14.
+	// "one two three" fits in 13 chars; "four five six seven eight nine ten" wraps.
+	if !strings.Contains(view, "\n") {
+		t.Errorf("expected wrapped (multi-line) note in edit view; got:\n%s", view)
+	}
+	// Continuation lines must be indented to align with note content start.
+	if !strings.Contains(view, "\n      ") {
+		t.Errorf("expected continuation indent of 6 spaces; got:\n%s", view)
+	}
+}
+
+func TestTaskUpdateNoteViewWrapsLongNote(t *testing.T) {
+	long := "one two three four five six seven eight nine ten"
+	m := updateModel{
+		phase:          phaseTaskUpdate,
+		taskUpdateSub:  taskUpdateNote,
+		taskUpdateSelected: activeTask{tag: "#x"},
+		taskUpdateNote: newNoteInput(long),
+		width:          20,
+	}
+	view := m.viewTaskUpdateForm()
+	if !strings.Contains(view, "\n      ") {
+		t.Errorf("expected wrapped note with 6-space indent; got:\n%s", view)
+	}
+}
+
+func TestNewTaskNoteViewWrapsLongNote(t *testing.T) {
+	long := "one two three four five six seven eight nine ten"
+	m := updateModel{
+		phase:        phaseNewTask,
+		newSub:       newFormNote,
+		newNoteInput: newNoteInput(long),
+		width:        25,
+	}
+	view := m.viewNewTask()
+	// Prefix "> Note:  " = 9 chars, content width = 16.
+	if !strings.Contains(view, "\n         ") {
+		t.Errorf("expected wrapped note with 9-space indent; got:\n%s", view)
+	}
+}
+

@@ -73,6 +73,7 @@ func main() {
 		checkVersionOnce(ctx.DataDir, ctx.Git, os.Stderr)
 	}
 
+	var plainOutput bool
 	var logGoal string
 	var logBlocked bool
 	var logDone bool
@@ -95,6 +96,13 @@ func main() {
 			}
 			return tui.Run(&ctx)
 		},
+	}
+
+	root.PersistentFlags().BoolVar(&plainOutput, "plain", false, "Disable colour output")
+	root.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		if plainOutput {
+			ctx.IsTTY = false
+		}
 	}
 
 	configPath := filepath.Join(goalieHome, "config.json")

@@ -202,9 +202,8 @@ func (m updateModel) reloadTaskStatesCmd() tea.Cmd {
 		if err != nil {
 			return taskStatesLoadedMsg{err: err}
 		}
-		// Collect blocked tasks first (sorted by goal then tag), then recent non-blocked.
+		// Collect blocked tasks first (sorted by goal then tag), then all non-blocked non-done tasks.
 		var blocked, recent []activeTask
-		cutoff := time.Now().UTC().Add(-7 * 24 * time.Hour)
 		for tag, state := range states {
 			if state.Done {
 				continue
@@ -214,10 +213,6 @@ func (m updateModel) reloadTaskStatesCmd() tea.Cmd {
 				continue
 			}
 			if state.TS == "" {
-				continue
-			}
-			ts, parseErr := time.Parse(time.RFC3339, state.TS)
-			if parseErr != nil || ts.Before(cutoff) {
 				continue
 			}
 			recent = append(recent, activeTask{tag: tag, state: state})

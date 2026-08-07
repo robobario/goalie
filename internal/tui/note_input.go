@@ -1,6 +1,9 @@
 package tui
 
-import "unicode/utf8"
+import (
+	"strings"
+	"unicode/utf8"
+)
 
 // noteInput is a UTF-8 aware text field with a byte-offset cursor.
 type noteInput struct {
@@ -63,4 +66,20 @@ func (n noteInput) view(username string) string {
 	before := renderNoteWithMentions(n.value[:n.cursor], username)
 	after := renderNoteWithMentions(n.value[n.cursor:], username)
 	return before + "_" + after
+}
+
+// viewWrapped is like view but word-wraps the content at maxWidth columns.
+// The cursor _ is embedded in the value before wrapping so it stays on the
+// correct visual line. When maxWidth <= 0 it falls back to view.
+func (n noteInput) viewWrapped(username string, maxWidth int) string {
+	if maxWidth <= 0 {
+		return n.view(username)
+	}
+	display := n.value[:n.cursor] + "_" + n.value[n.cursor:]
+	lines := wrapWords(display, maxWidth)
+	parts := make([]string, len(lines))
+	for i, line := range lines {
+		parts[i] = renderNoteWithMentions(line, username)
+	}
+	return strings.Join(parts, "\n")
 }

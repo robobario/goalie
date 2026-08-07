@@ -646,3 +646,26 @@ func TestAgeString(t *testing.T) {
 		})
 	}
 }
+
+func TestRenderNoteWrappedNoWrap(t *testing.T) {
+	got := renderNoteWrapped("hello world", "", 20)
+	if got != "hello world" {
+		t.Errorf("expected 'hello world', got %q", got)
+	}
+}
+
+func TestRenderNoteWrappedBreaksAtWordBoundary(t *testing.T) {
+	got := renderNoteWrapped("one two three", "", 7)
+	want := "one two\nthree"
+	if got != want {
+		t.Errorf("expected %q, got %q", want, got)
+	}
+}
+
+func TestRenderNoteWrappedZeroMaxWidth(t *testing.T) {
+	got := renderNoteWrapped("one two three", "", 0)
+	want := renderNoteWithMentions("one two three", "")
+	if got != want {
+		t.Errorf("expected %q, got %q", want, got)
+	}
+}

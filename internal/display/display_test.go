@@ -177,7 +177,7 @@ func TestFormatStatusEntryWithGoalNoThread(t *testing.T) {
 		Goal:    ptr("GOAL"),
 	}
 	got := FormatStatusEntry(e, "", fixedNow, false)
-	want := "(GOAL) note - yesterday"
+	want := "GOAL note - yesterday"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -191,7 +191,7 @@ func TestFormatStatusEntryBlockedWithGoal(t *testing.T) {
 		Goal:    ptr("GOAL"),
 	}
 	got := FormatStatusEntry(e, "", fixedNow, false)
-	want := "[BLOCKED](GOAL) note - yesterday"
+	want := "[BLOCKED] GOAL note - yesterday"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -361,8 +361,8 @@ func TestWrapStatusEntryWithGoalAndTask(t *testing.T) {
 		Blocked: false,
 	}
 	got := WrapStatusEntry(e, "", fixedNow, false, 50)
-	if !strings.Contains(got, "(GOAL)") || !strings.Contains(got, "#impl") {
-		t.Errorf("expected goal and task in output, got %q", got)
+	if !strings.Contains(got, "GOAL#impl") {
+		t.Errorf("expected concatenated GOAL#impl in output, got %q", got)
 	}
 }
 

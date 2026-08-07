@@ -130,24 +130,34 @@ func FormatEntry(e journal.Entry, selfUsername string, now time.Time, tty bool) 
 	return Username(e.Username, tty) + " " + taskPart + note + " - " + age
 }
 
+// goalTaskCombo returns "GOAL#task", "GOAL", "#task", or "" in plain text.
+func goalTaskCombo(e journal.Entry) string {
+	if e.Goal != nil && e.Task != nil {
+		return *e.Goal + *e.Task
+	}
+	if e.Goal != nil {
+		return *e.Goal
+	}
+	if e.Task != nil {
+		return *e.Task
+	}
+	return ""
+}
+
 func FormatStatusEntry(e journal.Entry, selfUsername string, now time.Time, tty bool) string {
 	age := ageString(e.TS, now)
-	goalPart := ""
-	if e.Goal != nil {
-		goalPart = "(" + *e.Goal + ")"
-	}
-	taskPart := ""
-	if e.Task != nil {
-		taskPart = *e.Task + " "
-	}
+	combo := goalTaskCombo(e)
 	note := HighlightMentions(e.Note, selfUsername, tty)
+	if e.Blocked && combo != "" {
+		return Red("[BLOCKED]", tty) + " " + combo + " " + note + " - " + age
+	}
 	if e.Blocked {
-		return Red("[BLOCKED]", tty) + goalPart + " " + taskPart + note + " - " + age
+		return Red("[BLOCKED]", tty) + " " + note + " - " + age
 	}
-	if goalPart != "" {
-		return goalPart + " " + taskPart + note + " - " + age
+	if combo != "" {
+		return combo + " " + note + " - " + age
 	}
-	return taskPart + note + " - " + age
+	return note + " - " + age
 }
 
 // WrapStatusEntry formats a status entry, wrapping the note at availableWidth
@@ -157,27 +167,20 @@ func WrapStatusEntry(e journal.Entry, selfUsername string, now time.Time, tty bo
 	age := ageString(e.TS, now)
 	suffix := " - " + age
 
-	goalPart := ""
-	if e.Goal != nil {
-		goalPart = "(" + *e.Goal + ")"
-	}
-	taskPart := ""
-	if e.Task != nil {
-		taskPart = *e.Task + " "
-	}
+	combo := goalTaskCombo(e)
 
-	// prefix mirrors FormatStatusEntry's structure and always ends with a space
-	// when non-empty, so prefix+note produces the correct rendered form.
+	// prefix always ends with a space when non-empty so prefix+note renders correctly.
+	// prefixPlain is the unstyled equivalent used for column-width maths.
 	var prefix, prefixPlain string
-	if e.Blocked {
-		prefix = Red("[BLOCKED]", tty) + goalPart + " " + taskPart
-		prefixPlain = "[BLOCKED]" + goalPart + " " + taskPart
-	} else if goalPart != "" {
-		prefix = goalPart + " " + taskPart
-		prefixPlain = goalPart + " " + taskPart
-	} else if taskPart != "" {
-		prefix = taskPart
-		prefixPlain = taskPart
+	if e.Blocked && combo != "" {
+		prefix = Red("[BLOCKED]", tty) + " " + combo + " "
+		prefixPlain = "[BLOCKED] " + combo + " "
+	} else if e.Blocked {
+		prefix = Red("[BLOCKED]", tty) + " "
+		prefixPlain = "[BLOCKED] "
+	} else if combo != "" {
+		prefix = combo + " "
+		prefixPlain = combo + " "
 	}
 
 	maxFirstLine := availableWidth - len(prefixPlain)

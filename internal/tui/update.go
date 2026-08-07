@@ -165,8 +165,9 @@ type updateModel struct {
 	tagError     string
 	newUnblocked bool
 
-	width  int
-	height int
+	width     int
+	height    int
+	wrapWidth int
 
 	knownUsernames   []string
 	mentionCompletion mentionCompletion

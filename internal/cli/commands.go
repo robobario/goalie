@@ -119,11 +119,12 @@ func Log(ctx AppContext, note, goalID string, blocked, done bool, task string) e
 		taskPtr = &task
 	}
 	return journal.Append(ctx.DataDir, ctx.Git, username, journal.Entry{
-		Goal:    goalPtr,
-		Note:    note,
-		Blocked: blocked,
-		Done:    done,
-		Task:    taskPtr,
+		Goal:          goalPtr,
+		Note:          note,
+		Blocked:       blocked,
+		Done:          done,
+		Task:          taskPtr,
+		SchemaVersion: ctx.SchemaVersion,
 	}, ctx.EncryptionKey)
 }
 

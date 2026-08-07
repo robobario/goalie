@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -14,7 +15,11 @@ import (
 	"goalie/internal/git"
 	"goalie/internal/goalieenv"
 	"goalie/internal/meta"
+	"goalie/internal/schema"
+	"goalie/internal/state"
 	"goalie/internal/tui"
+	semver "goalie/internal/version"
+	"goalie/internal/versiontrack"
 )
 
 var version = "dev"
@@ -36,13 +41,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	dataDir := filepath.Join(goalieHome, "data")
 	ctx := cli.AppContext{
-		DataDir: filepath.Join(goalieHome, "data"),
-		Git:     &git.RealRunner{},
-		Stdin:   os.Stdin,
-		Stdout:  os.Stdout,
-		Stderr:  os.Stderr,
-		IsTTY:   term.IsTerminal(int(os.Stdout.Fd())),
+		DataDir:       dataDir,
+		Git:           &schemaGuardRunner{inner: &git.RealRunner{}, dataDir: dataDir},
+		Stdin:         os.Stdin,
+		Stdout:        os.Stdout,
+		Stderr:        os.Stderr,
+		IsTTY:         term.IsTerminal(int(os.Stdout.Fd())),
+		SchemaVersion: schema.Version,
 	}
 
 	key, keyErr := crypto.LoadKey()
@@ -59,6 +66,11 @@ func main() {
 			keyErr = nil
 			ctx.EncryptionKey = nil
 		}
+		if err := enforceSchemaCompatibility(ctx.DataDir); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		checkVersionOnce(ctx.DataDir, ctx.Git, os.Stderr)
 	}
 
 	var logGoal string
@@ -260,7 +272,17 @@ func main() {
 	}
 
 	skillsCmd.AddCommand(skillsInstallCmd, skillsUpdateCmd, skillsRemoveCmd)
-	root.AddCommand(initCmd, logCmd, statusCmd, summaryCmd, updateCmd, goalCmd, keyCmd, motdCmd, skillsCmd)
+
+	exportCmd := &cobra.Command{
+		Use:   "export",
+		Short: "Dump all data as JSONL for debugging and schema compatibility testing",
+		Args:  cobra.NoArgs,
+		RunE: requireKey(keyErr, func(cmd *cobra.Command, args []string) error {
+			return cli.Export(ctx)
+		}),
+	}
+
+	root.AddCommand(initCmd, logCmd, statusCmd, summaryCmd, updateCmd, goalCmd, keyCmd, motdCmd, skillsCmd, exportCmd)
 
 	if err := root.Execute(); err != nil {
 		var exitErr *cli.ExitError
@@ -270,4 +292,65 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+// checkVersionOnce runs the version-tracking check at most once per 24 hours.
+// Failures are silent — version tracking must never block normal usage.
+func checkVersionOnce(dataDir string, r git.Runner, stderr interface{ Write([]byte) (int, error) }) {
+	s, err := state.Load()
+	if err != nil || !state.VersionCheckDue(s) {
+		return
+	}
+
+	highest, err := versiontrack.Record(dataDir, r, schema.Version)
+	if err != nil {
+		return
+	}
+
+	s.LastVersionCheck = time.Now().UTC().Format(time.RFC3339)
+	_ = state.Save(s)
+
+	if semver.Compare(highest, schema.Version) <= 0 {
+		return
+	}
+
+	fmt.Fprintf(stderr, "Note: team members are using schema version %s (you have %s). Consider upgrading goalie.\n", highest, schema.Version)
+}
+
+// enforceSchemaCompatibility reads the local versions/ directory and fails if
+// the highest recorded schema major version exceeds the one this binary supports.
+// It reads local state only — no git pull — so commands remain fast.
+func enforceSchemaCompatibility(dataDir string) error {
+	highest, err := versiontrack.HighestRecorded(dataDir)
+	if err != nil || highest == "" {
+		return nil
+	}
+	myMajor := semver.Major(schema.Version)
+	theirMajor := semver.Major(highest)
+	if myMajor >= 0 && theirMajor > myMajor {
+		return fmt.Errorf("data repo uses schema version %s (major %d) but this binary only supports major %d — upgrade goalie before running any commands", highest, theirMajor, myMajor)
+	}
+	return nil
+}
+
+// schemaGuardRunner wraps a git.Runner and re-checks schema compatibility after
+// every pull on the data directory, so a major version mismatch discovered via
+// a pull causes an immediate error rather than silently completing.
+type schemaGuardRunner struct {
+	inner   git.Runner
+	dataDir string
+}
+
+func (r *schemaGuardRunner) Run(args []string, cwd string) error {
+	if err := r.inner.Run(args, cwd); err != nil {
+		return err
+	}
+	if len(args) > 0 && args[0] == "pull" && cwd == r.dataDir {
+		return enforceSchemaCompatibility(r.dataDir)
+	}
+	return nil
+}
+
+func (r *schemaGuardRunner) Output(args []string, cwd string) (string, error) {
+	return r.inner.Output(args, cwd)
 }

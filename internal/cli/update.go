@@ -115,10 +115,11 @@ func InteractiveUpdate(ctx *AppContext) error {
 
 		tag := item.tag
 		if err := journal.Append(ctx.DataDir, ctx.Git, username, journal.Entry{
-			Goal:    item.state.Goal,
-			Note:    entryNote,
-			Blocked: !unblocked,
-			Task:    &tag,
+			Goal:          item.state.Goal,
+			Note:          entryNote,
+			Blocked:       !unblocked,
+			Task:          &tag,
+			SchemaVersion: ctx.SchemaVersion,
 		}, ctx.EncryptionKey); err != nil {
 			return err
 		}
@@ -184,10 +185,11 @@ func InteractiveUpdate(ctx *AppContext) error {
 				}
 				tag := item.tag
 				if err := journal.Append(ctx.DataDir, ctx.Git, username, journal.Entry{
-					Goal:    item.state.Goal,
-					Note:    note,
-					Blocked: isBlocked,
-					Task:    &tag,
+					Goal:          item.state.Goal,
+					Note:          note,
+					Blocked:       isBlocked,
+					Task:          &tag,
+					SchemaVersion: ctx.SchemaVersion,
 				}, ctx.EncryptionKey); err != nil {
 					return err
 				}
@@ -271,10 +273,11 @@ func InteractiveUpdate(ctx *AppContext) error {
 				goalPtr = &goalID
 			}
 			if err := journal.Append(ctx.DataDir, ctx.Git, username, journal.Entry{
-				Goal:    goalPtr,
-				Note:    note,
-				Blocked: isBlocked,
-				Task:    &tag,
+				Goal:          goalPtr,
+				Note:          note,
+				Blocked:       isBlocked,
+				Task:          &tag,
+				SchemaVersion: ctx.SchemaVersion,
 			}, ctx.EncryptionKey); err != nil {
 				return err
 			}

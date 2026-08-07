@@ -14,19 +14,21 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"goalie/internal/clock"
 	"goalie/internal/crypto"
 	"goalie/internal/git"
 )
 
 type Entry struct {
-	ID       string  `json:"id"`
-	TS       string  `json:"ts"`
-	Goal     *string `json:"goal"`
-	Note     string  `json:"note"`
-	Blocked  bool    `json:"blocked"`
-	Done     bool    `json:"done,omitempty"`
-	Task     *string `json:"task"`
-	Username string  `json:"-"`
+	ID            string  `json:"id"`
+	TS            string  `json:"ts"`
+	Goal          *string `json:"goal"`
+	Note          string  `json:"note"`
+	Blocked       bool    `json:"blocked"`
+	Done          bool    `json:"done,omitempty"`
+	Task          *string `json:"task"`
+	SchemaVersion string  `json:"schema_version,omitempty"`
+	Username      string  `json:"-"`
 }
 
 type TaskState struct {
@@ -85,7 +87,7 @@ func Append(dataDir string, r git.Runner, username string, e Entry, key []byte) 
 		return err
 	}
 
-	now := time.Now().UTC()
+	now := clock.Now()
 	e.ID = uuid.New().String()
 	e.TS = now.Format(time.RFC3339)
 
@@ -459,6 +461,30 @@ func readEntries(path, username string, key []byte) ([]Entry, error) {
 		entries = append(entries, e)
 	}
 	return entries, scanner.Err()
+}
+
+// ReadAll returns all journal entries across all users without a date cutoff
+// and without pulling from the remote.
+func ReadAll(dataDir string, key []byte) ([]Entry, error) {
+	journalDir := filepath.Join(dataDir, "journal")
+	allFiles, err := filepath.Glob(filepath.Join(journalDir, "*.jsonl"))
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(allFiles)
+	var entries []Entry
+	for _, file := range allFiles {
+		username, ok := usernameFromWeeklyFile(file)
+		if !ok {
+			continue
+		}
+		fileEntries, err := readEntries(file, username, key)
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, fileEntries...)
+	}
+	return entries, nil
 }
 
 // PriorBusinessDayStart returns midnight UTC of the most recent working day

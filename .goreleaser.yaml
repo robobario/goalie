@@ -8,6 +8,8 @@ builds:
   - id: goalie
     main: ./cmd/goalie
     binary: goalie
+    env:
+      - CGO_ENABLED=0
     ldflags:
       - -s -w -X main.version={{.Version}}
     targets:

@@ -42,8 +42,11 @@ jobs:
       - name: Stamp VERSION
         run: echo "${{ inputs.version }}" > VERSION
 
-      - name: Build binaries
-        run: ./build.sh
+      - name: Build linux binary for system tests
+        run: |
+          mkdir -p dist
+          go build -ldflags="-s -w -X main.version=${{ inputs.version }}" \
+            -o dist/goalie-linux-amd64 ./cmd/goalie
 
       - name: System tests against release binary
         run: GOALIE_BINARY=dist/goalie-linux-amd64 go test ./tests/system/...
@@ -59,16 +62,36 @@ jobs:
       - name: Push commit and tag
         run: git push origin main "v${{ inputs.version }}"
 
-      - name: Create GitHub release
+      - name: Build, sign, and publish release
+        # Signing secrets are optional — notarization is skipped if MACOS_SIGN_P12 is unset.
+        # Required secrets for macOS signing:
+        #   MACOS_SIGN_P12           - base64-encoded Developer ID Application .p12 certificate
+        #   MACOS_SIGN_PASSWORD      - password for the .p12
+        #   MACOS_NOTARY_ISSUER_ID   - App Store Connect API issuer UUID
+        #   MACOS_NOTARY_KEY_ID      - App Store Connect API key ID
+        #   MACOS_NOTARY_KEY         - base64-encoded App Store Connect API .p8 private key
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MACOS_SIGN_P12: ${{ secrets.MACOS_SIGN_P12 }}
+          MACOS_SIGN_PASSWORD: ${{ secrets.MACOS_SIGN_PASSWORD }}
+          MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
         run: |
-          gh release create "v${{ inputs.version }}" \
-            dist/goalie-linux-amd64 \
-            dist/goalie-darwin-amd64 \
-            dist/goalie-darwin-arm64 \
-            --title "v${{ inputs.version }}" \
-            --generate-notes
+          docker run --rm \
+            -v ${{ github.workspace }}:/src \
+            -w /src \
+            -e GITHUB_TOKEN \
+            -e MACOS_SIGN_P12 \
+            -e MACOS_SIGN_PASSWORD \
+            -e MACOS_NOTARY_ISSUER_ID \
+            -e MACOS_NOTARY_KEY_ID \
+            -e MACOS_NOTARY_KEY \
+            -e GIT_CONFIG_COUNT=1 \
+            -e GIT_CONFIG_KEY_0=safe.directory \
+            -e GIT_CONFIG_VALUE_0=/src \
+            docker.io/goreleaser/goreleaser:v2.17.1@sha256:ad46dcae6d92cf1f39ef12e7a9aa7dcb094ac1da26d972d45da4cbfe69f341d2 \
+            release --clean
 
       - name: Bump to dev version
         if: inputs.bump_to_dev

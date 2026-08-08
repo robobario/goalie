@@ -12,19 +12,22 @@ Own your data. Your goals and updates are stored in the git server you point `go
 
 **Prerequisites:** git.
 
-Download the binary for your platform from the [releases page](../../releases) or build from source with `./build.sh` (requires Docker).
+Download the archive for your platform from the [releases page](../../releases) or build from source with `./build.sh` (requires Docker).
 
-Copy the binary to a directory on your `PATH`:
+Extract and copy the binary to a directory on your `PATH`:
 
 ```sh
 # Linux
-cp goalie-linux-amd64 ~/bin/goalie
+tar -xzf goalie_*_linux_amd64.tar.gz
+cp goalie ~/bin/goalie
 
 # macOS (Apple Silicon)
-cp goalie-darwin-arm64 ~/bin/goalie
+tar -xzf goalie_*_darwin_arm64.tar.gz
+cp goalie ~/bin/goalie
 
 # macOS (Intel)
-cp goalie-darwin-amd64 ~/bin/goalie
+tar -xzf goalie_*_darwin_amd64.tar.gz
+cp goalie ~/bin/goalie
 
 chmod +x ~/bin/goalie
 ```

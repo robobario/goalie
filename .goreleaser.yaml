@@ -1,0 +1,48 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: goalie
+    main: ./cmd/goalie
+    binary: goalie
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    targets:
+      - linux_amd64
+      - darwin_amd64
+      - darwin_arm64
+
+archives:
+  - id: goalie
+    formats: ["tar.gz"]
+    name_template: "goalie_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-SNAPSHOT-{{.ShortCommit}}"
+
+# macOS signing and notarization via anchore/quill (cross-platform).
+# Skipped when MACOS_SIGN_P12 is not set (local snapshot builds).
+# Secrets required in CI:
+#   MACOS_SIGN_P12           - base64-encoded .p12 certificate
+#   MACOS_SIGN_PASSWORD      - password for the .p12
+#   MACOS_NOTARY_ISSUER_ID   - App Store Connect API issuer UUID
+#   MACOS_NOTARY_KEY_ID      - App Store Connect API key ID
+#   MACOS_NOTARY_KEY         - base64-encoded .p8 private key
+notarize:
+  macos:
+    - enabled: '{{ isEnvSet "MACOS_SIGN_P12" }}'
+      sign:
+        certificate: "{{.Env.MACOS_SIGN_P12}}"
+        password: "{{.Env.MACOS_SIGN_PASSWORD}}"
+      notarize:
+        issuer_id: "{{.Env.MACOS_NOTARY_ISSUER_ID}}"
+        key_id: "{{.Env.MACOS_NOTARY_KEY_ID}}"
+        key: "{{.Env.MACOS_NOTARY_KEY}}"
+        wait: true
+        timeout: 20m

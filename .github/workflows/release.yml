@@ -24,14 +24,16 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
       - name: Build, sign, and publish release
-        # Signing secrets are optional — notarization is skipped if MACOS_SIGN_P12 is unset.
-        # Required secrets for macOS signing:
-        #   MACOS_SIGN_P12           - base64-encoded Developer ID Application .p12 certificate
-        #   MACOS_SIGN_PASSWORD      - password for the .p12
-        #   MACOS_NOTARY_ISSUER_ID   - App Store Connect API issuer UUID
-        #   MACOS_NOTARY_KEY_ID      - App Store Connect API key ID
-        #   MACOS_NOTARY_KEY         - base64-encoded App Store Connect API .p8 private key
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: v2.17.1
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           MACOS_SIGN_P12: ${{ secrets.MACOS_SIGN_P12 }}
@@ -39,19 +41,4 @@ jobs:
           MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
           MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
           MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
-        run: |
-          docker run --rm \
-            -v ${{ github.workspace }}:/src \
-            -w /src \
-            -e GITHUB_TOKEN \
-            -e MACOS_SIGN_P12 \
-            -e MACOS_SIGN_PASSWORD \
-            -e MACOS_NOTARY_ISSUER_ID \
-            -e MACOS_NOTARY_KEY_ID \
-            -e MACOS_NOTARY_KEY \
-            -e GIT_CONFIG_COUNT=1 \
-            -e GIT_CONFIG_KEY_0=safe.directory \
-            -e GIT_CONFIG_VALUE_0=/src \
-            docker.io/goreleaser/goreleaser:v2.17.1@sha256:ad46dcae6d92cf1f39ef12e7a9aa7dcb094ac1da26d972d45da4cbfe69f341d2 \
-            release --clean
 

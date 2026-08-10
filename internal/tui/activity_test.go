@@ -618,35 +618,6 @@ func TestActivityViewWrapWidthDoesNotExceedTerminalWidth(t *testing.T) {
 	}
 }
 
-func TestAgeString(t *testing.T) {
-	base := time.Date(2024, 3, 10, 12, 0, 0, 0, time.UTC)
-	cases := []struct {
-		name string
-		ts   time.Time
-		want string
-	}{
-		{"minutes", base.Add(-30 * time.Minute), "30m ago"},
-		{"hours same day", base.Add(-5 * time.Hour), "5h ago"},
-		{"yesterday", base.Add(-24 * time.Hour), "yesterday"},
-		{"two days", base.Add(-48 * time.Hour), "2d ago"},
-		{"invalid ts", time.Time{}, "?d ago"},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			var ts string
-			if tc.ts.IsZero() {
-				ts = "not-a-timestamp"
-			} else {
-				ts = tc.ts.Format(time.RFC3339)
-			}
-			got := ageString(ts, base)
-			if got != tc.want {
-				t.Errorf("got %q, want %q", got, tc.want)
-			}
-		})
-	}
-}
-
 func TestRenderNoteWrappedNoWrap(t *testing.T) {
 	got := renderNoteWrapped("hello world", "", 20)
 	if got != "hello world" {

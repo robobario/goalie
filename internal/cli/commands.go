@@ -153,7 +153,7 @@ func Status(ctx AppContext, days int) error {
 		return nil
 	}
 
-	now := time.Now().UTC()
+	now := time.Now()
 	doneHideCutoff := journal.PriorBusinessDayStart(now)
 
 	byUser := make(map[string][]journal.Entry)
@@ -310,7 +310,7 @@ func Summary(ctx AppContext, days int, user string) error {
 		return keys[i].goal < keys[j].goal
 	})
 
-	now := time.Now().UTC()
+	now := time.Now()
 	for gi, k := range keys {
 		if gi > 0 {
 			fmt.Fprintln(ctx.Stdout)

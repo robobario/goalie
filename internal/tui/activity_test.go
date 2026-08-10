@@ -136,7 +136,7 @@ func TestFormatActivityEntryGoalTaskCombined(t *testing.T) {
 		Goal: strPtr("ROUTING"),
 		Task: strPtr("#impl"),
 	}
-	got := formatActivityEntry(e, time.Now(), "")
+	got := formatActivityEntry(e, time.Now(), "", false)
 	if !strings.Contains(got, "ROUTING") {
 		t.Errorf("expected goal in output; got %q", got)
 	}
@@ -156,7 +156,7 @@ func TestFormatActivityEntryGoalIncluded(t *testing.T) {
 		Note: "some work",
 		Goal: strPtr(goal),
 	}
-	got := formatActivityEntry(e, time.Now(), "")
+	got := formatActivityEntry(e, time.Now(), "", false)
 	if !strings.Contains(got, goal) {
 		t.Errorf("expected goal %q in entry output; got %q", goal, got)
 	}
@@ -169,7 +169,7 @@ func TestFormatActivityEntryTaskTagIncluded(t *testing.T) {
 		Note: "some work",
 		Task: strPtr(tag),
 	}
-	got := formatActivityEntry(e, time.Now(), "")
+	got := formatActivityEntry(e, time.Now(), "", false)
 	if !strings.Contains(got, tag) {
 		t.Errorf("expected task tag %q in entry output; got %q", tag, got)
 	}
@@ -182,7 +182,7 @@ func TestFormatActivityEntryDoneShowsLabel(t *testing.T) {
 		Done: true,
 		Task: strPtr("#impl"),
 	}
-	got := formatActivityEntry(e, time.Now(), "")
+	got := formatActivityEntry(e, time.Now(), "", false)
 	if !strings.Contains(got, "[done]") {
 		t.Errorf("expected '[done]' in done entry; got %q", got)
 	}
@@ -197,7 +197,7 @@ func TestFormatActivityEntryBlockedShowsLabel(t *testing.T) {
 		Note:    "waiting",
 		Blocked: true,
 	}
-	got := formatActivityEntry(e, time.Now(), "")
+	got := formatActivityEntry(e, time.Now(), "", false)
 	if !strings.Contains(got, "[BLOCKED]") {
 		t.Errorf("expected '[BLOCKED]' in blocked entry; got %q", got)
 	}
@@ -211,7 +211,7 @@ func TestFormatActivityEntryMentionHighlighted(t *testing.T) {
 		TS:   time.Now().Format(time.RFC3339),
 		Note: "waiting on @bob for review",
 	}
-	got := formatActivityEntry(e, time.Now(), "@alice")
+	got := formatActivityEntry(e, time.Now(), "@alice", false)
 	if !strings.Contains(got, "@bob") {
 		t.Errorf("expected @bob in output; got %q", got)
 	}
@@ -222,28 +222,28 @@ func TestFormatActivityEntrySelfMentionPresent(t *testing.T) {
 		TS:   time.Now().Format(time.RFC3339),
 		Note: "ask @alice to approve",
 	}
-	got := formatActivityEntry(e, time.Now(), "@alice")
+	got := formatActivityEntry(e, time.Now(), "@alice", false)
 	if !strings.Contains(got, "@alice") {
 		t.Errorf("expected @alice in output; got %q", got)
 	}
 }
 
 func TestRenderNoteWithMentionsSelf(t *testing.T) {
-	got := renderNoteWithMentions("waiting on @alice", "@alice")
+	got := renderNoteWithMentions("waiting on @alice", "@alice", false)
 	if !strings.Contains(got, "@alice") {
 		t.Errorf("expected @alice in output; got %q", got)
 	}
 }
 
 func TestRenderNoteWithMentionsNoMentions(t *testing.T) {
-	got := renderNoteWithMentions("no mentions here", "@alice")
+	got := renderNoteWithMentions("no mentions here", "@alice", false)
 	if got != "no mentions here" {
 		t.Errorf("expected unchanged note; got %q", got)
 	}
 }
 
 func TestRenderNoteWithURLHighlighted(t *testing.T) {
-	got := renderNoteWithMentions("see https://example.com for details", "")
+	got := renderNoteWithMentions("see https://example.com for details", "", false)
 	if !strings.Contains(got, "https://example.com") {
 		t.Errorf("expected URL in output; got %q", got)
 	}
@@ -254,7 +254,7 @@ func TestRenderNoteWithURLHighlighted(t *testing.T) {
 }
 
 func TestRenderNoteURLAndMentionTogether(t *testing.T) {
-	got := renderNoteWithMentions("@bob see https://example.com", "@alice")
+	got := renderNoteWithMentions("@bob see https://example.com", "@alice", false)
 	if !strings.Contains(got, "@bob") {
 		t.Errorf("expected @bob in output; got %q", got)
 	}
@@ -303,7 +303,7 @@ func TestRenderActivityEntryHeaderContainsAge(t *testing.T) {
 		Note: "some note",
 		Goal: strPtr("PROJ"),
 	}
-	got := renderActivityEntry(e, time.Now(), "", 0)
+	got := renderActivityEntry(e, time.Now(), "", false, 0)
 	lines := strings.Split(got, "\n")
 	// Header is always the first line and must contain the age.
 	if !strings.Contains(lines[0], "ago") {
@@ -322,7 +322,7 @@ func TestRenderActivityEntryShortNoteNoBlankLine(t *testing.T) {
 		Note: "short note",
 		Goal: strPtr("PROJ"),
 	}
-	got := renderActivityEntry(e, time.Now(), "", 120)
+	got := renderActivityEntry(e, time.Now(), "", false, 120)
 	if strings.Contains(got, "\n") {
 		t.Errorf("expected single line when note fits, got %q", got)
 	}
@@ -334,7 +334,7 @@ func TestRenderActivityEntryEmptyNoteNoBlankLine(t *testing.T) {
 		Note: "",
 		Goal: strPtr("PROJ"),
 	}
-	got := renderActivityEntry(e, time.Now(), "", 80)
+	got := renderActivityEntry(e, time.Now(), "", false, 80)
 	if strings.Contains(got, "\n") {
 		t.Errorf("expected single header line for empty note, got %q", got)
 	}
@@ -347,7 +347,7 @@ func TestRenderActivityEntryWrapsLongNote(t *testing.T) {
 		TS:   time.Now().Format(time.RFC3339),
 		Note: longNote,
 	}
-	got := renderActivityEntry(e, time.Now(), "", 40)
+	got := renderActivityEntry(e, time.Now(), "", false, 40)
 	if !strings.Contains(got, "\n") {
 		t.Errorf("expected multi-line output for long note at width 40, got %q", got)
 	}
@@ -360,7 +360,7 @@ func TestRenderActivityEntryAgeOnFirstLine(t *testing.T) {
 		TS:   time.Now().Format(time.RFC3339),
 		Note: longNote,
 	}
-	got := renderActivityEntry(e, time.Now(), "", 40)
+	got := renderActivityEntry(e, time.Now(), "", false, 40)
 	lines := strings.Split(got, "\n")
 	if len(lines) < 2 {
 		t.Fatalf("expected header + note lines, got %q", got)
@@ -619,14 +619,14 @@ func TestActivityViewWrapWidthDoesNotExceedTerminalWidth(t *testing.T) {
 }
 
 func TestRenderNoteWrappedNoWrap(t *testing.T) {
-	got := renderNoteWrapped("hello world", "", 20)
+	got := renderNoteWrapped("hello world", "", false, 20)
 	if got != "hello world" {
 		t.Errorf("expected 'hello world', got %q", got)
 	}
 }
 
 func TestRenderNoteWrappedBreaksAtWordBoundary(t *testing.T) {
-	got := renderNoteWrapped("one two three", "", 7)
+	got := renderNoteWrapped("one two three", "", false, 7)
 	want := "one two\nthree"
 	if got != want {
 		t.Errorf("expected %q, got %q", want, got)
@@ -634,9 +634,49 @@ func TestRenderNoteWrappedBreaksAtWordBoundary(t *testing.T) {
 }
 
 func TestRenderNoteWrappedZeroMaxWidth(t *testing.T) {
-	got := renderNoteWrapped("one two three", "", 0)
-	want := renderNoteWithMentions("one two three", "")
+	got := renderNoteWrapped("one two three", "", false, 0)
+	want := renderNoteWithMentions("one two three", "", false)
 	if got != want {
 		t.Errorf("expected %q, got %q", want, got)
+	}
+}
+
+func TestRenderNoteWithMentionsGitHubHyperLink(t *testing.T) {
+	url := "https://github.com/owner/repo/pull/42"
+	got := renderNoteWithMentions("see "+url, "", true)
+	if !strings.Contains(got, "owner/repo#42") {
+		t.Errorf("expected compressed label in %q", got)
+	}
+	if !strings.Contains(got, url) {
+		t.Errorf("expected full URL as OSC 8 target in %q", got)
+	}
+	if !strings.Contains(got, "\033]8;;") {
+		t.Errorf("expected OSC 8 escape in %q", got)
+	}
+}
+
+func TestRenderNoteWithMentionsNonGitHubHyperLink(t *testing.T) {
+	url := "https://www.example.com/thing/x/y/lonoooooooog"
+	got := renderNoteWithMentions("see "+url, "", true)
+	if !strings.Contains(got, "www.example.com/thin...") {
+		t.Errorf("expected truncated label in %q", got)
+	}
+	if !strings.Contains(got, url) {
+		t.Errorf("expected full URL as OSC 8 target in %q", got)
+	}
+}
+
+func TestFormatActivityEntryGitHubHyperLink(t *testing.T) {
+	url := "https://github.com/owner/repo/issues/7"
+	e := journal.Entry{
+		TS:   time.Now().Format(time.RFC3339),
+		Note: "see " + url,
+	}
+	got := formatActivityEntry(e, time.Now(), "", true)
+	if !strings.Contains(got, "owner/repo#7") {
+		t.Errorf("expected compressed label in %q", got)
+	}
+	if !strings.Contains(got, "\033]8;;") {
+		t.Errorf("expected OSC 8 escape in %q", got)
 	}
 }

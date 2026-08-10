@@ -69,6 +69,14 @@ func resolveStatusDays() int {
 	return cfg.EffectiveStatusDays()
 }
 
+func resolveHyperLinks() bool {
+	cfg, err := config.Load()
+	if err != nil || cfg == nil {
+		return false
+	}
+	return cfg.EffectiveCompressHyperLinks()
+}
+
 func initialModel(ctx *cli.AppContext) Model {
 	ww := resolveWrapWidth()
 	return Model{
@@ -80,6 +88,7 @@ func initialModel(ctx *cli.AppContext) Model {
 			selfUsername: resolveSelfUsername(ctx),
 			wrapWidth:    ww,
 			nonDoneDays:  resolveStatusDays(),
+			hyperLinks:   resolveHyperLinks(),
 		},
 		update: updateModel{ctx: ctx, wrapWidth: ww},
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/sahilm/fuzzy"
 	"goalie/internal/cli"
+	"goalie/internal/display"
 	"goalie/internal/journal"
 	"goalie/internal/timeutil"
 )
@@ -48,6 +49,7 @@ type activityModel struct {
 	width         int
 	wrapWidth     int
 	nonDoneDays   int
+	hyperLinks    bool
 }
 
 func loadActivityCmd(ctx *cli.AppContext, doPull bool) tea.Cmd {
@@ -196,7 +198,7 @@ func (m activityModel) View() string {
 				effectiveWidth = m.wrapWidth
 			}
 			availableWidth := effectiveWidth - len(entryIndent)
-			rendered := renderActivityEntry(e, now, m.selfUsername, availableWidth)
+			rendered := renderActivityEntry(e, now, m.selfUsername, m.hyperLinks, availableWidth)
 			for _, line := range strings.Split(rendered, "\n") {
 				sb.WriteString(entryIndent + line + "\n")
 			}
@@ -238,7 +240,7 @@ func wrapWords(text string, maxWidth int) []string {
 
 // renderActivityEntry formats an entry as "• PREFIX - AGE - note..." with the
 // note wrapping to indented continuation lines.
-func renderActivityEntry(e journal.Entry, now time.Time, selfUsername string, availableWidth int) string {
+func renderActivityEntry(e journal.Entry, now time.Time, selfUsername string, hyperLinks bool, availableWidth int) string {
 	const bullet = "•"
 	const contIndent = "  "
 
@@ -277,20 +279,20 @@ func renderActivityEntry(e journal.Entry, now time.Time, selfUsername string, av
 	if maxNoteOnFirstLine <= 0 {
 		sb.WriteString(fixedHeader)
 		for _, nl := range wrapWords(e.Note, contWidth) {
-			sb.WriteString("\n" + contIndent + renderNoteWithMentions(nl, selfUsername))
+			sb.WriteString("\n" + contIndent + renderNoteWithMentions(nl, selfUsername, hyperLinks))
 		}
 		return sb.String()
 	}
 
 	firstChunk, remaining := takeFirstLine(e.Note, maxNoteOnFirstLine)
 	if firstChunk != "" {
-		sb.WriteString(lineLeader + renderNoteWithMentions(firstChunk, selfUsername))
+		sb.WriteString(lineLeader + renderNoteWithMentions(firstChunk, selfUsername, hyperLinks))
 	} else {
 		sb.WriteString(fixedHeader)
 	}
 	if remaining != "" {
 		for _, cl := range wrapWords(remaining, contWidth) {
-			sb.WriteString("\n" + contIndent + renderNoteWithMentions(cl, selfUsername))
+			sb.WriteString("\n" + contIndent + renderNoteWithMentions(cl, selfUsername, hyperLinks))
 		}
 	}
 	return sb.String()
@@ -323,10 +325,10 @@ func takeFirstLine(text string, maxWidth int) (string, string) {
 	return current.String(), strings.Join(words[taken:], " ")
 }
 
-func renderNoteWithMentions(note, selfUsername string) string {
+func renderNoteWithMentions(note, selfUsername string, hyperLinks bool) string {
 	return tuiNoteTokenRe.ReplaceAllStringFunc(note, func(m string) string {
 		if strings.HasPrefix(m, "http") {
-			return urlStyle.Render(m)
+			return display.RenderURL(m, urlStyle, hyperLinks)
 		}
 		if selfUsername != "" && m == selfUsername {
 			return selfMentionStyle.Render(m)
@@ -338,19 +340,19 @@ func renderNoteWithMentions(note, selfUsername string) string {
 // renderNoteWrapped word-wraps value at maxWidth then applies mention/URL
 // highlighting to each line. When maxWidth <= 0 the note is rendered as a
 // single line, matching the behaviour of renderNoteWithMentions directly.
-func renderNoteWrapped(value, username string, maxWidth int) string {
+func renderNoteWrapped(value, username string, hyperLinks bool, maxWidth int) string {
 	if maxWidth <= 0 {
-		return renderNoteWithMentions(value, username)
+		return renderNoteWithMentions(value, username, hyperLinks)
 	}
 	lines := wrapWords(value, maxWidth)
 	parts := make([]string, len(lines))
 	for i, line := range lines {
-		parts[i] = renderNoteWithMentions(line, username)
+		parts[i] = renderNoteWithMentions(line, username, hyperLinks)
 	}
 	return strings.Join(parts, "\n")
 }
 
-func formatActivityEntry(e journal.Entry, now time.Time, selfUsername string) string {
+func formatActivityEntry(e journal.Entry, now time.Time, selfUsername string, hyperLinks bool) string {
 	var parts []string
 	if e.Done {
 		parts = append(parts, doneStyle.Render("[done]"))
@@ -365,6 +367,6 @@ func formatActivityEntry(e journal.Entry, now time.Time, selfUsername string) st
 	} else if e.Task != nil {
 		parts = append(parts, taskTagStyle.Render(*e.Task))
 	}
-	parts = append(parts, renderNoteWithMentions(e.Note, selfUsername))
+	parts = append(parts, renderNoteWithMentions(e.Note, selfUsername, hyperLinks))
 	return strings.Join(parts, " ") + " — " + timeutil.AgeString(e.TS, now)
 }

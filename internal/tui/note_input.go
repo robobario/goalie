@@ -63,8 +63,8 @@ func (n noteInput) appendStr(s string) noteInput {
 // view renders the field content with a _ cursor inserted at the current
 // position. Mention highlighting is applied to each half independently.
 func (n noteInput) view(username string) string {
-	before := renderNoteWithMentions(n.value[:n.cursor], username)
-	after := renderNoteWithMentions(n.value[n.cursor:], username)
+	before := renderNoteWithMentions(n.value[:n.cursor], username, false)
+	after := renderNoteWithMentions(n.value[n.cursor:], username, false)
 	return before + "_" + after
 }
 
@@ -79,7 +79,7 @@ func (n noteInput) viewWrapped(username string, maxWidth int) string {
 	lines := wrapWords(display, maxWidth)
 	parts := make([]string, len(lines))
 	for i, line := range lines {
-		parts[i] = renderNoteWithMentions(line, username)
+		parts[i] = renderNoteWithMentions(line, username, false)
 	}
 	return strings.Join(parts, "\n")
 }

@@ -654,13 +654,13 @@ func (m updateModel) viewEditNote() string {
 }
 
 func (m updateModel) viewEditTask() string {
-	noteView := strings.ReplaceAll(renderNoteWrapped(strings.TrimSpace(m.editNoteInput.value), m.username, m.noteContentWidth(6)), "\n", "\n      ")
+	noteView := strings.ReplaceAll(renderNoteWrapped(strings.TrimSpace(m.editNoteInput.value), m.username, false, m.noteContentWidth(6)), "\n", "\n      ")
 	return fmt.Sprintf("Note: %s\n\nTask tag: %s_\n\nEnter to confirm (#hashtag required), Esc to cancel",
 		noteView, taskTagStyle.Render(m.editTaskInput))
 }
 
 func (m updateModel) viewEditBlockedDone() string {
-	noteView := strings.ReplaceAll(renderNoteWrapped(strings.TrimSpace(m.editNoteInput.value), m.username, m.noteContentWidth(6)), "\n", "\n      ")
+	noteView := strings.ReplaceAll(renderNoteWrapped(strings.TrimSpace(m.editNoteInput.value), m.username, false, m.noteContentWidth(6)), "\n", "\n      ")
 	return fmt.Sprintf("Note: %s\nTask: %s\n\nBlocked? [y]  Not blocked? [n]  Done? [d]  (Esc to cancel)",
 		noteView, taskTagStyle.Render(m.editTaskInput))
 }
@@ -991,7 +991,7 @@ func (m updateModel) viewTaskUpdateForm() string {
 	if m.taskUpdateSub == taskUpdateNote {
 		noteView = strings.ReplaceAll(m.taskUpdateNote.viewWrapped(m.username, noteWidth), "\n", "\n"+noteIndent)
 	} else {
-		noteView = strings.ReplaceAll(renderNoteWrapped(m.taskUpdateNote.value, m.username, noteWidth), "\n", "\n"+noteIndent)
+		noteView = strings.ReplaceAll(renderNoteWrapped(m.taskUpdateNote.value, m.username, false, noteWidth), "\n", "\n"+noteIndent)
 	}
 	sb.WriteString(notePrefix + noteView + "\n\n")
 
@@ -1199,7 +1199,7 @@ func (m updateModel) viewNewTask() string {
 		noteView := strings.ReplaceAll(m.newNoteInput.viewWrapped(m.username, newNoteWidth), "\n", "\n"+newNoteIndent)
 		sb.WriteString("\n> Note:  " + noteView + "\n")
 	} else {
-		noteView := strings.ReplaceAll(renderNoteWrapped(m.newNoteInput.value, m.username, newNoteWidth), "\n", "\n"+newNoteIndent)
+		noteView := strings.ReplaceAll(renderNoteWrapped(m.newNoteInput.value, m.username, false, newNoteWidth), "\n", "\n"+newNoteIndent)
 		sb.WriteString("\n  Note:  " + noteView + "\n")
 	}
 

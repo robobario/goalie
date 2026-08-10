@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"fmt"
 	"regexp"
 	"sort"
 	"strings"
@@ -12,6 +11,7 @@ import (
 	"github.com/sahilm/fuzzy"
 	"goalie/internal/cli"
 	"goalie/internal/journal"
+	"goalie/internal/timeutil"
 )
 
 const activityFetchInterval = time.Minute
@@ -161,7 +161,7 @@ func (m activityModel) View() string {
 	}
 	sort.Strings(usernames)
 
-	now := time.Now().UTC()
+	now := time.Now()
 	doneHideCutoff := journal.PriorBusinessDayStart(now)
 
 	const entryIndent = "  "
@@ -256,7 +256,7 @@ func renderActivityEntry(e journal.Entry, now time.Time, selfUsername string, av
 		prefixParts = append(prefixParts, taskTagStyle.Render(*e.Task))
 	}
 	prefix := strings.Join(prefixParts, " ")
-	age := ageString(e.TS, now)
+	age := timeutil.AgeString(e.TS, now)
 
 	var fixedHeader string
 	if lipgloss.Width(prefix) > 0 {
@@ -366,25 +366,5 @@ func formatActivityEntry(e journal.Entry, now time.Time, selfUsername string) st
 		parts = append(parts, taskTagStyle.Render(*e.Task))
 	}
 	parts = append(parts, renderNoteWithMentions(e.Note, selfUsername))
-	return strings.Join(parts, " ") + " — " + ageString(e.TS, now)
-}
-
-func ageString(ts string, now time.Time) string {
-	parsed, err := time.Parse(time.RFC3339, ts)
-	if err != nil {
-		return "?d ago"
-	}
-	elapsed := now.Sub(parsed)
-	if elapsed < time.Hour {
-		return fmt.Sprintf("%dm ago", int(elapsed.Minutes()))
-	}
-	nowDate := now.Truncate(24 * time.Hour)
-	parsedDate := parsed.Truncate(24 * time.Hour)
-	if nowDate.Sub(parsedDate) == 24*time.Hour {
-		return "yesterday"
-	}
-	if elapsed < 24*time.Hour {
-		return fmt.Sprintf("%dh ago", int(elapsed.Hours()))
-	}
-	return fmt.Sprintf("%dd ago", int(elapsed.Hours()/24))
+	return strings.Join(parts, " ") + " — " + timeutil.AgeString(e.TS, now)
 }

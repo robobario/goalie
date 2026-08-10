@@ -12,6 +12,7 @@ import (
 	"goalie/internal/config"
 	"goalie/internal/goals"
 	"goalie/internal/journal"
+	"goalie/internal/timeutil"
 )
 
 type updatePhase int
@@ -597,7 +598,7 @@ func (m updateModel) viewEditPicking() string {
 	}
 	var sb strings.Builder
 	sb.WriteString("Select an entry to edit (↑/↓, Enter to select, Esc to go back)\n\n")
-	now := time.Now().UTC()
+	now := time.Now()
 	for i, e := range m.editEntries {
 		task := ""
 		if e.Task != nil {
@@ -607,7 +608,7 @@ func (m updateModel) viewEditPicking() string {
 		if e.Goal != nil {
 			goalPart = "(" + goalStyle.Render(*e.Goal) + ") "
 		}
-		age := ageString(e.TS, now)
+		age := timeutil.AgeString(e.TS, now)
 		note := e.Note
 		if len(note) > 40 {
 			note = note[:37] + "..."
@@ -735,7 +736,7 @@ func (m updateModel) enterPhaseTaskUpdate() updateModel {
 	m.taskUpdateNote = noteInput{}
 	m.taskUpdateState = entryUnblocked
 
-	now := time.Now().UTC()
+	now := time.Now()
 	displays := make([]string, 0, len(m.activeTasks))
 	byDisplay := make(map[string]activeTask, len(m.activeTasks))
 
@@ -759,7 +760,7 @@ func formatActiveTask(tag string, state journal.TaskState, blocked bool, now tim
 	if state.Goal != nil {
 		goal = *state.Goal
 	}
-	age := ageString(state.TS, now)
+	age := timeutil.AgeString(state.TS, now)
 	if goal != "" {
 		return fmt.Sprintf("%s%s%s %s — %s", prefix, goal, tag, state.Note, age)
 	}

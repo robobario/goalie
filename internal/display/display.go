@@ -9,6 +9,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"goalie/internal/journal"
+	"goalie/internal/timeutil"
 )
 
 var mentionRe = regexp.MustCompile(`@[a-zA-Z0-9][a-zA-Z0-9-]{0,38}`)
@@ -157,7 +158,7 @@ func FormatSummaryHeader(goal, task, username string, tty bool) string {
 // prevBlocked is the blocked state of the preceding entry (false for the first entry).
 // A label is shown only when the blocked state differs from prevBlocked.
 func FormatSummaryEntry(e journal.Entry, selfUsername string, prevBlocked bool, now time.Time, tty bool) string {
-	age := ageString(e.TS, now)
+	age := timeutil.AgeString(e.TS, now)
 	note := HighlightMentions(e.Note, selfUsername, tty)
 	if e.Blocked != prevBlocked {
 		if e.Blocked {
@@ -169,7 +170,7 @@ func FormatSummaryEntry(e journal.Entry, selfUsername string, prevBlocked bool, 
 }
 
 func FormatEntry(e journal.Entry, selfUsername string, now time.Time, tty bool) string {
-	age := ageString(e.TS, now)
+	age := timeutil.AgeString(e.TS, now)
 	taskPart := ""
 	if e.Task != nil {
 		taskPart = *e.Task + " "
@@ -210,7 +211,7 @@ func goalTaskComboStyled(e journal.Entry, tty bool) (styled, plain string) {
 }
 
 func FormatStatusEntry(e journal.Entry, selfUsername string, now time.Time, tty bool) string {
-	age := ageString(e.TS, now)
+	age := timeutil.AgeString(e.TS, now)
 	comboStyled, comboPlain := goalTaskComboStyled(e, tty)
 	note := highlightStatusNoteTokens(e.Note, selfUsername, tty)
 	if e.Blocked && comboPlain != "" {
@@ -229,7 +230,7 @@ func FormatStatusEntry(e journal.Entry, selfUsername string, now time.Time, tty 
 // characters. availableWidth is the column budget after any caller-applied
 // indent. When availableWidth <= 0 it falls back to the unwrapped format.
 func WrapStatusEntry(e journal.Entry, selfUsername string, now time.Time, tty bool, availableWidth int) string {
-	age := ageString(e.TS, now)
+	age := timeutil.AgeString(e.TS, now)
 	suffix := " - " + age
 
 	comboStyled, comboPlain := goalTaskComboStyled(e, tty)
@@ -330,26 +331,6 @@ func takeFirstLine(text string, maxWidth int) (string, string) {
 		}
 	}
 	return current.String(), strings.Join(words[taken:], " ")
-}
-
-func ageString(ts string, now time.Time) string {
-	parsed, err := time.Parse(time.RFC3339, ts)
-	if err != nil {
-		return "?d ago"
-	}
-	elapsed := now.Sub(parsed)
-	if elapsed < time.Hour {
-		return fmt.Sprintf("%dm ago", int(elapsed.Minutes()))
-	}
-	nowDate := now.Truncate(24 * time.Hour)
-	parsedDate := parsed.Truncate(24 * time.Hour)
-	if nowDate.Sub(parsedDate) == 24*time.Hour {
-		return "yesterday"
-	}
-	if elapsed < 24*time.Hour {
-		return fmt.Sprintf("%dh ago", int(elapsed.Hours()))
-	}
-	return fmt.Sprintf("%dd ago", int(elapsed.Hours()/24))
 }
 
 func max(a, b int) int {

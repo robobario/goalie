@@ -11,6 +11,59 @@ import (
 
 func intPtr(i int) *int { return &i }
 
+func boolPtr(b bool) *bool { return &b }
+
+func TestEffectiveCompressHyperLinksDefault(t *testing.T) {
+	cfg := &Config{Name: "test"}
+	if cfg.EffectiveCompressHyperLinks() {
+		t.Error("expected false when CompressHyperLinks is nil")
+	}
+}
+
+func TestEffectiveCompressHyperLinksTrue(t *testing.T) {
+	cfg := &Config{Name: "test", CompressHyperLinks: boolPtr(true)}
+	if !cfg.EffectiveCompressHyperLinks() {
+		t.Error("expected true when CompressHyperLinks is true")
+	}
+}
+
+func TestEffectiveCompressHyperLinksFalse(t *testing.T) {
+	cfg := &Config{Name: "test", CompressHyperLinks: boolPtr(false)}
+	if cfg.EffectiveCompressHyperLinks() {
+		t.Error("expected false when CompressHyperLinks is false")
+	}
+}
+
+func TestCompressHyperLinksOmittedWhenNil(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	cfg := &Config{Name: "test"}
+	if err := SaveTo(path, cfg); err != nil {
+		t.Fatalf("SaveTo: %v", err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if strings.Contains(string(data), "compress_hyperlinks") {
+		t.Errorf("expected compress_hyperlinks omitted when nil, got: %s", data)
+	}
+}
+
+func TestCompressHyperLinksRoundTrip(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	cfg := &Config{Name: "test", CompressHyperLinks: boolPtr(true)}
+	if err := SaveTo(path, cfg); err != nil {
+		t.Fatalf("SaveTo: %v", err)
+	}
+	got, err := LoadFrom(path)
+	if err != nil {
+		t.Fatalf("LoadFrom: %v", err)
+	}
+	if got.CompressHyperLinks == nil || !*got.CompressHyperLinks {
+		t.Errorf("CompressHyperLinks round-trip failed: got %v", got.CompressHyperLinks)
+	}
+}
+
 func TestEffectiveStatusDaysDefault(t *testing.T) {
 	cfg := &Config{Name: "test"}
 	if got := cfg.EffectiveStatusDays(); got != DefaultStatusDays {

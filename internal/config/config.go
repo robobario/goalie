@@ -20,9 +20,10 @@ const DefaultWrapWidth = 120
 const DefaultStatusDays = 8
 
 type Config struct {
-	Name       string `json:"name"`
-	WrapWidth  *int   `json:"wrap_width,omitempty"`
-	StatusDays *int   `json:"status_days,omitempty"`
+	Name                string `json:"name"`
+	WrapWidth           *int   `json:"wrap_width,omitempty"`
+	StatusDays          *int   `json:"status_days,omitempty"`
+	CompressHyperLinks  *bool  `json:"compress_hyperlinks,omitempty"`
 }
 
 func (c *Config) EffectiveWrapWidth() int {
@@ -37,6 +38,13 @@ func (c *Config) EffectiveStatusDays() int {
 		return DefaultStatusDays
 	}
 	return *c.StatusDays
+}
+
+func (c *Config) EffectiveCompressHyperLinks() bool {
+	if c.CompressHyperLinks == nil {
+		return false
+	}
+	return *c.CompressHyperLinks
 }
 
 var ErrNotInitialised = errors.New("goalie not initialised: run 'goalie init <repo-url>' first")

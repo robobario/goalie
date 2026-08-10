@@ -176,7 +176,7 @@ func TestFormatStatusEntryWithGoalNoThread(t *testing.T) {
 		Blocked: false,
 		Goal:    ptr("GOAL"),
 	}
-	got := FormatStatusEntry(e, "", fixedNow, false)
+	got := FormatStatusEntry(e, "", fixedNow, false, false)
 	want := "GOAL note - yesterday"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
@@ -190,7 +190,7 @@ func TestFormatStatusEntryBlockedWithGoal(t *testing.T) {
 		Blocked: true,
 		Goal:    ptr("GOAL"),
 	}
-	got := FormatStatusEntry(e, "", fixedNow, false)
+	got := FormatStatusEntry(e, "", fixedNow, false, false)
 	want := "[BLOCKED] GOAL note - yesterday"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
@@ -214,7 +214,7 @@ func TestFormatSummaryHeaderNoGoal(t *testing.T) {
 
 func TestFormatSummaryEntryNoStateChange(t *testing.T) {
 	e := journal.Entry{TS: fixedTS, Note: "steady progress", Blocked: false}
-	got := FormatSummaryEntry(e, "", false, fixedNow, false)
+	got := FormatSummaryEntry(e, "", false, fixedNow, false, false)
 	if got != "- steady progress — yesterday" {
 		t.Errorf("got %q", got)
 	}
@@ -222,7 +222,7 @@ func TestFormatSummaryEntryNoStateChange(t *testing.T) {
 
 func TestFormatSummaryEntryBlockedStateChange(t *testing.T) {
 	e := journal.Entry{TS: fixedTS, Note: "hit a wall", Blocked: true}
-	got := FormatSummaryEntry(e, "", false, fixedNow, false)
+	got := FormatSummaryEntry(e, "", false, fixedNow, false, false)
 	if !strings.HasPrefix(got, "- [Blocked]") {
 		t.Errorf("expected [Blocked] prefix, got %q", got)
 	}
@@ -230,7 +230,7 @@ func TestFormatSummaryEntryBlockedStateChange(t *testing.T) {
 
 func TestFormatSummaryEntryUnblockedStateChange(t *testing.T) {
 	e := journal.Entry{TS: fixedTS, Note: "resolved", Blocked: false}
-	got := FormatSummaryEntry(e, "", true, fixedNow, false)
+	got := FormatSummaryEntry(e, "", true, fixedNow, false, false)
 	if !strings.HasPrefix(got, "- [Unblocked]") {
 		t.Errorf("expected [Unblocked] prefix, got %q", got)
 	}
@@ -238,7 +238,7 @@ func TestFormatSummaryEntryUnblockedStateChange(t *testing.T) {
 
 func TestFormatSummaryEntryBlockedNoChange(t *testing.T) {
 	e := journal.Entry{TS: fixedTS, Note: "still stuck", Blocked: true}
-	got := FormatSummaryEntry(e, "", true, fixedNow, false)
+	got := FormatSummaryEntry(e, "", true, fixedNow, false, false)
 	if strings.Contains(got, "[Blocked]") || strings.Contains(got, "[Unblocked]") {
 		t.Errorf("expected no label when state unchanged, got %q", got)
 	}
@@ -253,7 +253,7 @@ func TestFormatStatusEntryNoGoalNoThread(t *testing.T) {
 		Note:    "note",
 		Blocked: false,
 	}
-	got := FormatStatusEntry(e, "", fixedNow, false)
+	got := FormatStatusEntry(e, "", fixedNow, false, false)
 	want := "note - yesterday"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
@@ -303,7 +303,7 @@ func TestHighlightMentionsNoMentions(t *testing.T) {
 
 func TestWrapStatusEntryShortNoteFitsOnOneLine(t *testing.T) {
 	e := journal.Entry{TS: fixedTS, Note: "short note", Blocked: false}
-	got := WrapStatusEntry(e, "", fixedNow, false, 50)
+	got := WrapStatusEntry(e, "", fixedNow, false, false, 50)
 	want := "short note - yesterday"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
@@ -313,7 +313,7 @@ func TestWrapStatusEntryShortNoteFitsOnOneLine(t *testing.T) {
 func TestWrapStatusEntryLongNoteWraps(t *testing.T) {
 	// Note is long enough to force wrapping at width 30.
 	e := journal.Entry{TS: fixedTS, Note: "one two three four five six seven", Blocked: false}
-	got := WrapStatusEntry(e, "", fixedNow, false, 30)
+	got := WrapStatusEntry(e, "", fixedNow, false, false, 30)
 	lines := strings.Split(got, "\n")
 	if len(lines) < 2 {
 		t.Errorf("expected wrapped output, got single line: %q", got)
@@ -331,7 +331,7 @@ func TestWrapStatusEntryLongNoteWraps(t *testing.T) {
 
 func TestWrapStatusEntryContinuationLinesIndented(t *testing.T) {
 	e := journal.Entry{TS: fixedTS, Note: "one two three four five six seven eight nine ten", Blocked: false}
-	got := WrapStatusEntry(e, "", fixedNow, false, 25)
+	got := WrapStatusEntry(e, "", fixedNow, false, false, 25)
 	lines := strings.Split(got, "\n")
 	if len(lines) < 2 {
 		t.Errorf("expected wrapped output")
@@ -345,8 +345,8 @@ func TestWrapStatusEntryContinuationLinesIndented(t *testing.T) {
 
 func TestWrapStatusEntryZeroWidthFallback(t *testing.T) {
 	e := journal.Entry{TS: fixedTS, Note: "note", Blocked: false}
-	wrapped := WrapStatusEntry(e, "", fixedNow, false, 0)
-	plain := FormatStatusEntry(e, "", fixedNow, false)
+	wrapped := WrapStatusEntry(e, "", fixedNow, false, false, 0)
+	plain := FormatStatusEntry(e, "", fixedNow, false, false)
 	if wrapped != plain {
 		t.Errorf("expected fallback to FormatStatusEntry, got %q", wrapped)
 	}
@@ -360,7 +360,7 @@ func TestWrapStatusEntryWithGoalAndTask(t *testing.T) {
 		Task:    ptr("#impl"),
 		Blocked: false,
 	}
-	got := WrapStatusEntry(e, "", fixedNow, false, 50)
+	got := WrapStatusEntry(e, "", fixedNow, false, false, 50)
 	if !strings.Contains(got, "GOAL#impl") {
 		t.Errorf("expected concatenated GOAL#impl in output, got %q", got)
 	}
@@ -368,7 +368,7 @@ func TestWrapStatusEntryWithGoalAndTask(t *testing.T) {
 
 func TestWrapStatusEntryBlockedPrefix(t *testing.T) {
 	e := journal.Entry{TS: fixedTS, Note: "stuck", Blocked: true}
-	got := WrapStatusEntry(e, "", fixedNow, false, 50)
+	got := WrapStatusEntry(e, "", fixedNow, false, false, 50)
 	if !strings.HasPrefix(got, "[BLOCKED]") {
 		t.Errorf("expected [BLOCKED] prefix, got %q", got)
 	}
@@ -382,7 +382,7 @@ func TestFormatStatusEntryTTYGoalTaskPreservesContent(t *testing.T) {
 		Task:    ptr("#impl"),
 		Blocked: false,
 	}
-	got := FormatStatusEntry(e, "", fixedNow, true)
+	got := FormatStatusEntry(e, "", fixedNow, true, false)
 	if !strings.Contains(got, "ROUTING") {
 		t.Errorf("expected goal ID in TTY output, got %q", got)
 	}
@@ -396,7 +396,7 @@ func TestFormatStatusEntryTTYGoalTaskPreservesContent(t *testing.T) {
 
 func TestFormatStatusEntryTTYBlockedPreservesContent(t *testing.T) {
 	e := journal.Entry{TS: fixedTS, Note: "stuck", Blocked: true}
-	got := FormatStatusEntry(e, "", fixedNow, true)
+	got := FormatStatusEntry(e, "", fixedNow, true, false)
 	if !strings.Contains(got, "[BLOCKED]") {
 		t.Errorf("expected [BLOCKED] text in TTY output, got %q", got)
 	}
@@ -406,7 +406,7 @@ func TestFormatStatusEntryTTYBlockedPreservesContent(t *testing.T) {
 }
 
 func TestHighlightStatusNoteTokensURLPreserved(t *testing.T) {
-	got := highlightStatusNoteTokens("see https://example.com for details", "", true)
+	got := highlightStatusNoteTokens("see https://example.com for details", "", true, false)
 	if !strings.Contains(got, "https://example.com") {
 		t.Errorf("expected URL preserved in output, got %q", got)
 	}
@@ -414,16 +414,50 @@ func TestHighlightStatusNoteTokensURLPreserved(t *testing.T) {
 
 func TestHighlightStatusNoteTokensNoTTY(t *testing.T) {
 	note := "see https://example.com and @alice"
-	got := highlightStatusNoteTokens(note, "@alice", false)
+	got := highlightStatusNoteTokens(note, "@alice", false, false)
 	if got != note {
 		t.Errorf("expected unchanged note in non-TTY, got %q", got)
 	}
 }
 
 func TestHighlightStatusNoteTokensMentionPreserved(t *testing.T) {
-	got := highlightStatusNoteTokens("waiting on @alice", "@alice", true)
+	got := highlightStatusNoteTokens("waiting on @alice", "@alice", true, false)
 	if !strings.Contains(got, "@alice") {
 		t.Errorf("expected @alice preserved in output, got %q", got)
+	}
+}
+
+func TestHighlightStatusNoteTokensGitHubHyperLink(t *testing.T) {
+	url := "https://github.com/owner/repo/pull/42"
+	got := highlightStatusNoteTokens("see "+url, "", true, true)
+	if !strings.Contains(got, "owner/repo#42") {
+		t.Errorf("expected compressed label in %q", got)
+	}
+	if !strings.Contains(got, url) {
+		t.Errorf("expected full URL as OSC 8 target in %q", got)
+	}
+	if !strings.Contains(got, "\033]8;;") {
+		t.Errorf("expected OSC 8 escape in %q", got)
+	}
+}
+
+func TestHighlightStatusNoteTokensNonGitHubHyperLink(t *testing.T) {
+	url := "https://www.example.com/thing/x/y/lonoooooooog"
+	got := highlightStatusNoteTokens("see "+url, "", true, true)
+	if !strings.Contains(got, "www.example.com/thin...") {
+		t.Errorf("expected truncated label in %q", got)
+	}
+	if !strings.Contains(got, url) {
+		t.Errorf("expected full URL as OSC 8 target in %q", got)
+	}
+}
+
+func TestFormatSummaryEntryURLCompressed(t *testing.T) {
+	url := "https://github.com/owner/repo/pull/99"
+	e := journal.Entry{TS: fixedTS, Note: "see " + url, Blocked: false}
+	got := FormatSummaryEntry(e, "", false, fixedNow, true, true)
+	if !strings.Contains(got, "owner/repo#99") {
+		t.Errorf("expected compressed GitHub URL in summary, got %q", got)
 	}
 }
 

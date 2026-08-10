@@ -185,6 +185,7 @@ func Status(ctx AppContext, days int) error {
 	const entryIndent = "  "
 	wrapWidth := loadWrapWidth()
 	availableWidth := wrapWidth - len(entryIndent)
+	hyperLinks := loadHyperLinks(ctx.IsTTY)
 
 	for _, u := range users {
 		display.Section(u, ctx.Stdout, ctx.IsTTY)
@@ -196,7 +197,7 @@ func Status(ctx AppContext, days int) error {
 			return ues[i].TS < ues[j].TS
 		})
 		for _, e := range ues {
-			formatted := display.WrapStatusEntry(e, selfUsername, now, ctx.IsTTY, availableWidth)
+			formatted := display.WrapStatusEntry(e, selfUsername, now, ctx.IsTTY, hyperLinks, availableWidth)
 			for _, line := range strings.Split(formatted, "\n") {
 				fmt.Fprintf(ctx.Stdout, "%s%s\n", entryIndent, line)
 			}
@@ -211,6 +212,17 @@ func loadWrapWidth() int {
 		return config.DefaultWrapWidth
 	}
 	return cfg.EffectiveWrapWidth()
+}
+
+func loadHyperLinks(isTTY bool) bool {
+	if !isTTY {
+		return false
+	}
+	cfg, err := config.Load()
+	if err != nil || cfg == nil {
+		return false
+	}
+	return cfg.EffectiveCompressHyperLinks()
 }
 
 func MotdShow(ctx AppContext) error {
@@ -310,6 +322,7 @@ func Summary(ctx AppContext, days int, user string) error {
 		return keys[i].goal < keys[j].goal
 	})
 
+	hyperLinks := loadHyperLinks(ctx.IsTTY)
 	now := time.Now()
 	for gi, k := range keys {
 		if gi > 0 {
@@ -318,7 +331,7 @@ func Summary(ctx AppContext, days int, user string) error {
 		fmt.Fprintln(ctx.Stdout, display.FormatSummaryHeader(k.goal, k.task, k.username, ctx.IsTTY))
 		prevBlocked := false
 		for _, e := range groups[k] {
-			fmt.Fprintln(ctx.Stdout, display.FormatSummaryEntry(e, selfUsername, prevBlocked, now, ctx.IsTTY))
+			fmt.Fprintln(ctx.Stdout, display.FormatSummaryEntry(e, selfUsername, prevBlocked, now, ctx.IsTTY, hyperLinks))
 			prevBlocked = e.Blocked
 		}
 	}

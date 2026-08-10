@@ -48,14 +48,15 @@ func applyStatusBlockedStyle(s string, tty bool) string {
 }
 
 // highlightStatusNoteTokens applies colour to URLs and @mentions, matching
-// the TUI's renderNoteWithMentions behaviour.
-func highlightStatusNoteTokens(note, selfUsername string, tty bool) string {
+// the TUI's renderNoteWithMentions behaviour. When hyperLinks is true,
+// GitHub PR/issue URLs are compressed and all URLs are wrapped in OSC 8.
+func highlightStatusNoteTokens(note, selfUsername string, tty, hyperLinks bool) string {
 	if !tty {
 		return note
 	}
 	return statusNoteTokenRe.ReplaceAllStringFunc(note, func(m string) string {
 		if strings.HasPrefix(m, "http") {
-			return statusURLStyle.Render(m)
+			return RenderURL(m, statusURLStyle, hyperLinks)
 		}
 		if selfUsername != "" && m == selfUsername {
 			return statusSelfMentionStyle.Render(m)
@@ -157,9 +158,9 @@ func FormatSummaryHeader(goal, task, username string, tty bool) string {
 // FormatSummaryEntry formats a single entry line within a summary story block.
 // prevBlocked is the blocked state of the preceding entry (false for the first entry).
 // A label is shown only when the blocked state differs from prevBlocked.
-func FormatSummaryEntry(e journal.Entry, selfUsername string, prevBlocked bool, now time.Time, tty bool) string {
+func FormatSummaryEntry(e journal.Entry, selfUsername string, prevBlocked bool, now time.Time, tty, hyperLinks bool) string {
 	age := timeutil.AgeString(e.TS, now)
-	note := HighlightMentions(e.Note, selfUsername, tty)
+	note := highlightStatusNoteTokens(e.Note, selfUsername, tty, hyperLinks)
 	if e.Blocked != prevBlocked {
 		if e.Blocked {
 			return "- " + Red("[Blocked]", tty) + " " + note + " — " + age
@@ -210,10 +211,10 @@ func goalTaskComboStyled(e journal.Entry, tty bool) (styled, plain string) {
 	return "", ""
 }
 
-func FormatStatusEntry(e journal.Entry, selfUsername string, now time.Time, tty bool) string {
+func FormatStatusEntry(e journal.Entry, selfUsername string, now time.Time, tty, hyperLinks bool) string {
 	age := timeutil.AgeString(e.TS, now)
 	comboStyled, comboPlain := goalTaskComboStyled(e, tty)
-	note := highlightStatusNoteTokens(e.Note, selfUsername, tty)
+	note := highlightStatusNoteTokens(e.Note, selfUsername, tty, hyperLinks)
 	if e.Blocked && comboPlain != "" {
 		return applyStatusBlockedStyle("[BLOCKED]", tty) + " " + comboStyled + " " + note + " - " + age
 	}
@@ -229,7 +230,7 @@ func FormatStatusEntry(e journal.Entry, selfUsername string, now time.Time, tty 
 // WrapStatusEntry formats a status entry, wrapping the note at availableWidth
 // characters. availableWidth is the column budget after any caller-applied
 // indent. When availableWidth <= 0 it falls back to the unwrapped format.
-func WrapStatusEntry(e journal.Entry, selfUsername string, now time.Time, tty bool, availableWidth int) string {
+func WrapStatusEntry(e journal.Entry, selfUsername string, now time.Time, tty, hyperLinks bool, availableWidth int) string {
 	age := timeutil.AgeString(e.TS, now)
 	suffix := " - " + age
 
@@ -252,25 +253,25 @@ func WrapStatusEntry(e journal.Entry, selfUsername string, now time.Time, tty bo
 	maxFirstLine := availableWidth - len(prefixPlain)
 
 	if availableWidth <= 0 || maxFirstLine <= 0 {
-		return FormatStatusEntry(e, selfUsername, now, tty)
+		return FormatStatusEntry(e, selfUsername, now, tty, hyperLinks)
 	}
 
 	notePlain := e.Note
 	if len(notePlain)+len(suffix) <= maxFirstLine {
-		return prefix + highlightStatusNoteTokens(notePlain, selfUsername, tty) + suffix
+		return prefix + highlightStatusNoteTokens(notePlain, selfUsername, tty, hyperLinks) + suffix
 	}
 
 	const contIndent = "  "
 	firstChunk, remaining := takeFirstLine(notePlain, maxFirstLine)
 
 	var sb strings.Builder
-	sb.WriteString(prefix + highlightStatusNoteTokens(firstChunk, selfUsername, tty))
+	sb.WriteString(prefix + highlightStatusNoteTokens(firstChunk, selfUsername, tty, hyperLinks))
 
 	contNoteWidth := availableWidth - len(contIndent)
 	contLines := wrapWords(remaining, contNoteWidth)
 	for i, cl := range contLines {
 		sb.WriteString("\n")
-		rendered := highlightStatusNoteTokens(cl, selfUsername, tty)
+		rendered := highlightStatusNoteTokens(cl, selfUsername, tty, hyperLinks)
 		if i == len(contLines)-1 {
 			sb.WriteString(contIndent + rendered + suffix)
 		} else {

@@ -18,11 +18,11 @@ func AgeString(ts string, now time.Time) string {
 		return fmt.Sprintf("%dm ago", int(elapsed.Minutes()))
 	}
 	loc := now.Location()
-	ny, nm, nd := now.In(loc).Date()
+	ny, nm, nd := now.Date()
 	py, pm, pd := parsed.In(loc).Date()
 	nowDay := time.Date(ny, nm, nd, 0, 0, 0, 0, loc)
 	parsedDay := time.Date(py, pm, pd, 0, 0, 0, 0, loc)
-	if nowDay.Sub(parsedDay) == 24*time.Hour {
+	if parsedDay.AddDate(0, 0, 1).Equal(nowDay) {
 		return "yesterday"
 	}
 	if elapsed < 24*time.Hour {

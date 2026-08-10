@@ -34,6 +34,25 @@ func TestAgeString(t *testing.T) {
 	}
 }
 
+// TestAgeStringDSTSpringForward guards against a day-comparison bug on the day
+// after a DST spring-forward transition. In New York, March 10 midnight is still
+// EST (UTC-5 = 05:00 UTC) while March 11 midnight is EDT (UTC-4 = 04:00 UTC),
+// so the two consecutive midnight boundaries are only 23h apart. A Sub()==24h
+// check would return "1d ago" instead of "yesterday". Calendar-based AddDate
+// comparison is correct in all cases.
+func TestAgeStringDSTSpringForward(t *testing.T) {
+	loc, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		t.Skip("America/New_York timezone not available")
+	}
+	now := time.Date(2024, 3, 11, 12, 0, 0, 0, loc)
+	parsed := time.Date(2024, 3, 10, 12, 0, 0, 0, loc)
+	got := AgeString(parsed.Format(time.RFC3339), now)
+	if got != "yesterday" {
+		t.Errorf("got %q, want %q", got, "yesterday")
+	}
+}
+
 // TestAgeStringTimezone guards against the UTC-truncation bug where a task
 // updated early in the morning local time (but on the previous UTC day) was
 // incorrectly shown as "yesterday" instead of "Xh ago".

@@ -64,6 +64,57 @@ func TestCompressHyperLinksRoundTrip(t *testing.T) {
 	}
 }
 
+func TestEffectiveNotificationsDefault(t *testing.T) {
+	cfg := &Config{Name: "test"}
+	if cfg.EffectiveNotifications() {
+		t.Error("expected false when Notifications is nil")
+	}
+}
+
+func TestEffectiveNotificationsTrue(t *testing.T) {
+	cfg := &Config{Name: "test", Notifications: boolPtr(true)}
+	if !cfg.EffectiveNotifications() {
+		t.Error("expected true when Notifications is true")
+	}
+}
+
+func TestEffectiveNotificationsFalse(t *testing.T) {
+	cfg := &Config{Name: "test", Notifications: boolPtr(false)}
+	if cfg.EffectiveNotifications() {
+		t.Error("expected false when Notifications is false")
+	}
+}
+
+func TestNotificationsOmittedWhenNil(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	cfg := &Config{Name: "test"}
+	if err := SaveTo(path, cfg); err != nil {
+		t.Fatalf("SaveTo: %v", err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if strings.Contains(string(data), "notifications") {
+		t.Errorf("expected notifications omitted when nil, got: %s", data)
+	}
+}
+
+func TestNotificationsRoundTrip(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	cfg := &Config{Name: "test", Notifications: boolPtr(true)}
+	if err := SaveTo(path, cfg); err != nil {
+		t.Fatalf("SaveTo: %v", err)
+	}
+	got, err := LoadFrom(path)
+	if err != nil {
+		t.Fatalf("LoadFrom: %v", err)
+	}
+	if got.Notifications == nil || !*got.Notifications {
+		t.Errorf("Notifications round-trip failed: got %v", got.Notifications)
+	}
+}
+
 func TestEffectiveStatusDaysDefault(t *testing.T) {
 	cfg := &Config{Name: "test"}
 	if got := cfg.EffectiveStatusDays(); got != DefaultStatusDays {

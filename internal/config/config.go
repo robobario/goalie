@@ -20,10 +20,11 @@ const DefaultWrapWidth = 120
 const DefaultStatusDays = 8
 
 type Config struct {
-	Name                string `json:"name"`
-	WrapWidth           *int   `json:"wrap_width,omitempty"`
-	StatusDays          *int   `json:"status_days,omitempty"`
-	CompressHyperLinks  *bool  `json:"compress_hyperlinks,omitempty"`
+	Name               string `json:"name"`
+	WrapWidth          *int   `json:"wrap_width,omitempty"`
+	StatusDays         *int   `json:"status_days,omitempty"`
+	CompressHyperLinks *bool  `json:"compress_hyperlinks,omitempty"`
+	Notifications      *bool  `json:"notifications,omitempty"`
 }
 
 func (c *Config) EffectiveWrapWidth() int {
@@ -45,6 +46,15 @@ func (c *Config) EffectiveCompressHyperLinks() bool {
 		return false
 	}
 	return *c.CompressHyperLinks
+}
+
+// EffectiveNotifications reports whether OS notifications for the TUI's
+// periodic Activity refresh are enabled. Off unless the user opts in.
+func (c *Config) EffectiveNotifications() bool {
+	if c.Notifications == nil {
+		return false
+	}
+	return *c.Notifications
 }
 
 var ErrNotInitialised = errors.New("goalie not initialised: run 'goalie init <repo-url>' first")

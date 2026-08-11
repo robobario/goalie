@@ -24,8 +24,9 @@ func readLine(r io.Reader) (string, error) {
 // It writes the prompt to w using display.Bold if tty.
 func ynPrompt(prompt string, r io.Reader, w io.Writer, tty bool) (bool, error) {
 	reader := bufio.NewReader(r)
+	dctx := display.Context{IsTTY: tty}
 	for {
-		fmt.Fprint(w, display.Bold(prompt, tty))
+		fmt.Fprint(w, display.Bold(prompt, dctx))
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			return false, err
@@ -42,8 +43,9 @@ func ynPrompt(prompt string, r io.Reader, w io.Writer, tty bool) (bool, error) {
 // requireInput reads lines from r until a non-empty line is given.
 func requireInput(prompt string, r io.Reader, w io.Writer, tty bool) (string, error) {
 	reader := bufio.NewReader(r)
+	dctx := display.Context{IsTTY: tty}
 	for {
-		fmt.Fprint(w, display.Bold(prompt, tty))
+		fmt.Fprint(w, display.Bold(prompt, dctx))
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			return "", err
@@ -79,9 +81,10 @@ func SelectGoal(dataDir string, key []byte, r io.Reader, w io.Writer, tty bool) 
 		}
 		fmt.Fprintf(w, "  %d. %s\n", i+1, label)
 	}
+	dctx := display.Context{IsTTY: tty}
 	reader := bufio.NewReader(r)
 	for {
-		fmt.Fprint(w, display.Bold("Which goal? (number, or blank to skip) ", tty))
+		fmt.Fprint(w, display.Bold("Which goal? (number, or blank to skip) ", dctx))
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			return "", err
@@ -119,9 +122,9 @@ func InteractiveLog(ctx *AppContext) (note, goalID, task string, blocked, done b
 			for i, t := range existing {
 				fmt.Fprintf(ctx.Stdout, "  %d. %s\n", i+1, t)
 			}
-			fmt.Fprint(ctx.Stdout, display.Bold("Task? (number or new #hashtag): ", ctx.IsTTY))
+			fmt.Fprint(ctx.Stdout, display.Bold("Task? (number or new #hashtag): ", ctx.DisplayCtx()))
 		} else {
-			fmt.Fprint(ctx.Stdout, display.Bold("Task? (#hashtag): ", ctx.IsTTY))
+			fmt.Fprint(ctx.Stdout, display.Bold("Task? (#hashtag): ", ctx.DisplayCtx()))
 		}
 		var line string
 		line, err = readLine(r)

@@ -113,7 +113,7 @@ func Init(repoURL string, dataDir string, configPath string, branch string, r gi
 		} else {
 			keyCheckPath := filepath.Join(dataDir, "key-check.enc")
 			if ok, _ := crypto.VerifyKeyCheck(keyCheckPath, key); ok {
-				fmt.Fprint(stdout, display.Green("Encryption key verified.", tty)+"\n")
+				fmt.Fprint(stdout, display.Green("Encryption key verified.", display.Context{IsTTY: tty})+"\n")
 			} else {
 				fmt.Fprint(stdout, "Warning: your encryption key does not match the team key-check. Run: goalie key import <hex>\n")
 			}
@@ -127,7 +127,7 @@ func Init(repoURL string, dataDir string, configPath string, branch string, r gi
 // The '@' prefix is shown as a fixed part of the prompt; the user types only the body.
 func promptUsername(r io.Reader, w io.Writer, tty bool) (string, error) {
 	for {
-		fmt.Fprint(w, display.Bold("Your username: @", tty))
+		fmt.Fprint(w, display.Bold("Your username: @", display.Context{IsTTY: tty}))
 		line, err := readLine(r)
 		if err != nil {
 			return "", err
@@ -144,7 +144,7 @@ func promptUsername(r io.Reader, w io.Writer, tty bool) (string, error) {
 // promptForKey loops until the user pastes a valid, verified hex key or presses Enter to skip.
 func promptForKey(r io.Reader, w io.Writer, dataDir string, tty bool) error {
 	for {
-		fmt.Fprint(w, display.Bold("Encryption key (paste hex or press Enter to skip): ", tty))
+		fmt.Fprint(w, display.Bold("Encryption key (paste hex or press Enter to skip): ", display.Context{IsTTY: tty}))
 		line, err := readLine(r)
 		if err == io.EOF {
 			fmt.Fprint(w, "No key imported. Run: goalie key import <hex-key> when ready.\n")
@@ -175,7 +175,7 @@ func promptForKey(r io.Reader, w io.Writer, dataDir string, tty bool) error {
 		if err := crypto.SaveKey(decoded); err != nil {
 			return err
 		}
-		fmt.Fprint(w, display.Green("Encryption key verified.", tty)+"\n")
+		fmt.Fprint(w, display.Green("Encryption key verified.", display.Context{IsTTY: tty})+"\n")
 		return nil
 	}
 }

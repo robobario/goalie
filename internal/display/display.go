@@ -26,37 +26,37 @@ var (
 	statusURLStyle         = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "136", Dark: "178"})
 )
 
-func applyGoalStyle(s string, tty bool) string {
-	if !tty {
+func applyGoalStyle(s string, ctx Context) string {
+	if !ctx.IsTTY {
 		return s
 	}
 	return statusGoalStyle.Render(s)
 }
 
-func applyTaskTagStyle(s string, tty bool) string {
-	if !tty {
+func applyTaskTagStyle(s string, ctx Context) string {
+	if !ctx.IsTTY {
 		return s
 	}
 	return statusTaskTagStyle.Render(s)
 }
 
-func applyStatusBlockedStyle(s string, tty bool) string {
-	if !tty {
+func applyStatusBlockedStyle(s string, ctx Context) string {
+	if !ctx.IsTTY {
 		return s
 	}
 	return statusBlockedStyle.Render(s)
 }
 
 // highlightStatusNoteTokens applies colour to URLs and @mentions, matching
-// the TUI's renderNoteWithMentions behaviour. When hyperLinks is true,
+// the TUI's renderNoteWithMentions behaviour. When HyperLinks is true,
 // GitHub PR/issue URLs are compressed and all URLs are wrapped in OSC 8.
-func highlightStatusNoteTokens(note, selfUsername string, tty, hyperLinks bool) string {
-	if !tty {
+func highlightStatusNoteTokens(note, selfUsername string, ctx Context) string {
+	if !ctx.IsTTY {
 		return note
 	}
 	return statusNoteTokenRe.ReplaceAllStringFunc(note, func(m string) string {
 		if strings.HasPrefix(m, "http") {
-			return RenderURL(m, statusURLStyle, hyperLinks)
+			return RenderURL(m, statusURLStyle, ctx.HyperLinks)
 		}
 		if selfUsername != "" && m == selfUsername {
 			return statusSelfMentionStyle.Render(m)
@@ -65,64 +65,64 @@ func highlightStatusNoteTokens(note, selfUsername string, tty, hyperLinks bool) 
 	})
 }
 
-func Teal(s string, tty bool) string {
-	if !tty {
+func Teal(s string, ctx Context) string {
+	if !ctx.IsTTY {
 		return s
 	}
 	return "\033[36m" + s + "\033[0m"
 }
 
-// FormatMotd formats text as a #MOTD line, teal-coloured when tty is true,
+// FormatMotd formats text as a #MOTD line, teal-coloured when IsTTY is true,
 // wrapped at wrapWidth with continuation lines indented to align with the text.
-func FormatMotd(text string, tty bool, wrapWidth int) string {
+func FormatMotd(text string, ctx Context, wrapWidth int) string {
 	const prefix = "#MOTD - "
 	const contIndent = "        " // 8 spaces, matching len(prefix)
 
 	if wrapWidth <= 0 || len(prefix)+len(text) <= wrapWidth {
-		return Teal(prefix+text, tty)
+		return Teal(prefix+text, ctx)
 	}
 
 	maxFirst := wrapWidth - len(prefix)
 	firstChunk, remaining := takeFirstLine(text, maxFirst)
 
 	var sb strings.Builder
-	sb.WriteString(Teal(prefix+firstChunk, tty))
+	sb.WriteString(Teal(prefix+firstChunk, ctx))
 	contWidth := wrapWidth - len(contIndent)
 	for _, cl := range wrapWords(remaining, contWidth) {
 		sb.WriteString("\n")
-		sb.WriteString(Teal(contIndent+cl, tty))
+		sb.WriteString(Teal(contIndent+cl, ctx))
 	}
 	return sb.String()
 }
 
-func Bold(s string, tty bool) string {
-	if !tty {
+func Bold(s string, ctx Context) string {
+	if !ctx.IsTTY {
 		return s
 	}
 	return "\033[1m" + s + "\033[0m"
 }
 
-func Red(s string, tty bool) string {
-	if !tty {
+func Red(s string, ctx Context) string {
+	if !ctx.IsTTY {
 		return s
 	}
 	return "\033[31m" + s + "\033[0m"
 }
 
-func Green(s string, tty bool) string {
-	if !tty {
+func Green(s string, ctx Context) string {
+	if !ctx.IsTTY {
 		return s
 	}
 	return "\033[32m" + s + "\033[0m"
 }
 
-func Username(name string, tty bool) string {
-	return Bold(name, tty)
+func Username(name string, ctx Context) string {
+	return Bold(name, ctx)
 }
 
-// BoldGreen wraps s in ANSI bold+green escape when tty is true.
-func BoldGreen(s string, tty bool) string {
-	if !tty {
+// BoldGreen wraps s in ANSI bold+green escape when IsTTY is true.
+func BoldGreen(s string, ctx Context) string {
+	if !ctx.IsTTY {
 		return s
 	}
 	return "\033[1;32m" + s + "\033[0m"
@@ -130,57 +130,57 @@ func BoldGreen(s string, tty bool) string {
 
 // HighlightMentions replaces @handle tokens in note with styled versions.
 // Mentions matching selfUsername get extra emphasis (bold+bright-green); others get bold+green.
-func HighlightMentions(note, selfUsername string, tty bool) string {
-	if !tty {
+func HighlightMentions(note, selfUsername string, ctx Context) string {
+	if !ctx.IsTTY {
 		return note
 	}
 	return mentionRe.ReplaceAllStringFunc(note, func(m string) string {
 		if selfUsername != "" && m == selfUsername {
 			return "\033[1;92m" + m + "\033[0m"
 		}
-		return BoldGreen(m, tty)
+		return BoldGreen(m, ctx)
 	})
 }
 
-func Section(title string, w io.Writer, tty bool) {
+func Section(title string, w io.Writer, ctx Context) {
 	const width = 44
 	dashes := strings.Repeat("─", max(0, width-len(title)-4))
 	line := "── " + title + " " + dashes
-	fmt.Fprintf(w, "\n%s\n", Bold(line, tty))
+	fmt.Fprintf(w, "\n%s\n", Bold(line, ctx))
 }
 
 // FormatSummaryHeader returns the group header for a summary story block.
 // goal is empty or "(no goal)"; task is the #hashtag; username is the slugified name.
-func FormatSummaryHeader(goal, task, username string, tty bool) string {
-	return Bold("= "+goal+task+username, tty)
+func FormatSummaryHeader(goal, task, username string, ctx Context) string {
+	return Bold("= "+goal+task+username, ctx)
 }
 
 // FormatSummaryEntry formats a single entry line within a summary story block.
 // prevBlocked is the blocked state of the preceding entry (false for the first entry).
 // A label is shown only when the blocked state differs from prevBlocked.
-func FormatSummaryEntry(e journal.Entry, selfUsername string, prevBlocked bool, now time.Time, tty, hyperLinks bool) string {
+func FormatSummaryEntry(e journal.Entry, selfUsername string, prevBlocked bool, now time.Time, ctx Context) string {
 	age := timeutil.AgeString(e.TS, now)
-	note := highlightStatusNoteTokens(e.Note, selfUsername, tty, hyperLinks)
+	note := highlightStatusNoteTokens(e.Note, selfUsername, ctx)
 	if e.Blocked != prevBlocked {
 		if e.Blocked {
-			return "- " + Red("[Blocked]", tty) + " " + note + " — " + age
+			return "- " + Red("[Blocked]", ctx) + " " + note + " — " + age
 		}
-		return "- " + Green("[Unblocked]", tty) + " " + note + " — " + age
+		return "- " + Green("[Unblocked]", ctx) + " " + note + " — " + age
 	}
 	return "- " + note + " — " + age
 }
 
-func FormatEntry(e journal.Entry, selfUsername string, now time.Time, tty bool) string {
+func FormatEntry(e journal.Entry, selfUsername string, now time.Time, ctx Context) string {
 	age := timeutil.AgeString(e.TS, now)
 	taskPart := ""
 	if e.Task != nil {
 		taskPart = *e.Task + " "
 	}
-	note := HighlightMentions(e.Note, selfUsername, tty)
+	note := HighlightMentions(e.Note, selfUsername, ctx)
 	if e.Blocked {
-		return Red("[BLOCKED]", tty) + " " + Username(e.Username, tty) + " " + taskPart + note + " - " + age
+		return Red("[BLOCKED]", ctx) + " " + Username(e.Username, ctx) + " " + taskPart + note + " - " + age
 	}
-	return Username(e.Username, tty) + " " + taskPart + note + " - " + age
+	return Username(e.Username, ctx) + " " + taskPart + note + " - " + age
 }
 
 // goalTaskCombo returns "GOAL#task", "GOAL", "#task", or "" in plain text.
@@ -198,28 +198,28 @@ func goalTaskCombo(e journal.Entry) string {
 }
 
 // goalTaskComboStyled returns the styled rendering and its plain-text equivalent.
-func goalTaskComboStyled(e journal.Entry, tty bool) (styled, plain string) {
+func goalTaskComboStyled(e journal.Entry, ctx Context) (styled, plain string) {
 	if e.Goal != nil && e.Task != nil {
-		return applyGoalStyle(*e.Goal, tty) + applyTaskTagStyle(*e.Task, tty), *e.Goal + *e.Task
+		return applyGoalStyle(*e.Goal, ctx) + applyTaskTagStyle(*e.Task, ctx), *e.Goal + *e.Task
 	}
 	if e.Goal != nil {
-		return applyGoalStyle(*e.Goal, tty), *e.Goal
+		return applyGoalStyle(*e.Goal, ctx), *e.Goal
 	}
 	if e.Task != nil {
-		return applyTaskTagStyle(*e.Task, tty), *e.Task
+		return applyTaskTagStyle(*e.Task, ctx), *e.Task
 	}
 	return "", ""
 }
 
-func FormatStatusEntry(e journal.Entry, selfUsername string, now time.Time, tty, hyperLinks bool) string {
+func FormatStatusEntry(e journal.Entry, selfUsername string, now time.Time, ctx Context) string {
 	age := timeutil.AgeString(e.TS, now)
-	comboStyled, comboPlain := goalTaskComboStyled(e, tty)
-	note := highlightStatusNoteTokens(e.Note, selfUsername, tty, hyperLinks)
+	comboStyled, comboPlain := goalTaskComboStyled(e, ctx)
+	note := highlightStatusNoteTokens(e.Note, selfUsername, ctx)
 	if e.Blocked && comboPlain != "" {
-		return applyStatusBlockedStyle("[BLOCKED]", tty) + " " + comboStyled + " " + note + " - " + age
+		return applyStatusBlockedStyle("[BLOCKED]", ctx) + " " + comboStyled + " " + note + " - " + age
 	}
 	if e.Blocked {
-		return applyStatusBlockedStyle("[BLOCKED]", tty) + " " + note + " - " + age
+		return applyStatusBlockedStyle("[BLOCKED]", ctx) + " " + note + " - " + age
 	}
 	if comboPlain != "" {
 		return comboStyled + " " + note + " - " + age
@@ -228,14 +228,14 @@ func FormatStatusEntry(e journal.Entry, selfUsername string, now time.Time, tty,
 }
 
 // renderNoteWords renders a slice of NoteWord as a string with ANSI styling
-// applied when tty is true. Words with Token=false are passed through
+// applied when IsTTY is true. Words with Token=false are passed through
 // highlightStatusNoteTokens so that partial matches (e.g. "@alice's") receive
 // correct inline styling without adjacent-character corruption.
-func renderNoteWords(words []NoteWord, selfUsername string, tty, hyperLinks bool) string {
+func renderNoteWords(words []NoteWord, selfUsername string, ctx Context) string {
 	if len(words) == 0 {
 		return ""
 	}
-	if !tty {
+	if !ctx.IsTTY {
 		parts := make([]string, len(words))
 		for i, w := range words {
 			parts[i] = w.Original
@@ -245,11 +245,11 @@ func renderNoteWords(words []NoteWord, selfUsername string, tty, hyperLinks bool
 	parts := make([]string, len(words))
 	for i, w := range words {
 		if !w.Token {
-			parts[i] = highlightStatusNoteTokens(w.Original, selfUsername, tty, hyperLinks)
+			parts[i] = highlightStatusNoteTokens(w.Original, selfUsername, ctx)
 			continue
 		}
 		if strings.HasPrefix(w.Original, "http") {
-			parts[i] = RenderURL(w.Original, statusURLStyle, hyperLinks)
+			parts[i] = RenderURL(w.Original, statusURLStyle, ctx.HyperLinks)
 		} else if selfUsername != "" && w.Original == selfUsername {
 			parts[i] = statusSelfMentionStyle.Render(w.Original)
 		} else {
@@ -262,22 +262,22 @@ func renderNoteWords(words []NoteWord, selfUsername string, tty, hyperLinks bool
 // WrapStatusEntry formats a status entry, wrapping the note at availableWidth
 // characters. availableWidth is the column budget after any caller-applied
 // indent. When availableWidth <= 0 it falls back to the unwrapped format.
-// Width calculations use the compressed form of URLs (when hyperLinks is true)
+// Width calculations use the compressed form of URLs (when HyperLinks is true)
 // so that compress_hyperlinks users see accurate line breaks.
-func WrapStatusEntry(e journal.Entry, selfUsername string, now time.Time, tty, hyperLinks bool, availableWidth int) string {
+func WrapStatusEntry(e journal.Entry, selfUsername string, now time.Time, ctx Context, availableWidth int) string {
 	age := timeutil.AgeString(e.TS, now)
 	suffix := " - " + age
 
-	comboStyled, comboPlain := goalTaskComboStyled(e, tty)
+	comboStyled, comboPlain := goalTaskComboStyled(e, ctx)
 
 	// prefix always ends with a space when non-empty so prefix+note renders correctly.
 	// prefixPlain is the unstyled equivalent used for column-width maths.
 	var prefix, prefixPlain string
 	if e.Blocked && comboPlain != "" {
-		prefix = applyStatusBlockedStyle("[BLOCKED]", tty) + " " + comboStyled + " "
+		prefix = applyStatusBlockedStyle("[BLOCKED]", ctx) + " " + comboStyled + " "
 		prefixPlain = "[BLOCKED] " + comboPlain + " "
 	} else if e.Blocked {
-		prefix = applyStatusBlockedStyle("[BLOCKED]", tty) + " "
+		prefix = applyStatusBlockedStyle("[BLOCKED]", ctx) + " "
 		prefixPlain = "[BLOCKED] "
 	} else if comboPlain != "" {
 		prefix = comboStyled + " "
@@ -287,25 +287,25 @@ func WrapStatusEntry(e journal.Entry, selfUsername string, now time.Time, tty, h
 	maxFirstLine := availableWidth - len(prefixPlain)
 
 	if availableWidth <= 0 || maxFirstLine <= 0 {
-		return FormatStatusEntry(e, selfUsername, now, tty, hyperLinks)
+		return FormatStatusEntry(e, selfUsername, now, ctx)
 	}
 
-	words := TokenizeNoteWords(e.Note, tty && hyperLinks)
+	words := TokenizeNoteWords(e.Note, ctx.IsTTY && ctx.HyperLinks)
 	if noteWordsWidth(words)+len(suffix) <= maxFirstLine {
-		return prefix + highlightStatusNoteTokens(e.Note, selfUsername, tty, hyperLinks) + suffix
+		return prefix + highlightStatusNoteTokens(e.Note, selfUsername, ctx) + suffix
 	}
 
 	const contIndent = "  "
 	firstWords, remainingWords := TakeFirstLineWords(words, maxFirstLine)
 
 	var sb strings.Builder
-	sb.WriteString(prefix + renderNoteWords(firstWords, selfUsername, tty, hyperLinks))
+	sb.WriteString(prefix + renderNoteWords(firstWords, selfUsername, ctx))
 
 	contNoteWidth := availableWidth - len(contIndent)
 	contLines := WrapNoteWords(remainingWords, contNoteWidth)
 	for i, lineWords := range contLines {
 		sb.WriteString("\n")
-		rendered := renderNoteWords(lineWords, selfUsername, tty, hyperLinks)
+		rendered := renderNoteWords(lineWords, selfUsername, ctx)
 		if i == len(contLines)-1 {
 			sb.WriteString(contIndent + rendered + suffix)
 		} else {

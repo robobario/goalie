@@ -21,12 +21,10 @@ func readLine(r io.Reader) (string, error) {
 }
 
 // ynPrompt reads lines from r until one is "y", "yes", "n", or "no" (case-insensitive).
-// It writes the prompt to w using display.Bold if tty.
-func ynPrompt(prompt string, r io.Reader, w io.Writer, tty bool) (bool, error) {
+func ynPrompt(prompt string, r io.Reader, ctx AppContext) (bool, error) {
 	reader := bufio.NewReader(r)
-	dctx := display.Context{IsTTY: tty}
 	for {
-		fmt.Fprint(w, display.Bold(prompt, dctx))
+		fmt.Fprint(ctx.Stdout, display.Bold(prompt, ctx.DisplayCtx()))
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			return false, err
@@ -41,11 +39,10 @@ func ynPrompt(prompt string, r io.Reader, w io.Writer, tty bool) (bool, error) {
 }
 
 // requireInput reads lines from r until a non-empty line is given.
-func requireInput(prompt string, r io.Reader, w io.Writer, tty bool) (string, error) {
+func requireInput(prompt string, r io.Reader, ctx AppContext) (string, error) {
 	reader := bufio.NewReader(r)
-	dctx := display.Context{IsTTY: tty}
 	for {
-		fmt.Fprint(w, display.Bold(prompt, dctx))
+		fmt.Fprint(ctx.Stdout, display.Bold(prompt, ctx.DisplayCtx()))
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			return "", err
@@ -58,8 +55,8 @@ func requireInput(prompt string, r io.Reader, w io.Writer, tty bool) (string, er
 
 // SelectGoal presents open goals from dataDir and returns the chosen goal ID,
 // or "" if the user skips. Returns error on I/O failure.
-func SelectGoal(dataDir string, key []byte, r io.Reader, w io.Writer, tty bool) (string, error) {
-	all, err := goals.List(dataDir, key)
+func SelectGoal(r io.Reader, ctx AppContext) (string, error) {
+	all, err := goals.List(ctx.DataDir, ctx.EncryptionKey)
 	if err != nil {
 		return "", err
 	}
@@ -70,21 +67,20 @@ func SelectGoal(dataDir string, key []byte, r io.Reader, w io.Writer, tty bool) 
 		}
 	}
 	if len(open) == 0 {
-		fmt.Fprint(w, "To create a new goal, use: goalie goal add <ID> <DESCRIPTION>\n")
+		fmt.Fprint(ctx.Stdout, "To create a new goal, use: goalie goal add <ID> <DESCRIPTION>\n")
 		return "", nil
 	}
-	fmt.Fprint(w, "Goals:\n")
+	fmt.Fprint(ctx.Stdout, "Goals:\n")
 	for i, g := range open {
 		label := g.ID
 		if g.Description != "" {
 			label = g.ID + " — " + g.Description
 		}
-		fmt.Fprintf(w, "  %d. %s\n", i+1, label)
+		fmt.Fprintf(ctx.Stdout, "  %d. %s\n", i+1, label)
 	}
-	dctx := display.Context{IsTTY: tty}
 	reader := bufio.NewReader(r)
 	for {
-		fmt.Fprint(w, display.Bold("Which goal? (number, or blank to skip) ", dctx))
+		fmt.Fprint(ctx.Stdout, display.Bold("Which goal? (number, or blank to skip) ", ctx.DisplayCtx()))
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			return "", err
@@ -97,7 +93,7 @@ func SelectGoal(dataDir string, key []byte, r io.Reader, w io.Writer, tty bool) 
 		if parseErr == nil && n >= 1 && n <= len(open) {
 			return open[n-1].ID, nil
 		}
-		fmt.Fprintf(w, "Enter a number between 1 and %d, or blank to skip.\n", len(open))
+		fmt.Fprintf(ctx.Stdout, "Enter a number between 1 and %d, or blank to skip.\n", len(open))
 	}
 }
 
@@ -105,7 +101,7 @@ func SelectGoal(dataDir string, key []byte, r io.Reader, w io.Writer, tty bool) 
 func InteractiveLog(ctx *AppContext) (note, goalID, task string, blocked, done bool, err error) {
 	r := bufio.NewReader(ctx.Stdin)
 
-	goalID, err = SelectGoal(ctx.DataDir, ctx.EncryptionKey, r, ctx.Stdout, ctx.IsTTY)
+	goalID, err = SelectGoal(r, *ctx)
 	if err != nil {
 		return
 	}
@@ -146,12 +142,12 @@ func InteractiveLog(ctx *AppContext) (note, goalID, task string, blocked, done b
 		fmt.Fprint(ctx.Stdout, "Enter a number or a #hashtag.\n")
 	}
 
-	blocked, err = ynPrompt("Are you blocked? (y/n) ", r, ctx.Stdout, ctx.IsTTY)
+	blocked, err = ynPrompt("Are you blocked? (y/n) ", r, *ctx)
 	if err != nil {
 		return
 	}
 
-	done, err = ynPrompt("Mark as done? (y/n) ", r, ctx.Stdout, ctx.IsTTY)
+	done, err = ynPrompt("Mark as done? (y/n) ", r, *ctx)
 	if err != nil {
 		return
 	}
@@ -160,6 +156,6 @@ func InteractiveLog(ctx *AppContext) (note, goalID, task string, blocked, done b
 	if blocked {
 		notePrompt = "Notes (what is blocking you?): "
 	}
-	note, err = requireInput(notePrompt, r, ctx.Stdout, ctx.IsTTY)
+	note, err = requireInput(notePrompt, r, *ctx)
 	return
 }

@@ -13,7 +13,7 @@ const overwriteWarning = "You already have an encryption key. Replacing it may p
 
 func KeyInit(ctx AppContext) error {
 	if keyFileExists() {
-		ok, err := ynPrompt(overwriteWarning, bufio.NewReader(ctx.Stdin), ctx.Stdout, ctx.IsTTY)
+		ok, err := ynPrompt(overwriteWarning, bufio.NewReader(ctx.Stdin), ctx)
 		if err != nil {
 			return err
 		}
@@ -39,7 +39,7 @@ func KeyImport(ctx AppContext, hexKey string) error {
 		return &ExitError{Code: 1}
 	}
 	if keyFileExists() {
-		ok, err := ynPrompt(overwriteWarning, bufio.NewReader(ctx.Stdin), ctx.Stdout, ctx.IsTTY)
+		ok, err := ynPrompt(overwriteWarning, bufio.NewReader(ctx.Stdin), ctx)
 		if err != nil {
 			return err
 		}

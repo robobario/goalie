@@ -346,7 +346,7 @@ func renderNoteWordsTUI(words []display.NoteWord, selfUsername string, hyperLink
 	parts := make([]string, len(words))
 	for i, w := range words {
 		if !w.Token {
-			parts[i] = w.Original
+			parts[i] = renderNoteWithMentions(w.Original, selfUsername, hyperLinks)
 			continue
 		}
 		if strings.HasPrefix(w.Original, "http") {

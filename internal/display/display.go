@@ -228,7 +228,9 @@ func FormatStatusEntry(e journal.Entry, selfUsername string, now time.Time, tty,
 }
 
 // renderNoteWords renders a slice of NoteWord as a string with ANSI styling
-// applied when tty is true.
+// applied when tty is true. Words with Token=false are passed through
+// highlightStatusNoteTokens so that partial matches (e.g. "@alice's") receive
+// correct inline styling without adjacent-character corruption.
 func renderNoteWords(words []NoteWord, selfUsername string, tty, hyperLinks bool) string {
 	if len(words) == 0 {
 		return ""
@@ -243,7 +245,7 @@ func renderNoteWords(words []NoteWord, selfUsername string, tty, hyperLinks bool
 	parts := make([]string, len(words))
 	for i, w := range words {
 		if !w.Token {
-			parts[i] = w.Original
+			parts[i] = highlightStatusNoteTokens(w.Original, selfUsername, tty, hyperLinks)
 			continue
 		}
 		if strings.HasPrefix(w.Original, "http") {
@@ -288,7 +290,7 @@ func WrapStatusEntry(e journal.Entry, selfUsername string, now time.Time, tty, h
 		return FormatStatusEntry(e, selfUsername, now, tty, hyperLinks)
 	}
 
-	words := TokenizeNoteWords(e.Note, hyperLinks)
+	words := TokenizeNoteWords(e.Note, tty && hyperLinks)
 	if noteWordsWidth(words)+len(suffix) <= maxFirstLine {
 		return prefix + highlightStatusNoteTokens(e.Note, selfUsername, tty, hyperLinks) + suffix
 	}

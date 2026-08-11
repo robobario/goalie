@@ -9,6 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"goalie/internal/cli"
+	"goalie/internal/config"
 	"goalie/internal/goals"
 	"goalie/internal/journal"
 	"goalie/internal/timeutil"
@@ -191,6 +192,9 @@ func (m updateModel) reloadTaskStatesCmd() tea.Cmd {
 	ctx := m.ctx
 	return func() tea.Msg {
 		username := ctx.Username
+		if username == "" {
+			return taskStatesLoadedMsg{err: config.ErrNotInitialised}
+		}
 		journalDir := filepath.Join(ctx.DataDir, "journal")
 		states, err := journal.CurrentTaskStates(journalDir, username, ctx.EncryptionKey)
 		if err != nil {

@@ -7,6 +7,8 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"goalie/internal/cli"
+	"goalie/internal/config"
 	"goalie/internal/goals"
 	"goalie/internal/journal"
 )
@@ -1021,6 +1023,20 @@ func TestNewTaskNoteViewWrapsLongNote(t *testing.T) {
 	// Prefix "> Note:  " = 9 chars, content width = 16.
 	if !strings.Contains(view, "\n         ") {
 		t.Errorf("expected wrapped note with 9-space indent; got:\n%s", view)
+	}
+}
+
+func TestReloadTaskStatesCmdEmptyUsernameReturnsError(t *testing.T) {
+	ctx := &cli.AppContext{Username: ""}
+	m := updateModel{ctx: ctx}
+	cmd := m.reloadTaskStatesCmd()
+	msg := cmd()
+	loaded, ok := msg.(taskStatesLoadedMsg)
+	if !ok {
+		t.Fatalf("expected taskStatesLoadedMsg, got %T", msg)
+	}
+	if !errors.Is(loaded.err, config.ErrNotInitialised) {
+		t.Errorf("expected ErrNotInitialised, got %v", loaded.err)
 	}
 }
 

@@ -26,11 +26,7 @@ func resolveUsername(ctx AppContext) (string, error) {
 	if ctx.Username != "" {
 		return ctx.Username, nil
 	}
-	cfg, err := config.Load()
-	if err != nil {
-		return "", err
-	}
-	return cfg.Name, nil
+	return "", config.ErrNotInitialised
 }
 
 func GoalAdd(ctx AppContext, id, desc string) error {
@@ -133,16 +129,10 @@ func Status(ctx AppContext, days int) error {
 		return err
 	}
 	if days <= 0 {
-		cfg, err := config.Load()
-		if err != nil {
-			days = config.DefaultStatusDays
-		} else {
-			days = cfg.EffectiveStatusDays()
-		}
+		days = ctx.EffectiveStatusDays()
 	}
 	if motdText, ok, err := motd.Latest(ctx.DataDir, ctx.EncryptionKey); err == nil && ok {
-		wrapWidth := loadWrapWidth()
-		fmt.Fprintln(ctx.Stdout, display.FormatMotd(motdText, ctx.IsTTY, wrapWidth))
+		fmt.Fprintln(ctx.Stdout, display.FormatMotd(motdText, ctx.IsTTY, ctx.EffectiveWrapWidth()))
 	}
 	entries, err := journal.CollectLatest(ctx.DataDir, ctx.Git, days, ctx.EncryptionKey)
 	if err != nil {
@@ -183,9 +173,7 @@ func Status(ctx AppContext, days int) error {
 	selfUsername, _ := resolveUsername(ctx)
 
 	const entryIndent = "  "
-	wrapWidth := loadWrapWidth()
-	availableWidth := wrapWidth - len(entryIndent)
-	hyperLinks := loadHyperLinks(ctx.IsTTY)
+	availableWidth := ctx.EffectiveWrapWidth() - len(entryIndent)
 
 	for _, u := range users {
 		display.Section(u, ctx.Stdout, ctx.IsTTY)
@@ -197,7 +185,7 @@ func Status(ctx AppContext, days int) error {
 			return ues[i].TS < ues[j].TS
 		})
 		for _, e := range ues {
-			formatted := display.WrapStatusEntry(e, selfUsername, now, ctx.IsTTY, hyperLinks, availableWidth)
+			formatted := display.WrapStatusEntry(e, selfUsername, now, ctx.IsTTY, ctx.HyperLinks, availableWidth)
 			for _, line := range strings.Split(formatted, "\n") {
 				fmt.Fprintf(ctx.Stdout, "%s%s\n", entryIndent, line)
 			}
@@ -206,24 +194,6 @@ func Status(ctx AppContext, days int) error {
 	return nil
 }
 
-func loadWrapWidth() int {
-	cfg, err := config.Load()
-	if err != nil || cfg == nil {
-		return config.DefaultWrapWidth
-	}
-	return cfg.EffectiveWrapWidth()
-}
-
-func loadHyperLinks(isTTY bool) bool {
-	if !isTTY {
-		return false
-	}
-	cfg, err := config.Load()
-	if err != nil || cfg == nil {
-		return false
-	}
-	return cfg.EffectiveCompressHyperLinks()
-}
 
 func MotdShow(ctx AppContext) error {
 	if err := requireDataDir(ctx); err != nil {
@@ -322,7 +292,6 @@ func Summary(ctx AppContext, days int, user string) error {
 		return keys[i].goal < keys[j].goal
 	})
 
-	hyperLinks := loadHyperLinks(ctx.IsTTY)
 	now := time.Now()
 	for gi, k := range keys {
 		if gi > 0 {
@@ -331,7 +300,7 @@ func Summary(ctx AppContext, days int, user string) error {
 		fmt.Fprintln(ctx.Stdout, display.FormatSummaryHeader(k.goal, k.task, k.username, ctx.IsTTY))
 		prevBlocked := false
 		for _, e := range groups[k] {
-			fmt.Fprintln(ctx.Stdout, display.FormatSummaryEntry(e, selfUsername, prevBlocked, now, ctx.IsTTY, hyperLinks))
+			fmt.Fprintln(ctx.Stdout, display.FormatSummaryEntry(e, selfUsername, prevBlocked, now, ctx.IsTTY, ctx.HyperLinks))
 			prevBlocked = e.Blocked
 		}
 	}

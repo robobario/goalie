@@ -7,7 +7,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"goalie/internal/cli"
-	"goalie/internal/config"
 	"goalie/internal/motd"
 )
 
@@ -42,53 +41,18 @@ type Model struct {
 	syncing   bool
 }
 
-func resolveSelfUsername(ctx *cli.AppContext) string {
-	if ctx.Username != "" {
-		return ctx.Username
-	}
-	cfg, err := config.Load()
-	if err != nil || cfg == nil {
-		return ""
-	}
-	return cfg.Name
-}
-
-func resolveWrapWidth() int {
-	cfg, err := config.Load()
-	if err != nil || cfg == nil {
-		return config.DefaultWrapWidth
-	}
-	return cfg.EffectiveWrapWidth()
-}
-
-func resolveStatusDays() int {
-	cfg, err := config.Load()
-	if err != nil || cfg == nil {
-		return config.DefaultStatusDays
-	}
-	return cfg.EffectiveStatusDays()
-}
-
-func resolveHyperLinks() bool {
-	cfg, err := config.Load()
-	if err != nil || cfg == nil {
-		return false
-	}
-	return cfg.EffectiveCompressHyperLinks()
-}
-
 func initialModel(ctx *cli.AppContext) Model {
-	ww := resolveWrapWidth()
+	ww := ctx.EffectiveWrapWidth()
 	return Model{
 		ctx:       ctx,
 		activeTab: activityTab,
 		wrapWidth: ww,
 		syncing:   true,
 		activity: activityModel{
-			selfUsername: resolveSelfUsername(ctx),
+			selfUsername: ctx.Username,
 			wrapWidth:    ww,
-			nonDoneDays:  resolveStatusDays(),
-			hyperLinks:   resolveHyperLinks(),
+			nonDoneDays:  ctx.EffectiveStatusDays(),
+			hyperLinks:   ctx.HyperLinks,
 		},
 		update: updateModel{ctx: ctx, wrapWidth: ww},
 	}

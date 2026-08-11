@@ -11,6 +11,7 @@ import (
 	"golang.org/x/term"
 
 	"goalie/internal/cli"
+	"goalie/internal/config"
 	"goalie/internal/crypto"
 	"goalie/internal/git"
 	"goalie/internal/goalieenv"
@@ -102,6 +103,19 @@ func main() {
 	root.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		if plainOutput {
 			ctx.IsTTY = false
+		}
+		cfg, err := config.Load()
+		if err == nil && cfg != nil {
+			ctx.Config = cfg
+			ctx.WrapWidth = cfg.EffectiveWrapWidth()
+			ctx.HyperLinks = ctx.IsTTY && cfg.EffectiveCompressHyperLinks()
+			ctx.StatusDays = cfg.EffectiveStatusDays()
+			if ctx.Username == "" {
+				ctx.Username = cfg.Name
+			}
+		} else {
+			ctx.WrapWidth = config.DefaultWrapWidth
+			ctx.StatusDays = config.DefaultStatusDays
 		}
 	}
 

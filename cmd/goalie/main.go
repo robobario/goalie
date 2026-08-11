@@ -110,6 +110,7 @@ func main() {
 			ctx.WrapWidth = cfg.EffectiveWrapWidth()
 			ctx.HyperLinks = ctx.IsTTY && cfg.EffectiveCompressHyperLinks()
 			ctx.StatusDays = cfg.EffectiveStatusDays()
+			ctx.NotificationsEnabled = cfg.EffectiveNotifications()
 			if ctx.Username == "" {
 				ctx.Username = cfg.Name
 			}

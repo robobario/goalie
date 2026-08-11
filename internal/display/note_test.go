@@ -64,6 +64,21 @@ func TestTokenizeNoteWordsMention(t *testing.T) {
 	}
 }
 
+func TestTokenizeNoteWordsPartialMention(t *testing.T) {
+	// "@alice's" partially matches @mention; the apostrophe is not consumed.
+	// The whole word must be Token=false so adjacent punctuation is not split.
+	words := TokenizeNoteWords("@alice's work", false)
+	if len(words) != 2 {
+		t.Fatalf("expected 2 words, got %d: %v", len(words), words)
+	}
+	if words[0].Token {
+		t.Errorf("partial-match word should have Token=false: %+v", words[0])
+	}
+	if words[0].Original != "@alice's" {
+		t.Errorf("original should be '@alice's', got %q", words[0].Original)
+	}
+}
+
 func TestTakeFirstLineWordsAllFit(t *testing.T) {
 	words := TokenizeNoteWords("one two three", false)
 	first, rest := TakeFirstLineWords(words, 80)

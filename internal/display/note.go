@@ -13,30 +13,27 @@ type NoteWord struct {
 	Token bool
 }
 
-// TokenizeNoteWords parses note into a slice of NoteWord. URL tokens get
-// Display set to CompressURL(url) when hyperLinks is true; all other words
-// carry Display equal to Original.
+// TokenizeNoteWords parses note into a slice of NoteWord. Each space-separated
+// word whose entire text matches a URL or @mention pattern gets Token=true; URL
+// tokens additionally get Display set to CompressURL(url) when hyperLinks is
+// true. Words that only partially match (e.g. "@alice's") are left as plain
+// words so their adjacent punctuation is preserved during rendering.
 func TokenizeNoteWords(note string, hyperLinks bool) []NoteWord {
-	var words []NoteWord
-	last := 0
-	for _, loc := range statusNoteTokenRe.FindAllStringIndex(note, -1) {
-		if loc[0] > last {
-			for _, w := range strings.Fields(note[last:loc[0]]) {
-				words = append(words, NoteWord{Original: w, Display: w})
+	words := strings.Fields(note)
+	result := make([]NoteWord, len(words))
+	for i, w := range words {
+		loc := statusNoteTokenRe.FindStringIndex(w)
+		if loc != nil && loc[0] == 0 && loc[1] == len(w) {
+			display := w
+			if hyperLinks && strings.HasPrefix(w, "http") {
+				display = CompressURL(w)
 			}
+			result[i] = NoteWord{Original: w, Display: display, Token: true}
+		} else {
+			result[i] = NoteWord{Original: w, Display: w}
 		}
-		m := note[loc[0]:loc[1]]
-		display := m
-		if hyperLinks && strings.HasPrefix(m, "http") {
-			display = CompressURL(m)
-		}
-		words = append(words, NoteWord{Original: m, Display: display, Token: true})
-		last = loc[1]
 	}
-	for _, w := range strings.Fields(note[last:]) {
-		words = append(words, NoteWord{Original: w, Display: w})
-	}
-	return words
+	return result
 }
 
 // TakeFirstLineWords splits words into a first slice that fits within maxWidth

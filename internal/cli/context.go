@@ -20,10 +20,11 @@ type AppContext struct {
 	SchemaVersion string
 
 	// Derived from config at startup; zero means use package default.
-	Config     *config.Config
-	HyperLinks bool
-	WrapWidth  int
-	StatusDays int
+	Config               *config.Config
+	HyperLinks           bool
+	WrapWidth            int
+	StatusDays           int
+	NotificationsEnabled bool
 }
 
 func (ctx AppContext) EffectiveWrapWidth() int {

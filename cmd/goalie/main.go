@@ -127,7 +127,7 @@ func main() {
 		Short: "Clone or create the data branch in ~/.goalie/data",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return cli.Init(args[0], ctx.DataDir, configPath, initBranch, ctx.Git, ctx.Stdin, ctx.Stdout, ctx.IsTTY)
+			return cli.Init(args[0], ctx.DataDir, configPath, initBranch, ctx.Git, ctx)
 		},
 	}
 	initCmd.Flags().StringVar(&initBranch, "branch", "data", "Git branch name to use for the data branch")

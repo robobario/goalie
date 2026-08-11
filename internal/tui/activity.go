@@ -275,24 +275,26 @@ func renderActivityEntry(e journal.Entry, now time.Time, selfUsername string, hy
 	maxNoteOnFirstLine := availableWidth - lipgloss.Width(lineLeader)
 	contWidth := max(1, availableWidth-len(contIndent))
 
+	words := display.TokenizeNoteWords(e.Note, hyperLinks)
+
 	var sb strings.Builder
 	if maxNoteOnFirstLine <= 0 {
 		sb.WriteString(fixedHeader)
-		for _, nl := range wrapWords(e.Note, contWidth) {
-			sb.WriteString("\n" + contIndent + renderNoteWithMentions(nl, selfUsername, hyperLinks))
+		for _, lineWords := range display.WrapNoteWords(words, contWidth) {
+			sb.WriteString("\n" + contIndent + renderNoteWordsTUI(lineWords, selfUsername, hyperLinks))
 		}
 		return sb.String()
 	}
 
-	firstChunk, remaining := takeFirstLine(e.Note, maxNoteOnFirstLine)
-	if firstChunk != "" {
-		sb.WriteString(lineLeader + renderNoteWithMentions(firstChunk, selfUsername, hyperLinks))
+	firstWords, remainingWords := display.TakeFirstLineWords(words, maxNoteOnFirstLine)
+	if len(firstWords) > 0 {
+		sb.WriteString(lineLeader + renderNoteWordsTUI(firstWords, selfUsername, hyperLinks))
 	} else {
 		sb.WriteString(fixedHeader)
 	}
-	if remaining != "" {
-		for _, cl := range wrapWords(remaining, contWidth) {
-			sb.WriteString("\n" + contIndent + renderNoteWithMentions(cl, selfUsername, hyperLinks))
+	if len(remainingWords) > 0 {
+		for _, lineWords := range display.WrapNoteWords(remainingWords, contWidth) {
+			sb.WriteString("\n" + contIndent + renderNoteWordsTUI(lineWords, selfUsername, hyperLinks))
 		}
 	}
 	return sb.String()
@@ -337,17 +339,41 @@ func renderNoteWithMentions(note, selfUsername string, hyperLinks bool) string {
 	})
 }
 
+// renderNoteWordsTUI renders a slice of display.NoteWord with TUI-local styles.
+func renderNoteWordsTUI(words []display.NoteWord, selfUsername string, hyperLinks bool) string {
+	if len(words) == 0 {
+		return ""
+	}
+	parts := make([]string, len(words))
+	for i, w := range words {
+		if !w.Token {
+			parts[i] = w.Original
+			continue
+		}
+		if strings.HasPrefix(w.Original, "http") {
+			parts[i] = display.RenderURL(w.Original, urlStyle, hyperLinks)
+		} else if selfUsername != "" && w.Original == selfUsername {
+			parts[i] = selfMentionStyle.Render(w.Original)
+		} else {
+			parts[i] = mentionStyle.Render(w.Original)
+		}
+	}
+	return strings.Join(parts, " ")
+}
+
 // renderNoteWrapped word-wraps value at maxWidth then applies mention/URL
 // highlighting to each line. When maxWidth <= 0 the note is rendered as a
 // single line, matching the behaviour of renderNoteWithMentions directly.
+// Width calculations use compressed URL lengths when hyperLinks is true.
 func renderNoteWrapped(value, username string, hyperLinks bool, maxWidth int) string {
 	if maxWidth <= 0 {
 		return renderNoteWithMentions(value, username, hyperLinks)
 	}
-	lines := wrapWords(value, maxWidth)
+	words := display.TokenizeNoteWords(value, hyperLinks)
+	lines := display.WrapNoteWords(words, maxWidth)
 	parts := make([]string, len(lines))
-	for i, line := range lines {
-		parts[i] = renderNoteWithMentions(line, username, hyperLinks)
+	for i, lineWords := range lines {
+		parts[i] = renderNoteWordsTUI(lineWords, username, hyperLinks)
 	}
 	return strings.Join(parts, "\n")
 }

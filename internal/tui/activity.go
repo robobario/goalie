@@ -339,7 +339,6 @@ func renderNoteWithMentions(note, selfUsername string, hyperLinks bool) string {
 	})
 }
 
-// renderNoteWordsTUI renders a slice of display.NoteWord with TUI-local styles.
 func renderNoteWordsTUI(words []display.NoteWord, selfUsername string, hyperLinks bool) string {
 	if len(words) == 0 {
 		return ""

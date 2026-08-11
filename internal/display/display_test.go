@@ -452,6 +452,33 @@ func TestHighlightStatusNoteTokensNonGitHubHyperLink(t *testing.T) {
 	}
 }
 
+func TestWrapStatusEntryURLCompressedFitsOnOneLine(t *testing.T) {
+	// Raw URL is 37 chars; compressed to "owner/repo#42" (13 chars).
+	// With hyperLinks=true the display width should use the compressed length,
+	// so a note that would exceed the budget at raw length fits on one line.
+	url := "https://github.com/owner/repo/pull/42"
+	// "see " (4) + compressed (13) + " - yesterday" (12) = 29; fits in 30.
+	// Raw would be 4 + 37 + 12 = 53, which exceeds 30.
+	e := journal.Entry{TS: fixedTS, Note: "see " + url, Blocked: false}
+	got := WrapStatusEntry(e, "", fixedNow, false, true, 30)
+	lines := strings.Split(got, "\n")
+	if len(lines) != 1 {
+		t.Errorf("expected single line with hyperLinks=true at width 30, got %d lines: %q", len(lines), got)
+	}
+}
+
+func TestWrapStatusEntryURLRawLengthUsedWhenNoHyperLinks(t *testing.T) {
+	// Same note, but hyperLinks=false: display width uses full URL length.
+	// Raw: "see " (4) + url (37) + " - yesterday" (12) = 53, exceeds 30; wraps.
+	url := "https://github.com/owner/repo/pull/42"
+	e := journal.Entry{TS: fixedTS, Note: "see " + url, Blocked: false}
+	got := WrapStatusEntry(e, "", fixedNow, false, false, 30)
+	lines := strings.Split(got, "\n")
+	if len(lines) < 2 {
+		t.Errorf("expected wrapped output with hyperLinks=false at width 30, got: %q", got)
+	}
+}
+
 func TestFormatSummaryEntryURLCompressed(t *testing.T) {
 	url := "https://github.com/owner/repo/pull/99"
 	e := journal.Entry{TS: fixedTS, Note: "see " + url, Blocked: false}

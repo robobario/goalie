@@ -24,7 +24,8 @@ func TestInit_NoKeyPromptsForKey(t *testing.T) {
 	var out strings.Builder
 
 	// press Enter to skip the key prompt
-	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, strings.NewReader("\n"), &out, false); err != nil {
+	ctx := AppContext{Stdin: strings.NewReader("\n"), Stdout: &out}
+	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -48,7 +49,8 @@ func TestInit_KeyExistsNoGuidance(t *testing.T) {
 	runner := &git.FakeRunner{}
 	var out strings.Builder
 
-	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, strings.NewReader(""), &out, false); err != nil {
+	ctx := AppContext{Stdin: strings.NewReader(""), Stdout: &out}
+	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -99,7 +101,8 @@ func TestInit_DataBranchExists(t *testing.T) {
 		},
 	}
 
-	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, strings.NewReader(""), os.Stdout, false); err != nil {
+	ctx := AppContext{Stdin: strings.NewReader(""), Stdout: os.Stdout}
+	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -118,7 +121,8 @@ func TestInit_DataBranchDoesNotExist(t *testing.T) {
 		},
 	}
 
-	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, strings.NewReader("n\n"), os.Stdout, false); err != nil {
+	ctx := AppContext{Stdin: strings.NewReader("n\n"), Stdout: os.Stdout}
+	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -155,7 +159,8 @@ func TestInit_CustomBranchUsedInGitCalls(t *testing.T) {
 		},
 	}
 
-	if err := Init("https://example.com/repo.git", dataDir, configPath, "data-test", runner, strings.NewReader("n\n"), os.Stdout, false); err != nil {
+	ctx := AppContext{Stdin: strings.NewReader("n\n"), Stdout: os.Stdout}
+	if err := Init("https://example.com/repo.git", dataDir, configPath, "data-test", runner, ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -177,7 +182,8 @@ func TestInit_CustomBranchClone(t *testing.T) {
 		},
 	}
 
-	if err := Init("https://example.com/repo.git", dataDir, configPath, "data-test", runner, strings.NewReader(""), os.Stdout, false); err != nil {
+	ctx := AppContext{Stdin: strings.NewReader(""), Stdout: os.Stdout}
+	if err := Init("https://example.com/repo.git", dataDir, configPath, "data-test", runner, ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -193,7 +199,8 @@ func TestInit_DataDirAlreadyExists(t *testing.T) {
 	runner := &git.FakeRunner{}
 	var out strings.Builder
 
-	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, strings.NewReader(""), &out, false); err != nil {
+	ctx := AppContext{Stdin: strings.NewReader(""), Stdout: &out}
+	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -212,7 +219,8 @@ func TestInit_ConfigWritten(t *testing.T) {
 	runner := &git.FakeRunner{}
 
 	// User types just the body after '@' — the prompt prepends '@' automatically.
-	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, strings.NewReader("alice\n"), os.Stdout, false); err != nil {
+	ctx := AppContext{Stdin: strings.NewReader("alice\n"), Stdout: os.Stdout}
+	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -232,7 +240,8 @@ func TestInit_NewBranch_MetaEncryptTrue(t *testing.T) {
 	runner := &git.FakeRunner{Outputs: map[string][]string{"ls-remote": {""}}}
 	var out strings.Builder
 
-	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, strings.NewReader("y\n"), &out, false); err != nil {
+	ctx := AppContext{Stdin: strings.NewReader("y\n"), Stdout: &out}
+	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -252,7 +261,8 @@ func TestInit_NewBranch_MetaEncryptFalse(t *testing.T) {
 	runner := &git.FakeRunner{Outputs: map[string][]string{"ls-remote": {""}}}
 	var out strings.Builder
 
-	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, strings.NewReader("n\n"), &out, false); err != nil {
+	ctx := AppContext{Stdin: strings.NewReader("n\n"), Stdout: &out}
+	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -275,7 +285,8 @@ func TestInit_ExistingBranch_NoEncryptionPrompt(t *testing.T) {
 	runner := &git.FakeRunner{Outputs: map[string][]string{"ls-remote": {"abc123\trefs/heads/data\n"}}}
 
 	// stdin is empty — if a prompt were shown, the call would fail with EOF
-	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, strings.NewReader(""), os.Stdout, false); err != nil {
+	ctx := AppContext{Stdin: strings.NewReader(""), Stdout: os.Stdout}
+	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, ctx); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -286,7 +297,8 @@ func TestInit_NewBranch_Encrypt_KeyCheckCommitted(t *testing.T) {
 	configPath := prewriteConfig(t, "Alice")
 	runner := &git.FakeRunner{Outputs: map[string][]string{"ls-remote": {""}}}
 
-	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, strings.NewReader("y\n"), os.Stdout, false); err != nil {
+	ctx := AppContext{Stdin: strings.NewReader("y\n"), Stdout: os.Stdout}
+	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -305,7 +317,8 @@ func TestInit_NewBranch_Encrypt_PrintsKeyHex(t *testing.T) {
 	runner := &git.FakeRunner{Outputs: map[string][]string{"ls-remote": {""}}}
 	var out strings.Builder
 
-	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, strings.NewReader("y\n"), &out, false); err != nil {
+	ctx := AppContext{Stdin: strings.NewReader("y\n"), Stdout: &out}
+	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -331,7 +344,8 @@ func TestInit_NewBranch_Encrypt_ExistingKey_Reuse(t *testing.T) {
 	var out strings.Builder
 
 	// "y" for encrypt, "y" for reuse existing key
-	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, strings.NewReader("y\ny\n"), &out, false); err != nil {
+	ctx := AppContext{Stdin: strings.NewReader("y\ny\n"), Stdout: &out}
+	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -358,7 +372,8 @@ func TestInit_NewBranch_Encrypt_ExistingKey_Regenerate(t *testing.T) {
 	runner := &git.FakeRunner{Outputs: map[string][]string{"ls-remote": {""}}}
 
 	// "y" for encrypt, "n" to decline reuse → generates a new key
-	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, strings.NewReader("y\nn\n"), os.Stdout, false); err != nil {
+	ctx := AppContext{Stdin: strings.NewReader("y\nn\n"), Stdout: os.Stdout}
+	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -400,7 +415,8 @@ func TestInit_KeyMismatch_ShowsWarning(t *testing.T) {
 	runner := &git.FakeRunner{}
 	var out strings.Builder
 
-	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, strings.NewReader(""), &out, false); err != nil {
+	ctx := AppContext{Stdin: strings.NewReader(""), Stdout: &out}
+	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -431,7 +447,8 @@ func TestInit_PromptForKey_Skip(t *testing.T) {
 	configPath := prewriteConfig(t, "Alice")
 	var out strings.Builder
 
-	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", &git.FakeRunner{}, strings.NewReader("\n"), &out, false); err != nil {
+	ctx := AppContext{Stdin: strings.NewReader("\n"), Stdout: &out}
+	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", &git.FakeRunner{}, ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -448,7 +465,8 @@ func TestInit_PromptForKey_ValidKey(t *testing.T) {
 	configPath := prewriteConfig(t, "Alice")
 	var out strings.Builder
 
-	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", &git.FakeRunner{}, strings.NewReader(keyHex+"\n"), &out, false); err != nil {
+	ctx := AppContext{Stdin: strings.NewReader(keyHex + "\n"), Stdout: &out}
+	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", &git.FakeRunner{}, ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -473,7 +491,8 @@ func TestInit_PromptForKey_InvalidThenValid(t *testing.T) {
 	var out strings.Builder
 
 	stdin := strings.NewReader("notvalidhex\n" + keyHex + "\n")
-	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", &git.FakeRunner{}, stdin, &out, false); err != nil {
+	ctx := AppContext{Stdin: stdin, Stdout: &out}
+	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", &git.FakeRunner{}, ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -494,7 +513,8 @@ func TestInit_PromptForKey_WrongKeyThenSkip(t *testing.T) {
 
 	wrongKey := strings.Repeat("bb", 32)
 	stdin := strings.NewReader(wrongKey + "\n\n")
-	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", &git.FakeRunner{}, stdin, &out, false); err != nil {
+	ctx := AppContext{Stdin: stdin, Stdout: &out}
+	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", &git.FakeRunner{}, ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -514,7 +534,8 @@ func TestInit_UsernameInvalidThenValid(t *testing.T) {
 	var out strings.Builder
 
 	// First input has a space (invalid), second is valid
-	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, strings.NewReader("bad user\nalice-jones\n"), &out, false); err != nil {
+	ctx := AppContext{Stdin: strings.NewReader("bad user\nalice-jones\n"), Stdout: &out}
+	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -536,7 +557,8 @@ func TestInit_ConfigNotOverwritten(t *testing.T) {
 	configPath := prewriteConfig(t, "OriginalName")
 	runner := &git.FakeRunner{}
 
-	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, strings.NewReader(""), os.Stdout, false); err != nil {
+	ctx := AppContext{Stdin: strings.NewReader(""), Stdout: os.Stdout}
+	if err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, ctx); err != nil {
 		t.Fatal(err)
 	}
 

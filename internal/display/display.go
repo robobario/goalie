@@ -227,9 +227,41 @@ func FormatStatusEntry(e journal.Entry, selfUsername string, now time.Time, tty,
 	return note + " - " + age
 }
 
+// renderNoteWords renders a slice of NoteWord as a string with ANSI styling
+// applied when tty is true.
+func renderNoteWords(words []NoteWord, selfUsername string, tty, hyperLinks bool) string {
+	if len(words) == 0 {
+		return ""
+	}
+	if !tty {
+		parts := make([]string, len(words))
+		for i, w := range words {
+			parts[i] = w.Original
+		}
+		return strings.Join(parts, " ")
+	}
+	parts := make([]string, len(words))
+	for i, w := range words {
+		if !w.Token {
+			parts[i] = w.Original
+			continue
+		}
+		if strings.HasPrefix(w.Original, "http") {
+			parts[i] = RenderURL(w.Original, statusURLStyle, hyperLinks)
+		} else if selfUsername != "" && w.Original == selfUsername {
+			parts[i] = statusSelfMentionStyle.Render(w.Original)
+		} else {
+			parts[i] = statusMentionStyle.Render(w.Original)
+		}
+	}
+	return strings.Join(parts, " ")
+}
+
 // WrapStatusEntry formats a status entry, wrapping the note at availableWidth
 // characters. availableWidth is the column budget after any caller-applied
 // indent. When availableWidth <= 0 it falls back to the unwrapped format.
+// Width calculations use the compressed form of URLs (when hyperLinks is true)
+// so that compress_hyperlinks users see accurate line breaks.
 func WrapStatusEntry(e journal.Entry, selfUsername string, now time.Time, tty, hyperLinks bool, availableWidth int) string {
 	age := timeutil.AgeString(e.TS, now)
 	suffix := " - " + age
@@ -256,22 +288,22 @@ func WrapStatusEntry(e journal.Entry, selfUsername string, now time.Time, tty, h
 		return FormatStatusEntry(e, selfUsername, now, tty, hyperLinks)
 	}
 
-	notePlain := e.Note
-	if len(notePlain)+len(suffix) <= maxFirstLine {
-		return prefix + highlightStatusNoteTokens(notePlain, selfUsername, tty, hyperLinks) + suffix
+	words := TokenizeNoteWords(e.Note, hyperLinks)
+	if noteWordsWidth(words)+len(suffix) <= maxFirstLine {
+		return prefix + highlightStatusNoteTokens(e.Note, selfUsername, tty, hyperLinks) + suffix
 	}
 
 	const contIndent = "  "
-	firstChunk, remaining := takeFirstLine(notePlain, maxFirstLine)
+	firstWords, remainingWords := TakeFirstLineWords(words, maxFirstLine)
 
 	var sb strings.Builder
-	sb.WriteString(prefix + highlightStatusNoteTokens(firstChunk, selfUsername, tty, hyperLinks))
+	sb.WriteString(prefix + renderNoteWords(firstWords, selfUsername, tty, hyperLinks))
 
 	contNoteWidth := availableWidth - len(contIndent)
-	contLines := wrapWords(remaining, contNoteWidth)
-	for i, cl := range contLines {
+	contLines := WrapNoteWords(remainingWords, contNoteWidth)
+	for i, lineWords := range contLines {
 		sb.WriteString("\n")
-		rendered := highlightStatusNoteTokens(cl, selfUsername, tty, hyperLinks)
+		rendered := renderNoteWords(lineWords, selfUsername, tty, hyperLinks)
 		if i == len(contLines)-1 {
 			sb.WriteString(contIndent + rendered + suffix)
 		} else {

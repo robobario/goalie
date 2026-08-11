@@ -4,6 +4,7 @@ import (
 	"io"
 
 	"goalie/internal/config"
+	"goalie/internal/display"
 	"goalie/internal/git"
 )
 
@@ -37,4 +38,8 @@ func (ctx AppContext) EffectiveStatusDays() int {
 		return config.DefaultStatusDays
 	}
 	return ctx.StatusDays
+}
+
+func (ctx AppContext) DisplayCtx() display.Context {
+	return display.Context{IsTTY: ctx.IsTTY, HyperLinks: ctx.HyperLinks}
 }

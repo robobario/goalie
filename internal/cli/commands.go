@@ -132,7 +132,7 @@ func Status(ctx AppContext, days int) error {
 		days = ctx.EffectiveStatusDays()
 	}
 	if motdText, ok, err := motd.Latest(ctx.DataDir, ctx.EncryptionKey); err == nil && ok {
-		fmt.Fprintln(ctx.Stdout, display.FormatMotd(motdText, ctx.IsTTY, ctx.EffectiveWrapWidth()))
+		fmt.Fprintln(ctx.Stdout, display.FormatMotd(motdText, ctx.DisplayCtx(), ctx.EffectiveWrapWidth()))
 	}
 	entries, err := journal.CollectLatest(ctx.DataDir, ctx.Git, days, ctx.EncryptionKey)
 	if err != nil {
@@ -176,7 +176,7 @@ func Status(ctx AppContext, days int) error {
 	availableWidth := ctx.EffectiveWrapWidth() - len(entryIndent)
 
 	for _, u := range users {
-		display.Section(u, ctx.Stdout, ctx.IsTTY)
+		display.Section(u, ctx.Stdout, ctx.DisplayCtx())
 		ues := byUser[u]
 		sort.Slice(ues, func(i, j int) bool {
 			if ues[i].Blocked != ues[j].Blocked {
@@ -185,7 +185,7 @@ func Status(ctx AppContext, days int) error {
 			return ues[i].TS < ues[j].TS
 		})
 		for _, e := range ues {
-			formatted := display.WrapStatusEntry(e, selfUsername, now, ctx.IsTTY, ctx.HyperLinks, availableWidth)
+			formatted := display.WrapStatusEntry(e, selfUsername, now, ctx.DisplayCtx(), availableWidth)
 			for _, line := range strings.Split(formatted, "\n") {
 				fmt.Fprintf(ctx.Stdout, "%s%s\n", entryIndent, line)
 			}
@@ -297,10 +297,10 @@ func Summary(ctx AppContext, days int, user string) error {
 		if gi > 0 {
 			fmt.Fprintln(ctx.Stdout)
 		}
-		fmt.Fprintln(ctx.Stdout, display.FormatSummaryHeader(k.goal, k.task, k.username, ctx.IsTTY))
+		fmt.Fprintln(ctx.Stdout, display.FormatSummaryHeader(k.goal, k.task, k.username, ctx.DisplayCtx()))
 		prevBlocked := false
 		for _, e := range groups[k] {
-			fmt.Fprintln(ctx.Stdout, display.FormatSummaryEntry(e, selfUsername, prevBlocked, now, ctx.IsTTY, ctx.HyperLinks))
+			fmt.Fprintln(ctx.Stdout, display.FormatSummaryEntry(e, selfUsername, prevBlocked, now, ctx.DisplayCtx()))
 			prevBlocked = e.Blocked
 		}
 	}

@@ -61,7 +61,7 @@ func InteractiveUpdate(ctx *AppContext) error {
 		fmt.Fprint(ctx.Stdout, "No blocked tasks.\n")
 	}
 
-	display.Section("Blocked tasks", ctx.Stdout, ctx.IsTTY)
+	display.Section("Blocked tasks", ctx.Stdout, ctx.DisplayCtx())
 
 	sort.Slice(blocked, func(i, j int) bool {
 		gi, gj := "", ""
@@ -97,7 +97,7 @@ func InteractiveUpdate(ctx *AppContext) error {
 			return err
 		}
 
-		fmt.Fprint(ctx.Stdout, display.Bold("Notes to add (enter to skip): ", ctx.IsTTY))
+		fmt.Fprint(ctx.Stdout, display.Bold("Notes to add (enter to skip): ", ctx.DisplayCtx()))
 		noteLine, err := readLine(r)
 		if err != nil {
 			return err
@@ -137,7 +137,7 @@ func InteractiveUpdate(ctx *AppContext) error {
 		return recent[i].state.TS > recent[j].state.TS
 	})
 
-	display.Section("Active tasks", ctx.Stdout, ctx.IsTTY)
+	display.Section("Active tasks", ctx.Stdout, ctx.DisplayCtx())
 
 	if len(recent) > 0 {
 		fmt.Fprint(ctx.Stdout, "Your active tasks:\n")
@@ -155,7 +155,7 @@ func InteractiveUpdate(ctx *AppContext) error {
 		}
 		if doUpdate {
 			for {
-				fmt.Fprint(ctx.Stdout, display.Bold("Enter number (or blank to finish): ", ctx.IsTTY))
+				fmt.Fprint(ctx.Stdout, display.Bold("Enter number (or blank to finish): ", ctx.DisplayCtx()))
 				choice, err := readLine(r)
 				if err != nil {
 					return err
@@ -197,7 +197,7 @@ func InteractiveUpdate(ctx *AppContext) error {
 		}
 	}
 
-	display.Section("New tasks", ctx.Stdout, ctx.IsTTY)
+	display.Section("New tasks", ctx.Stdout, ctx.DisplayCtx())
 
 	wantNew, err := ynPrompt("Have you started any new tasks you want to log? (y/n) ", r, ctx.Stdout, ctx.IsTTY)
 	if err != nil {
@@ -227,9 +227,9 @@ func InteractiveUpdate(ctx *AppContext) error {
 				for i, t := range existing {
 					fmt.Fprintf(ctx.Stdout, "  %d. %s\n", i+1, t)
 				}
-				fmt.Fprint(ctx.Stdout, display.Bold("Task? (number to continue, new #hashtag, or blank to skip) ", ctx.IsTTY))
+				fmt.Fprint(ctx.Stdout, display.Bold("Task? (number to continue, new #hashtag, or blank to skip) ", ctx.DisplayCtx()))
 			} else {
-				fmt.Fprint(ctx.Stdout, display.Bold("Task? (#hashtag or blank to skip) ", ctx.IsTTY))
+				fmt.Fprint(ctx.Stdout, display.Bold("Task? (#hashtag or blank to skip) ", ctx.DisplayCtx()))
 			}
 
 			answer, err := readLine(r)

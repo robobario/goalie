@@ -50,7 +50,7 @@ func Init(repoURL string, dataDir string, configPath string, branch string, r gi
 					return err
 				}
 			}
-			encrypt, err := ynPrompt("Enable client-side encryption? (y/n) ", sr, ctx.Stdout, ctx.IsTTY)
+			encrypt, err := ynPrompt("Enable client-side encryption? (y/n) ", sr, ctx)
 			if err != nil {
 				return err
 			}
@@ -186,7 +186,7 @@ func promptForKey(r io.Reader, ctx AppContext, dataDir string) error {
 func setupEncryptionKey(r io.Reader, ctx AppContext) ([]byte, error) {
 	existing, err := crypto.LoadKey()
 	if err == nil {
-		reuse, err := ynPrompt("Use your existing encryption key? (y/n) ", r, ctx.Stdout, ctx.IsTTY)
+		reuse, err := ynPrompt("Use your existing encryption key? (y/n) ", r, ctx)
 		if err != nil {
 			return nil, err
 		}

@@ -84,7 +84,7 @@ func InteractiveUpdate(ctx *AppContext) error {
 			fmt.Fprintf(ctx.Stdout, "%s - %s\n", item.tag, item.state.Note)
 		}
 
-		anyChanges, err := ynPrompt("Any changes or notes to record? (y/n) ", r, ctx.Stdout, ctx.IsTTY)
+		anyChanges, err := ynPrompt("Any changes or notes to record? (y/n) ", r, *ctx)
 		if err != nil {
 			return err
 		}
@@ -92,7 +92,7 @@ func InteractiveUpdate(ctx *AppContext) error {
 			continue
 		}
 
-		unblocked, err := ynPrompt("Is it now unblocked? (y/n) ", r, ctx.Stdout, ctx.IsTTY)
+		unblocked, err := ynPrompt("Is it now unblocked? (y/n) ", r, *ctx)
 		if err != nil {
 			return err
 		}
@@ -149,7 +149,7 @@ func InteractiveUpdate(ctx *AppContext) error {
 			}
 		}
 
-		doUpdate, err := ynPrompt("Do you want to update any of these? (y/n) ", r, ctx.Stdout, ctx.IsTTY)
+		doUpdate, err := ynPrompt("Do you want to update any of these? (y/n) ", r, *ctx)
 		if err != nil {
 			return err
 		}
@@ -171,7 +171,7 @@ func InteractiveUpdate(ctx *AppContext) error {
 				}
 				item := recent[n-1]
 
-				isBlocked, err := ynPrompt("Are you blocked? (y/n) ", r, ctx.Stdout, ctx.IsTTY)
+				isBlocked, err := ynPrompt("Are you blocked? (y/n) ", r, *ctx)
 				if err != nil {
 					return err
 				}
@@ -179,7 +179,7 @@ func InteractiveUpdate(ctx *AppContext) error {
 				if isBlocked {
 					notePrompt = "Notes (what is blocking you?): "
 				}
-				note, err := requireInput(notePrompt, r, ctx.Stdout, ctx.IsTTY)
+				note, err := requireInput(notePrompt, r, *ctx)
 				if err != nil {
 					return err
 				}
@@ -199,7 +199,7 @@ func InteractiveUpdate(ctx *AppContext) error {
 
 	display.Section("New tasks", ctx.Stdout, ctx.DisplayCtx())
 
-	wantNew, err := ynPrompt("Have you started any new tasks you want to log? (y/n) ", r, ctx.Stdout, ctx.IsTTY)
+	wantNew, err := ynPrompt("Have you started any new tasks you want to log? (y/n) ", r, *ctx)
 	if err != nil {
 		return err
 	}
@@ -208,7 +208,7 @@ func InteractiveUpdate(ctx *AppContext) error {
 	}
 
 	for {
-		goalID, err := SelectGoal(ctx.DataDir, ctx.EncryptionKey, r, ctx.Stdout, ctx.IsTTY)
+		goalID, err := SelectGoal(r, *ctx)
 		if err != nil {
 			return err
 		}
@@ -256,7 +256,7 @@ func InteractiveUpdate(ctx *AppContext) error {
 		}
 
 		if tag != "" {
-			isBlocked, err := ynPrompt("Are you blocked? (y/n) ", r, ctx.Stdout, ctx.IsTTY)
+			isBlocked, err := ynPrompt("Are you blocked? (y/n) ", r, *ctx)
 			if err != nil {
 				return err
 			}
@@ -264,7 +264,7 @@ func InteractiveUpdate(ctx *AppContext) error {
 			if isBlocked {
 				notePrompt = "Notes (what is blocking you?): "
 			}
-			note, err := requireInput(notePrompt, r, ctx.Stdout, ctx.IsTTY)
+			note, err := requireInput(notePrompt, r, *ctx)
 			if err != nil {
 				return err
 			}
@@ -283,7 +283,7 @@ func InteractiveUpdate(ctx *AppContext) error {
 			}
 		}
 
-		more, err := ynPrompt("Log another new task? (y/n) ", r, ctx.Stdout, ctx.IsTTY)
+		more, err := ynPrompt("Log another new task? (y/n) ", r, *ctx)
 		if err != nil {
 			return err
 		}

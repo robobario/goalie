@@ -655,6 +655,22 @@ func TestRenderNoteWithMentionsGitHubHyperLink(t *testing.T) {
 	}
 }
 
+func TestRenderActivityEntryURLCompressedFitsOnFirstLine(t *testing.T) {
+	// Raw URL is 37 chars; compressed to "owner/repo#42" (13 chars).
+	// Header is "• - now - " (~10 chars). maxNoteOnFirstLine ~= availableWidth - 10.
+	// With hyperLinks=true and availableWidth=30, the compressed note should fit.
+	url := "https://github.com/owner/repo/pull/42"
+	e := journal.Entry{
+		TS:   time.Now().Format(time.RFC3339),
+		Note: url,
+	}
+	got := renderActivityEntry(e, time.Now(), "", true, 40)
+	lines := strings.Split(got, "\n")
+	if len(lines) > 1 {
+		t.Errorf("expected single line with hyperLinks=true at width 40, got %d lines: %q", len(lines), got)
+	}
+}
+
 func TestRenderNoteWithMentionsNonGitHubHyperLink(t *testing.T) {
 	url := "https://www.example.com/thing/x/y/lonoooooooog"
 	got := renderNoteWithMentions("see "+url, "", true)

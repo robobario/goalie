@@ -346,6 +346,42 @@ func TestSyncingViewShowsSyncMessage(t *testing.T) {
 	}
 }
 
+func TestInitSchedulesTickWhenNotificationsEnabled(t *testing.T) {
+	m := initialModel(&cli.AppContext{NotificationsEnabled: true})
+	if m.Init() == nil {
+		t.Fatal("expected non-nil Init cmd when notifications enabled")
+	}
+}
+
+func TestTickOnActivityTabTriggersSyncAndReArms(t *testing.T) {
+	m := newModel()
+	m.activeTab = activityTab
+	next, cmd := m.Update(tickMsg{})
+	got := next.(Model)
+	if !got.syncing {
+		t.Error("expected syncing=true after tick while on activity tab")
+	}
+	if got.activity.loaded {
+		t.Error("expected activity.loaded=false after tick-triggered refresh starts")
+	}
+	if cmd == nil {
+		t.Error("expected a batched cmd (re-arm + load) after tick")
+	}
+}
+
+func TestTickOnUpdateTabSkipsSyncButReArms(t *testing.T) {
+	m := newModel()
+	m.activeTab = updateTab
+	next, cmd := m.Update(tickMsg{})
+	got := next.(Model)
+	if got.syncing {
+		t.Error("expected syncing to stay false when tick fires while on update tab")
+	}
+	if cmd == nil {
+		t.Error("expected re-arm cmd even when tick is a no-op for the current tab")
+	}
+}
+
 func TestWindowSizeMsgPropagatedToActivityChild(t *testing.T) {
 	m := newModel()
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})

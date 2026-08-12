@@ -29,6 +29,17 @@ type motdLoadedMsg struct {
 	text string
 }
 
+// tickMsg fires every activityFetchInterval to drive the periodic Activity
+// refresh used to surface eager notifications (see #83). Only scheduled when
+// the user has opted into ctx.NotificationsEnabled.
+type tickMsg struct{}
+
+func tickCmd() tea.Cmd {
+	return tea.Tick(activityFetchInterval, func(time.Time) tea.Msg {
+		return tickMsg{}
+	})
+}
+
 type Model struct {
 	ctx       *cli.AppContext
 	activeTab tab
@@ -90,7 +101,11 @@ func loadMotdCmd(ctx *cli.AppContext) tea.Cmd {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(loadActivityCmd(m.ctx, true), loadMotdCmd(m.ctx), m.update.Init())
+	cmds := []tea.Cmd{loadActivityCmd(m.ctx, true), loadMotdCmd(m.ctx), m.update.Init()}
+	if m.ctx.NotificationsEnabled {
+		cmds = append(cmds, tickCmd())
+	}
+	return tea.Batch(cmds...)
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -189,6 +204,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 	case motdLoadedMsg:
 		m.motd = msg.text
+	case tickMsg:
+		cmds = append(cmds, tickCmd())
+		if m.activeTab == activityTab {
+			m.activity.loaded = false
+			m.syncing = true
+			cmds = append(cmds, loadActivityCmd(m.ctx, true))
+		}
 	}
 	return m, tea.Batch(cmds...)
 }

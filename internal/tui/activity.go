@@ -197,14 +197,24 @@ func notifyNewEntriesCmd(n notify.Notifier, oldEntries, newEntries []journal.Ent
 	}
 	return func() tea.Msg {
 		for _, t := range triggers {
-			if t.newBlocked {
-				_ = n.Send("Blocked", t.entry.Username+" is blocked: "+t.entry.Note)
-			}
-			if t.newMention {
-				_ = n.Send("Mentioned", t.entry.Username+" mentioned you: "+t.entry.Note)
-			}
+			title, body := notifyTitleAndBody(t)
+			_ = n.Send(title, body)
 		}
 		return nil
+	}
+}
+
+// notifyTitleAndBody merges a trigger's reason(s) into a single
+// notification so an entry that's both newly blocked and mentions
+// selfUsername sends one OS notification, not two.
+func notifyTitleAndBody(t notifyTrigger) (title, body string) {
+	switch {
+	case t.newBlocked && t.newMention:
+		return "Blocked & Mentioned", t.entry.Username + " is blocked and mentioned you: " + t.entry.Note
+	case t.newBlocked:
+		return "Blocked", t.entry.Username + " is blocked: " + t.entry.Note
+	default:
+		return "Mentioned", t.entry.Username + " mentioned you: " + t.entry.Note
 	}
 }
 

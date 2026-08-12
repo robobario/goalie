@@ -37,6 +37,25 @@ func TestNotifyFiresOnNewBlockedEntryFromOtherUser(t *testing.T) {
 	}
 }
 
+func TestNotifyMergesBlockedAndMentionIntoOneNotification(t *testing.T) {
+	fake := &fakeNotifier{}
+	m := activityModel{selfUsername: "@me", notifier: fake, notificationsEnabled: true}
+	m, _ = m.Update(entriesLoadedMsg{entries: []journal.Entry{}})
+	_, cmd := m.Update(entriesLoadedMsg{entries: []journal.Entry{
+		{ID: "1b", Username: "@alice", Blocked: true, Note: "stuck, @me can you help"},
+	}})
+	if cmd == nil {
+		t.Fatal("expected a notify cmd for an entry that is both blocked and mentions self")
+	}
+	cmd()
+	if len(fake.sent) != 1 {
+		t.Fatalf("expected exactly one notification, got %+v", fake.sent)
+	}
+	if fake.sent[0].title != "Blocked & Mentioned" {
+		t.Errorf("expected merged title, got %q", fake.sent[0].title)
+	}
+}
+
 func TestNotifyFiresOnSelfMentionFromOtherUser(t *testing.T) {
 	fake := &fakeNotifier{}
 	m := activityModel{selfUsername: "@me", notifier: fake, notificationsEnabled: true}

@@ -5,6 +5,10 @@ package notify
 
 import "github.com/gen2brain/beeep"
 
+func init() {
+	beeep.AppName = "Goalie"
+}
+
 type Notifier interface {
 	Send(title, message string) error
 }

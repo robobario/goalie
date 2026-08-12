@@ -169,5 +169,17 @@ goalie --version                    # Print version and exit
 
 Running `goalie` opens a terminal interface with two tabs (switch with Tab / Shift-Tab):
 
-- **Activity** — shows the latest entry per person per task across the last 30 days. Start typing to filter by note, goal, or task tag.
+- **Activity** — shows the latest entry per person per task across the last 30 days. Start typing to filter by note, goal, or task tag. When notifications are enabled (see [Configuration](#configuration)), this view refreshes automatically every minute; input other than `q` / Ctrl-C is locked out for the duration of the refresh.
 - **Update** — shows a menu to choose what to do: review blocked tasks, log progress on a recent or new task, or edit a recent entry. ↑/↓ to move, Enter to select, Esc to return to the menu from any sub-flow, `q` to quit. Editing lets you fix the note, task tag, and blocked/done state of any entry from the last 7 days.
+
+## Configuration
+
+`goalie` reads optional settings from `~/.goalie/config.json`. All fields are optional; add only the ones you want to override:
+
+```json
+{
+  "notifications": true
+}
+```
+
+- `notifications` (bool, default `false`) — when `true`, the TUI's Activity view polls for updates every minute and fires an OS desktop notification when another user's entry newly becomes blocked, or when a note mentions you by your `@username`. Off by default; enable it by hand-editing `config.json`.

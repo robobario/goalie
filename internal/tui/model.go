@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"goalie/internal/cli"
 	"goalie/internal/motd"
+	"goalie/internal/notify"
 )
 
 type tab int
@@ -60,10 +61,12 @@ func initialModel(ctx *cli.AppContext) Model {
 		wrapWidth: ww,
 		syncing:   true,
 		activity: activityModel{
-			selfUsername: ctx.Username,
-			wrapWidth:    ww,
-			nonDoneDays:  ctx.EffectiveStatusDays(),
-			hyperLinks:   ctx.HyperLinks,
+			selfUsername:         ctx.Username,
+			wrapWidth:            ww,
+			nonDoneDays:          ctx.EffectiveStatusDays(),
+			hyperLinks:           ctx.HyperLinks,
+			notifier:             notify.BeeepNotifier{},
+			notificationsEnabled: ctx.NotificationsEnabled,
 		},
 		update: updateModel{ctx: ctx, wrapWidth: ww},
 	}

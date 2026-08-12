@@ -12,6 +12,7 @@ import (
 	"goalie/internal/cli"
 	"goalie/internal/display"
 	"goalie/internal/journal"
+	"goalie/internal/notify"
 	"goalie/internal/timeutil"
 )
 
@@ -38,18 +39,20 @@ type entriesLoadedMsg struct {
 }
 
 type activityModel struct {
-	entries       []journal.Entry
-	filtered      []journal.Entry
-	search        string
-	searchMode    bool
-	err           error
-	loaded        bool
-	lastPulledAt  time.Time
-	selfUsername  string
-	width         int
-	wrapWidth     int
-	nonDoneDays   int
-	hyperLinks    bool
+	entries              []journal.Entry
+	filtered             []journal.Entry
+	search               string
+	searchMode           bool
+	err                  error
+	loaded               bool
+	lastPulledAt         time.Time
+	selfUsername         string
+	width                int
+	wrapWidth            int
+	nonDoneDays          int
+	hyperLinks           bool
+	notifier             notify.Notifier
+	notificationsEnabled bool
 }
 
 func loadActivityCmd(ctx *cli.AppContext, doPull bool) tea.Cmd {
@@ -90,14 +93,20 @@ func FilterEntries(entries []journal.Entry, query string) []journal.Entry {
 }
 
 func (m activityModel) Update(msg tea.Msg) (activityModel, tea.Cmd) {
+	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case entriesLoadedMsg:
+		hadLoaded := m.loaded
+		oldEntries := m.entries
 		m.loaded = true
 		m.err = msg.err
 		m.entries = msg.entries
 		m.filtered = FilterEntries(m.entries, m.search)
 		if !msg.pulledAt.IsZero() {
 			m.lastPulledAt = msg.pulledAt
+		}
+		if hadLoaded && m.notificationsEnabled && m.notifier != nil {
+			cmd = notifyNewEntriesCmd(m.notifier, oldEntries, m.entries, m.selfUsername)
 		}
 	case tea.KeyMsg:
 		if msg.Paste {
@@ -129,7 +138,57 @@ func (m activityModel) Update(msg tea.Msg) (activityModel, tea.Cmd) {
 			}
 		}
 	}
-	return m, nil
+	return m, cmd
+}
+
+// noteHasSelfMention reports whether note contains selfUsername as a
+// standalone @mention token, matching the highlighting logic in
+// renderNoteWithMentions.
+func noteHasSelfMention(note, selfUsername string) bool {
+	if selfUsername == "" {
+		return false
+	}
+	for _, tok := range tuiNoteTokenRe.FindAllString(note, -1) {
+		if tok == selfUsername {
+			return true
+		}
+	}
+	return false
+}
+
+// notifyNewEntriesCmd returns a tea.Cmd that fires OS notifications for
+// entries present in newEntries but not oldEntries (by ID) from another
+// user: one for a newly blocked entry, one for a note mentioning
+// selfUsername. Returns nil when there is nothing new to notify about.
+func notifyNewEntriesCmd(n notify.Notifier, oldEntries, newEntries []journal.Entry, selfUsername string) tea.Cmd {
+	oldIDs := make(map[string]struct{}, len(oldEntries))
+	for _, e := range oldEntries {
+		oldIDs[e.ID] = struct{}{}
+	}
+	var fresh []journal.Entry
+	for _, e := range newEntries {
+		if e.Username == selfUsername {
+			continue
+		}
+		if _, seen := oldIDs[e.ID]; seen {
+			continue
+		}
+		fresh = append(fresh, e)
+	}
+	if len(fresh) == 0 {
+		return nil
+	}
+	return func() tea.Msg {
+		for _, e := range fresh {
+			if e.Blocked {
+				_ = n.Send("Blocked", e.Username+" is blocked: "+e.Note)
+			}
+			if noteHasSelfMention(e.Note, selfUsername) {
+				_ = n.Send("Mentioned", e.Username+" mentioned you: "+e.Note)
+			}
+		}
+		return nil
+	}
 }
 
 func (m activityModel) View() string {

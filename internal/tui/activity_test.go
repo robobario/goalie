@@ -12,6 +12,93 @@ import (
 
 func strPtr(s string) *string { return &s }
 
+type fakeNotifier struct {
+	sent []struct{ title, message string }
+}
+
+func (f *fakeNotifier) Send(title, message string) error {
+	f.sent = append(f.sent, struct{ title, message string }{title, message})
+	return nil
+}
+
+func TestNotifyFiresOnNewBlockedEntryFromOtherUser(t *testing.T) {
+	fake := &fakeNotifier{}
+	m := activityModel{selfUsername: "@me", notifier: fake, notificationsEnabled: true}
+	m, _ = m.Update(entriesLoadedMsg{entries: []journal.Entry{}})
+	_, cmd := m.Update(entriesLoadedMsg{entries: []journal.Entry{
+		{ID: "1", Username: "@alice", Blocked: true, Note: "stuck on setup"},
+	}})
+	if cmd == nil {
+		t.Fatal("expected a notify cmd for a new blocked entry")
+	}
+	cmd()
+	if len(fake.sent) != 1 || fake.sent[0].title != "Blocked" {
+		t.Errorf("expected one Blocked notification, got %+v", fake.sent)
+	}
+}
+
+func TestNotifyFiresOnSelfMentionFromOtherUser(t *testing.T) {
+	fake := &fakeNotifier{}
+	m := activityModel{selfUsername: "@me", notifier: fake, notificationsEnabled: true}
+	m, _ = m.Update(entriesLoadedMsg{entries: []journal.Entry{}})
+	_, cmd := m.Update(entriesLoadedMsg{entries: []journal.Entry{
+		{ID: "2", Username: "@alice", Note: "hey @me check this"},
+	}})
+	if cmd == nil {
+		t.Fatal("expected a notify cmd for a self-mention")
+	}
+	cmd()
+	if len(fake.sent) != 1 || fake.sent[0].title != "Mentioned" {
+		t.Errorf("expected one Mentioned notification, got %+v", fake.sent)
+	}
+}
+
+func TestNotifySkipsOwnEntries(t *testing.T) {
+	fake := &fakeNotifier{}
+	m := activityModel{selfUsername: "@me", notifier: fake, notificationsEnabled: true}
+	m, _ = m.Update(entriesLoadedMsg{entries: []journal.Entry{}})
+	_, cmd := m.Update(entriesLoadedMsg{entries: []journal.Entry{
+		{ID: "3", Username: "@me", Blocked: true, Note: "stuck"},
+	}})
+	if cmd != nil {
+		t.Error("expected no notify cmd for the user's own entry")
+	}
+}
+
+func TestNotifySkipsFirstLoad(t *testing.T) {
+	fake := &fakeNotifier{}
+	m := activityModel{selfUsername: "@me", notifier: fake, notificationsEnabled: true}
+	_, cmd := m.Update(entriesLoadedMsg{entries: []journal.Entry{
+		{ID: "4", Username: "@alice", Blocked: true, Note: "already blocked at startup"},
+	}})
+	if cmd != nil {
+		t.Error("expected no notify cmd on the initial load")
+	}
+}
+
+func TestNotifySkipsWhenDisabled(t *testing.T) {
+	fake := &fakeNotifier{}
+	m := activityModel{selfUsername: "@me", notifier: fake, notificationsEnabled: false}
+	m, _ = m.Update(entriesLoadedMsg{entries: []journal.Entry{}})
+	_, cmd := m.Update(entriesLoadedMsg{entries: []journal.Entry{
+		{ID: "5", Username: "@alice", Blocked: true, Note: "stuck"},
+	}})
+	if cmd != nil {
+		t.Error("expected no notify cmd when notifications are disabled")
+	}
+}
+
+func TestNotifySkipsUnchangedEntries(t *testing.T) {
+	fake := &fakeNotifier{}
+	entry := journal.Entry{ID: "6", Username: "@alice", Blocked: true, Note: "stuck"}
+	m := activityModel{selfUsername: "@me", notifier: fake, notificationsEnabled: true}
+	m, _ = m.Update(entriesLoadedMsg{entries: []journal.Entry{entry}})
+	_, cmd := m.Update(entriesLoadedMsg{entries: []journal.Entry{entry}})
+	if cmd != nil {
+		t.Error("expected no notify cmd when the entry ID was already seen")
+	}
+}
+
 func TestActivityViewMultiLineErrorPreserved(t *testing.T) {
 	m := activityModel{err: errors.New("line one\nline two\nline three")}
 	got := m.View()

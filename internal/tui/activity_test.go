@@ -88,6 +88,38 @@ func TestNotifySkipsWhenDisabled(t *testing.T) {
 	}
 }
 
+func TestNotifyFiresOnExistingEntryEditedToBlocked(t *testing.T) {
+	fake := &fakeNotifier{}
+	m := activityModel{selfUsername: "@me", notifier: fake, notificationsEnabled: true}
+	m, _ = m.Update(entriesLoadedMsg{entries: []journal.Entry{
+		{ID: "7", Username: "@alice", Blocked: false, Note: "working on it"},
+	}})
+	_, cmd := m.Update(entriesLoadedMsg{entries: []journal.Entry{
+		{ID: "7", Username: "@alice", Blocked: true, Note: "working on it, now stuck"},
+	}})
+	if cmd == nil {
+		t.Fatal("expected a notify cmd when an existing entry is edited into blocked state")
+	}
+	cmd()
+	if len(fake.sent) != 1 || fake.sent[0].title != "Blocked" {
+		t.Errorf("expected one Blocked notification, got %+v", fake.sent)
+	}
+}
+
+func TestNotifySkipsEntryThatStaysBlocked(t *testing.T) {
+	fake := &fakeNotifier{}
+	m := activityModel{selfUsername: "@me", notifier: fake, notificationsEnabled: true}
+	m, _ = m.Update(entriesLoadedMsg{entries: []journal.Entry{
+		{ID: "8", Username: "@alice", Blocked: true, Note: "stuck on X"},
+	}})
+	_, cmd := m.Update(entriesLoadedMsg{entries: []journal.Entry{
+		{ID: "8", Username: "@alice", Blocked: true, Note: "still stuck on X, tried Y"},
+	}})
+	if cmd != nil {
+		t.Error("expected no notify cmd when an already-blocked entry's note is merely edited")
+	}
+}
+
 func TestNotifySkipsUnchangedEntries(t *testing.T) {
 	fake := &fakeNotifier{}
 	entry := journal.Entry{ID: "6", Username: "@alice", Blocked: true, Note: "stuck"}

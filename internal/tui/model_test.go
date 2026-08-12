@@ -382,6 +382,34 @@ func TestTickOnUpdateTabSkipsSyncButReArms(t *testing.T) {
 	}
 }
 
+func TestTickTriggeredRefreshStillFiresNotifications(t *testing.T) {
+	// Regression test: model.go resets m.activity.loaded=false before every
+	// refresh (for the "Loading..." spinner), including tick-triggered ones.
+	// The notify-diff gate must survive that reset instead of mistaking every
+	// refresh for the very first load.
+	fake := &fakeNotifier{}
+	m := initialModel(&cli.AppContext{NotificationsEnabled: true, Username: "@me"})
+	m.activity.notifier = fake
+	m.syncing = false
+
+	next, _ := m.Update(entriesLoadedMsg{entries: []journal.Entry{}, pulledAt: time.Now()})
+	m = next.(Model)
+
+	next, _ = m.Update(tickMsg{})
+	m = next.(Model)
+	if m.activity.loaded {
+		t.Fatal("expected tick to reset activity.loaded for the spinner")
+	}
+
+	_, cmd := m.Update(entriesLoadedMsg{
+		entries:  []journal.Entry{{ID: "9", Username: "@alice", Blocked: true, Note: "stuck"}},
+		pulledAt: time.Now(),
+	})
+	if cmd == nil {
+		t.Fatal("expected a notify cmd to survive a tick-triggered loaded reset")
+	}
+}
+
 func TestWindowSizeMsgPropagatedToActivityChild(t *testing.T) {
 	m := newModel()
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})

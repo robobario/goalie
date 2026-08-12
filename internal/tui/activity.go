@@ -45,6 +45,7 @@ type activityModel struct {
 	searchMode           bool
 	err                  error
 	loaded               bool
+	everLoaded           bool
 	lastPulledAt         time.Time
 	selfUsername         string
 	width                int
@@ -96,9 +97,12 @@ func (m activityModel) Update(msg tea.Msg) (activityModel, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case entriesLoadedMsg:
-		hadLoaded := m.loaded
+		// everLoaded (unlike loaded) is never reset before a refresh, so it
+		// reliably distinguishes the first-ever load from a periodic refresh.
+		hadLoaded := m.everLoaded
 		oldEntries := m.entries
 		m.loaded = true
+		m.everLoaded = true
 		m.err = msg.err
 		m.entries = msg.entries
 		m.filtered = FilterEntries(m.entries, m.search)
@@ -156,35 +160,48 @@ func noteHasSelfMention(note, selfUsername string) bool {
 	return false
 }
 
+// notifyTrigger pairs an entry with which transition(s) made it notify-worthy,
+// since an entry can appear in fresh for one reason while already having
+// notified for the other on an earlier refresh.
+type notifyTrigger struct {
+	entry      journal.Entry
+	newBlocked bool
+	newMention bool
+}
+
 // notifyNewEntriesCmd returns a tea.Cmd that fires OS notifications for
-// entries present in newEntries but not oldEntries (by ID) from another
-// user: one for a newly blocked entry, one for a note mentioning
-// selfUsername. Returns nil when there is nothing new to notify about.
+// entries from another user that transitioned into a notify-worthy state
+// between oldEntries and newEntries: becoming Blocked, or a note newly
+// @mentioning selfUsername. Comparing by ID's prior value (not just prior
+// presence) catches in-place edits made via the update flow, not just
+// brand-new entries. Returns nil when there is nothing new to notify about.
 func notifyNewEntriesCmd(n notify.Notifier, oldEntries, newEntries []journal.Entry, selfUsername string) tea.Cmd {
-	oldIDs := make(map[string]struct{}, len(oldEntries))
+	oldByID := make(map[string]journal.Entry, len(oldEntries))
 	for _, e := range oldEntries {
-		oldIDs[e.ID] = struct{}{}
+		oldByID[e.ID] = e
 	}
-	var fresh []journal.Entry
+	var triggers []notifyTrigger
 	for _, e := range newEntries {
 		if e.Username == selfUsername {
 			continue
 		}
-		if _, seen := oldIDs[e.ID]; seen {
-			continue
+		old, existed := oldByID[e.ID]
+		newBlocked := e.Blocked && (!existed || !old.Blocked)
+		newMention := noteHasSelfMention(e.Note, selfUsername) && (!existed || !noteHasSelfMention(old.Note, selfUsername))
+		if newBlocked || newMention {
+			triggers = append(triggers, notifyTrigger{entry: e, newBlocked: newBlocked, newMention: newMention})
 		}
-		fresh = append(fresh, e)
 	}
-	if len(fresh) == 0 {
+	if len(triggers) == 0 {
 		return nil
 	}
 	return func() tea.Msg {
-		for _, e := range fresh {
-			if e.Blocked {
-				_ = n.Send("Blocked", e.Username+" is blocked: "+e.Note)
+		for _, t := range triggers {
+			if t.newBlocked {
+				_ = n.Send("Blocked", t.entry.Username+" is blocked: "+t.entry.Note)
 			}
-			if noteHasSelfMention(e.Note, selfUsername) {
-				_ = n.Send("Mentioned", e.Username+" mentioned you: "+e.Note)
+			if t.newMention {
+				_ = n.Send("Mentioned", t.entry.Username+" mentioned you: "+t.entry.Note)
 			}
 		}
 		return nil

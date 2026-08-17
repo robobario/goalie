@@ -22,6 +22,7 @@ const activityFetchInterval = time.Minute
 var tuiNoteTokenRe = regexp.MustCompile(`https?://\S+|@[a-zA-Z0-9][a-zA-Z0-9-]{0,38}`)
 
 var blockedStyle      = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "124", Dark: "9"})
+var unblockedStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "28", Dark: "82"})
 var doneStyle         = lipgloss.NewStyle().Faint(true)
 var goalStyle         = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "27", Dark: "75"})
 var goalDescStyle     = lipgloss.NewStyle().Faint(true).Italic(true)
@@ -251,6 +252,7 @@ func (m activityModel) View() string {
 
 	now := time.Now()
 	doneHideCutoff := journal.PriorBusinessDayStart(now)
+	unblockedTargets := journal.UnblockedTargets(m.filtered)
 
 	const entryIndent = "  "
 
@@ -279,7 +281,7 @@ func (m activityModel) View() string {
 				effectiveWidth = m.wrapWidth
 			}
 			availableWidth := effectiveWidth - len(entryIndent)
-			rendered := renderActivityEntry(e, now, m.selfUsername, m.hyperLinks, availableWidth)
+			rendered := renderActivityEntry(e, now, m.selfUsername, m.hyperLinks, availableWidth, unblockedTargets)
 			for _, line := range strings.Split(rendered, "\n") {
 				sb.WriteString(entryIndent + line + "\n")
 			}
@@ -320,15 +322,21 @@ func wrapWords(text string, maxWidth int) []string {
 }
 
 // renderActivityEntry formats an entry as "• PREFIX - AGE - note..." with the
-// note wrapping to indented continuation lines.
-func renderActivityEntry(e journal.Entry, now time.Time, selfUsername string, hyperLinks bool, availableWidth int) string {
+// note wrapping to indented continuation lines. A blocked entry renders as
+// [UNBLOCKED] instead of [BLOCKED] when unblockedTargets marks its
+// (username, goal, task) as unblocked by someone else's entry (see
+// journal.UnblockedTargets).
+func renderActivityEntry(e journal.Entry, now time.Time, selfUsername string, hyperLinks bool, availableWidth int, unblockedTargets map[journal.UnblockTarget]bool) string {
 	const bullet = "•"
 	const contIndent = "  "
 
 	var prefixParts []string
-	if e.Done {
+	switch {
+	case e.Done:
 		prefixParts = append(prefixParts, doneStyle.Render("[done]"))
-	} else if e.Blocked {
+	case e.Blocked && unblockedTargets[journal.TargetOf(e)]:
+		prefixParts = append(prefixParts, unblockedStyle.Render("[UNBLOCKED]"))
+	case e.Blocked:
 		prefixParts = append(prefixParts, blockedStyle.Render("[BLOCKED]"))
 	}
 	if e.Goal != nil && e.Task != nil {

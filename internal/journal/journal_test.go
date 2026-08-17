@@ -878,6 +878,13 @@ func TestPriorBusinessDayStart(t *testing.T) {
 			now:  time.Date(2026, 8, 2, 12, 0, 0, 0, time.UTC), // Sunday
 			want: midnight(2026, 7, 31),                         // Friday
 		},
+		{
+			// Regression for issue #151: at Fri 09:11 NZST, the prior business
+			// day is local Thursday, not the UTC-calendar Wednesday.
+			name: "NZST evening crossing UTC date uses local weekday",
+			now:  time.Date(2026, 8, 14, 9, 11, 0, 0, time.FixedZone("NZST", 12*60*60)), // Friday NZST
+			want: time.Date(2026, 8, 13, 0, 0, 0, 0, time.FixedZone("NZST", 12*60*60)),  // Thursday NZST midnight
+		},
 	}
 
 	for _, tc := range cases {

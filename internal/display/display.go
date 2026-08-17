@@ -21,6 +21,7 @@ var (
 	statusGoalStyle        = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "27", Dark: "75"})
 	statusTaskTagStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "130", Dark: "208"})
 	statusBlockedStyle     = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "124", Dark: "9"})
+	statusDoneStyle        = lipgloss.NewStyle().Faint(true)
 	statusMentionStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "28", Dark: "76"})
 	statusSelfMentionStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "22", Dark: "82"})
 	statusURLStyle         = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "136", Dark: "178"})
@@ -45,6 +46,26 @@ func applyStatusBlockedStyle(s string, ctx Context) string {
 		return s
 	}
 	return statusBlockedStyle.Render(s)
+}
+
+func applyStatusDoneStyle(s string, ctx Context) string {
+	if !ctx.IsTTY {
+		return s
+	}
+	return statusDoneStyle.Render(s)
+}
+
+// statusTag returns the styled and plain-text forms of an entry's status
+// tag: "[done] " takes precedence over "[BLOCKED] " when both are set,
+// matching the TUI activity view. Empty when neither applies.
+func statusTag(e journal.Entry, ctx Context) (styled, plain string) {
+	if e.Done {
+		return applyStatusDoneStyle("[done]", ctx) + " ", "[done] "
+	}
+	if e.Blocked {
+		return applyStatusBlockedStyle("[BLOCKED]", ctx) + " ", "[BLOCKED] "
+	}
+	return "", ""
 }
 
 // highlightStatusNoteTokens applies colour to URLs and @mentions, matching
@@ -214,17 +235,12 @@ func goalTaskComboStyled(e journal.Entry, ctx Context) (styled, plain string) {
 func FormatStatusEntry(e journal.Entry, selfUsername string, now time.Time, ctx Context) string {
 	age := timeutil.AgeString(e.TS, now)
 	comboStyled, comboPlain := goalTaskComboStyled(e, ctx)
+	tagStyled, _ := statusTag(e, ctx)
 	note := highlightStatusNoteTokens(e.Note, selfUsername, ctx)
-	if e.Blocked && comboPlain != "" {
-		return applyStatusBlockedStyle("[BLOCKED]", ctx) + " " + comboStyled + " " + note + " - " + age
-	}
-	if e.Blocked {
-		return applyStatusBlockedStyle("[BLOCKED]", ctx) + " " + note + " - " + age
-	}
 	if comboPlain != "" {
-		return comboStyled + " " + note + " - " + age
+		return tagStyled + comboStyled + " " + note + " - " + age
 	}
-	return note + " - " + age
+	return tagStyled + note + " - " + age
 }
 
 // renderNoteWords renders a slice of NoteWord as a string with ANSI styling
@@ -269,19 +285,17 @@ func WrapStatusEntry(e journal.Entry, selfUsername string, now time.Time, ctx Co
 	suffix := " - " + age
 
 	comboStyled, comboPlain := goalTaskComboStyled(e, ctx)
+	tagStyled, tagPlain := statusTag(e, ctx)
 
 	// prefix always ends with a space when non-empty so prefix+note renders correctly.
 	// prefixPlain is the unstyled equivalent used for column-width maths.
 	var prefix, prefixPlain string
-	if e.Blocked && comboPlain != "" {
-		prefix = applyStatusBlockedStyle("[BLOCKED]", ctx) + " " + comboStyled + " "
-		prefixPlain = "[BLOCKED] " + comboPlain + " "
-	} else if e.Blocked {
-		prefix = applyStatusBlockedStyle("[BLOCKED]", ctx) + " "
-		prefixPlain = "[BLOCKED] "
-	} else if comboPlain != "" {
-		prefix = comboStyled + " "
-		prefixPlain = comboPlain + " "
+	if comboPlain != "" {
+		prefix = tagStyled + comboStyled + " "
+		prefixPlain = tagPlain + comboPlain + " "
+	} else {
+		prefix = tagStyled
+		prefixPlain = tagPlain
 	}
 
 	maxFirstLine := availableWidth - len(prefixPlain)

@@ -29,6 +29,9 @@ type Entry struct {
 	Task          *string `json:"task"`
 	SchemaVersion string  `json:"schema_version,omitempty"`
 	Username      string  `json:"-"`
+	// Unblocks holds the username of another user whose latest entry for this
+	// entry's (Goal, Task) should be considered unblocked because of this entry.
+	Unblocks *string `json:"unblocks,omitempty"`
 }
 
 type TaskState struct {
@@ -63,6 +66,41 @@ func displayTier(e Entry) int {
 	default:
 		return 1
 	}
+}
+
+// UnblockTarget identifies an entry by (username, goal, task) — the same
+// triple CollectLatestLocal dedups on — so a referencing entry can name a
+// target without needing to know its ID.
+type UnblockTarget struct {
+	Username string
+	Goal     string
+	Task     string
+}
+
+// TargetOf returns the UnblockTarget matching e's own (Username, Goal, Task),
+// for looking e up in the set returned by UnblockedTargets.
+func TargetOf(e Entry) UnblockTarget {
+	return UnblockTarget{Username: e.Username, Goal: ptrOrEmpty(e.Goal), Task: ptrOrEmpty(e.Task)}
+}
+
+// UnblockedTargets returns the set of (username, goal, task) triples that
+// some entry's Unblocks field marks as unblocked.
+func UnblockedTargets(entries []Entry) map[UnblockTarget]bool {
+	targets := make(map[UnblockTarget]bool)
+	for _, e := range entries {
+		if e.Unblocks == nil {
+			continue
+		}
+		targets[UnblockTarget{Username: *e.Unblocks, Goal: ptrOrEmpty(e.Goal), Task: ptrOrEmpty(e.Task)}] = true
+	}
+	return targets
+}
+
+func ptrOrEmpty(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 var weekFileSuffix = regexp.MustCompile(`-\d{4}-W\d{2}$`)

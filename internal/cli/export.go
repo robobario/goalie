@@ -83,6 +83,7 @@ func Export(ctx AppContext) error {
 			Done          bool    `json:"done"`
 			Note          string  `json:"note"`
 			SchemaVersion string  `json:"schema_version"`
+			Unblocks      *string `json:"unblocks,omitempty"`
 		}{
 			Type:          "entry",
 			ID:            e.ID,
@@ -94,6 +95,7 @@ func Export(ctx AppContext) error {
 			Done:          e.Done,
 			Note:          e.Note,
 			SchemaVersion: e.SchemaVersion,
+			Unblocks:      e.Unblocks,
 		}); err != nil {
 			return err
 		}

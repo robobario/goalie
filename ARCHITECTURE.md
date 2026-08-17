@@ -46,7 +46,7 @@ file naming conventions, JSON field sets, and the encryption scheme.
 
 | Change | Version component to bump |
 |--------|--------------------------|
-| New optional JSON field added to an existing file type | PATCH |
+| New optional JSON field added to an existing file type | MINOR |
 | New optional directory or file type added | MINOR |
 | Existing field removed, renamed, or reinterpreted | MAJOR |
 | File naming convention changed | MAJOR |

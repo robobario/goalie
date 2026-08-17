@@ -5,4 +5,4 @@ package schema
 //   - major: breaking change, requires a migration step
 //   - minor: backwards-compatible addition (new optional fields, new directories)
 //   - patch: compatible fix with no structural change
-const Version = "1.0.0"
+const Version = "1.1.0"

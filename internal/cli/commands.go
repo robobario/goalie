@@ -124,6 +124,81 @@ func Log(ctx AppContext, note, goalID string, blocked, done bool, task string) e
 	}, ctx.EncryptionKey)
 }
 
+// unblockLookupDays bounds how far back Unblock searches for the target's
+// latest entry. Wider than the status/summary default window since a
+// blocker can sit untouched for a while before someone notices it's cleared.
+const unblockLookupDays = 30
+
+// targetLabel formats a goal+task pair for user-facing messages, e.g.
+// "ROUTING#impl" or just "#impl" when there is no goal.
+func targetLabel(goal, task string) string {
+	return goal + task
+}
+
+// Unblock records a new entry, as the current user, marking another user's
+// blocked entry for the same (goal, task) as unblocked. It does not mutate
+// the target entry — display code renders the target's [BLOCKED] tag as
+// [UNBLOCKED] once an entry referencing it exists (see journal.UnblockedTargets).
+func Unblock(ctx AppContext, targetUsername, goalID, task, note string) error {
+	if err := requireDataDir(ctx); err != nil {
+		return err
+	}
+	if targetUsername == "" {
+		fmt.Fprintln(ctx.Stderr, "Username is required — e.g. goalie unblock @alice --task #impl")
+		return &ExitError{Code: 1}
+	}
+	if task == "" {
+		fmt.Fprintln(ctx.Stderr, "Task tag is required — use --task #impl")
+		return &ExitError{Code: 1}
+	}
+	if !goals.ValidTaskTag(task) {
+		fmt.Fprintf(ctx.Stderr, "Task tag '%s' is invalid — use #lowercase, e.g. #impl\n", task)
+		return &ExitError{Code: 1}
+	}
+	if goalID != "" && !goals.Exists(ctx.DataDir, goalID, ctx.EncryptionKey) {
+		fmt.Fprintf(ctx.Stderr, "Goal '%s' does not exist\n", goalID)
+		return &ExitError{Code: 1}
+	}
+
+	entries, err := journal.CollectLatest(ctx.DataDir, ctx.Git, unblockLookupDays, ctx.EncryptionKey)
+	if err != nil {
+		return err
+	}
+	target := journal.UnblockTarget{Username: targetUsername, Goal: goalID, Task: task}
+	var found journal.Entry
+	targetFound := false
+	for _, e := range entries {
+		if journal.TargetOf(e) == target {
+			found = e
+			targetFound = true
+			break
+		}
+	}
+	if !targetFound {
+		fmt.Fprintf(ctx.Stderr, "No entry found for %s on %s\n", targetUsername, targetLabel(goalID, task))
+		return &ExitError{Code: 1}
+	}
+	if !found.Blocked {
+		fmt.Fprintf(ctx.Stderr, "The latest entry for %s on %s is not blocked\n", targetUsername, targetLabel(goalID, task))
+		return &ExitError{Code: 1}
+	}
+
+	username, err := resolveUsername(ctx)
+	if err != nil {
+		return err
+	}
+	if note == "" {
+		note = "unblocked"
+	}
+	return journal.Append(ctx.DataDir, ctx.Git, username, journal.Entry{
+		Goal:          found.Goal,
+		Task:          found.Task,
+		Note:          note,
+		Unblocks:      &targetUsername,
+		SchemaVersion: ctx.SchemaVersion,
+	}, ctx.EncryptionKey)
+}
+
 func Status(ctx AppContext, days int) error {
 	if err := requireDataDir(ctx); err != nil {
 		return err

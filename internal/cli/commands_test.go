@@ -14,6 +14,7 @@ import (
 	"goalie/internal/cli"
 	"goalie/internal/crypto"
 	"goalie/internal/git"
+	"goalie/internal/journal"
 )
 
 func ts(deltaDays float64) string {
@@ -136,6 +137,127 @@ func TestGoalAddInvalidIDLowercaseExitsNonzero(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "my-goal") {
 		t.Errorf("stderr missing 'my-goal': %s", stderr.String())
+	}
+}
+
+// Unblock
+
+func writeRoutingGoal(t *testing.T, ctx cli.AppContext) {
+	t.Helper()
+	if err := cli.GoalAdd(ctx, "ROUTING", "Routing work"); err != nil {
+		t.Fatalf("failed to set up ROUTING goal fixture: %v", err)
+	}
+}
+
+func TestUnblockAppendsEntryReferencingTarget(t *testing.T) {
+	ctx, _, _ := newCtx(t)
+	writeRoutingGoal(t, ctx)
+
+	journalDir := filepath.Join(ctx.DataDir, "journal")
+	os.MkdirAll(journalDir, 0o755)
+	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("@alice")), []jsonlEntry{
+		{"ts": ts(-1), "note": "stuck", "task": "#impl", "goal": "ROUTING", "blocked": true, "done": false},
+	}, ctx.EncryptionKey)
+
+	if err := cli.Unblock(ctx, "@alice", "ROUTING", "#impl", "looks fine now"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	entries, err := journal.Collect(ctx.DataDir, ctx.Git, 7, ctx.Username, ctx.EncryptionKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry from %s, got %d", ctx.Username, len(entries))
+	}
+	e := entries[0]
+	if e.Unblocks == nil || *e.Unblocks != "@alice" {
+		t.Errorf("expected Unblocks=@alice, got %v", e.Unblocks)
+	}
+	if e.Note != "looks fine now" {
+		t.Errorf("expected note preserved, got %q", e.Note)
+	}
+	if e.Goal == nil || *e.Goal != "ROUTING" || e.Task == nil || *e.Task != "#impl" {
+		t.Errorf("expected goal/task copied from target, got goal=%v task=%v", e.Goal, e.Task)
+	}
+}
+
+func TestUnblockDefaultsNoteWhenOmitted(t *testing.T) {
+	ctx, _, _ := newCtx(t)
+	writeRoutingGoal(t, ctx)
+
+	journalDir := filepath.Join(ctx.DataDir, "journal")
+	os.MkdirAll(journalDir, 0o755)
+	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("@alice")), []jsonlEntry{
+		{"ts": ts(-1), "note": "stuck", "task": "#impl", "goal": "ROUTING", "blocked": true, "done": false},
+	}, ctx.EncryptionKey)
+
+	if err := cli.Unblock(ctx, "@alice", "ROUTING", "#impl", ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	entries, err := journal.Collect(ctx.DataDir, ctx.Git, 7, ctx.Username, ctx.EncryptionKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Note == "" {
+		t.Fatalf("expected a default note, got %v", entries)
+	}
+}
+
+func TestUnblockErrorsWhenTargetNotFound(t *testing.T) {
+	ctx, _, stderr := newCtx(t)
+	writeRoutingGoal(t, ctx)
+
+	err := cli.Unblock(ctx, "@alice", "ROUTING", "#impl", "")
+	if !isExitCode(err, 1) {
+		t.Fatalf("expected exit code 1, got %v", err)
+	}
+	if !strings.Contains(stderr.String(), "No entry found") {
+		t.Errorf("expected 'No entry found' in stderr, got %q", stderr.String())
+	}
+}
+
+func TestUnblockErrorsWhenTargetNotBlocked(t *testing.T) {
+	ctx, _, stderr := newCtx(t)
+	writeRoutingGoal(t, ctx)
+
+	journalDir := filepath.Join(ctx.DataDir, "journal")
+	os.MkdirAll(journalDir, 0o755)
+	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("@alice")), []jsonlEntry{
+		{"ts": ts(-1), "note": "still going", "task": "#impl", "goal": "ROUTING", "blocked": false, "done": false},
+	}, ctx.EncryptionKey)
+
+	err := cli.Unblock(ctx, "@alice", "ROUTING", "#impl", "")
+	if !isExitCode(err, 1) {
+		t.Fatalf("expected exit code 1, got %v", err)
+	}
+	if !strings.Contains(stderr.String(), "not blocked") {
+		t.Errorf("expected 'not blocked' in stderr, got %q", stderr.String())
+	}
+}
+
+func TestUnblockRequiresTask(t *testing.T) {
+	ctx, _, stderr := newCtx(t)
+
+	err := cli.Unblock(ctx, "@alice", "ROUTING", "", "")
+	if !isExitCode(err, 1) {
+		t.Fatalf("expected exit code 1, got %v", err)
+	}
+	if !strings.Contains(stderr.String(), "Task tag is required") {
+		t.Errorf("expected 'Task tag is required' in stderr, got %q", stderr.String())
+	}
+}
+
+func TestUnblockRequiresUsername(t *testing.T) {
+	ctx, _, stderr := newCtx(t)
+
+	err := cli.Unblock(ctx, "", "ROUTING", "#impl", "")
+	if !isExitCode(err, 1) {
+		t.Fatalf("expected exit code 1, got %v", err)
+	}
+	if !strings.Contains(stderr.String(), "Username is required") {
+		t.Errorf("expected 'Username is required' in stderr, got %q", stderr.String())
 	}
 }
 

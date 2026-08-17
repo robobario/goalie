@@ -7,6 +7,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"goalie/internal/cli"
+	"goalie/internal/crypto"
+	"goalie/internal/git"
 	"goalie/internal/journal"
 )
 
@@ -419,5 +421,55 @@ func TestWindowSizeMsgPropagatedToActivityChild(t *testing.T) {
 	}
 	if got.activity.width != 80 {
 		t.Errorf("activity model should receive width=80 from WindowSizeMsg, got %d", got.activity.width)
+	}
+}
+
+// TestBlockedFromOthersLoadedMsgRoutedToUpdateChild guards against a bug
+// where a new async message type was handled inside updateModel.Update but
+// the top-level Model.Update never routed it there — the message type
+// matched no case in Model's msg-type switch and was silently dropped, so
+// the "Unblock a teammate" picker stayed permanently empty no matter how
+// long a real git pull took to complete.
+func TestBlockedFromOthersLoadedMsgRoutedToUpdateChild(t *testing.T) {
+	dataDir := t.TempDir()
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := &cli.AppContext{
+		DataDir:       dataDir,
+		Git:           &git.FakeRunner{},
+		Username:      "@robobario",
+		EncryptionKey: key,
+	}
+	ts := time.Now().Add(-5 * 24 * time.Hour).Format(time.RFC3339)
+	goal := "FORK_KAFKA_APIS"
+	task := "#shemshaha"
+	if err := journal.Append(dataDir, ctx.Git, "@other-user", journal.Entry{
+		TS: ts, Goal: &goal, Task: &task, Blocked: true, Note: "stuck",
+	}, key); err != nil {
+		t.Fatal(err)
+	}
+
+	m := initialModel(ctx)
+	m.syncing = false
+	m.activeTab = updateTab
+	m.update.phase = phaseMenu
+	m.update.username = "@robobario"
+	m.update.menuCursor = 3 // "Unblock a teammate"
+
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = next.(Model)
+	if m.update.phase != phaseUnblockTeammate {
+		t.Fatalf("expected phaseUnblockTeammate, got %v", m.update.phase)
+	}
+	if cmd == nil {
+		t.Fatal("expected a load cmd")
+	}
+
+	next, _ = m.Update(cmd())
+	m = next.(Model)
+	if len(m.update.unblockPicker.items) != 1 {
+		t.Fatalf("expected 1 item in unblockPicker after the load msg is routed, got %d", len(m.update.unblockPicker.items))
 	}
 }

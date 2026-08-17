@@ -9,6 +9,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"goalie/internal/cli"
 	"goalie/internal/config"
+	"goalie/internal/crypto"
+	"goalie/internal/git"
 	"goalie/internal/goals"
 	"goalie/internal/journal"
 )
@@ -203,12 +205,12 @@ func TestUpdateLoadedSetsActiveTasks(t *testing.T) {
 	}
 }
 
-func TestMenuOptionsAlwaysHasThreeItems(t *testing.T) {
-	// Menu always shows: Update a task, New task, Edit a recent entry.
+func TestMenuOptionsAlwaysHasFourItems(t *testing.T) {
+	// Menu always shows: Update a task, New task, Edit a recent entry, Unblock a teammate.
 	m := updateModel{phase: phaseMenu}
 	opts := m.menuOptions()
-	if len(opts) != 3 {
-		t.Fatalf("expected 3 options, got %d", len(opts))
+	if len(opts) != 4 {
+		t.Fatalf("expected 4 options, got %d", len(opts))
 	}
 	if opts[0].phase != phaseTaskUpdate {
 		t.Errorf("expected first option to be phaseTaskUpdate, got %v", opts[0].phase)
@@ -218,6 +220,9 @@ func TestMenuOptionsAlwaysHasThreeItems(t *testing.T) {
 	}
 	if opts[2].phase != phaseEditEntry {
 		t.Errorf("expected third option to be phaseEditEntry, got %v", opts[2].phase)
+	}
+	if opts[3].phase != phaseUnblockTeammate {
+		t.Errorf("expected fourth option to be phaseUnblockTeammate, got %v", opts[3].phase)
 	}
 }
 
@@ -1037,6 +1042,115 @@ func TestReloadTaskStatesCmdEmptyUsernameReturnsError(t *testing.T) {
 	}
 	if !errors.Is(loaded.err, config.ErrNotInitialised) {
 		t.Errorf("expected ErrNotInitialised, got %v", loaded.err)
+	}
+}
+
+func TestMenuIncludesUnblockOption(t *testing.T) {
+	m := updateModel{phase: phaseMenu}
+	opts := m.menuOptions()
+	found := false
+	for _, o := range opts {
+		if o.phase == phaseUnblockTeammate {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected 'Unblock a teammate' option in menu")
+	}
+}
+
+func TestBlockedFromOthersLoadedSetsPicker(t *testing.T) {
+	m := updateModel{phase: phaseUnblockTeammate, unblockSub: unblockPicking}
+	entries := []journal.Entry{
+		{Username: "@alice", TS: time.Now().Format(time.RFC3339), Note: "stuck", Blocked: true, Task: strPtr("#impl")},
+	}
+	m, _ = m.Update(blockedFromOthersLoadedMsg{entries: entries})
+	if len(m.unblockPicker.items) != 1 {
+		t.Fatalf("expected 1 picker item, got %d", len(m.unblockPicker.items))
+	}
+	if len(m.unblockByDisplay) != 1 {
+		t.Fatalf("expected 1 unblockByDisplay entry, got %d", len(m.unblockByDisplay))
+	}
+}
+
+func TestUnblockPickingEnterAdvancesToNote(t *testing.T) {
+	entries := []journal.Entry{
+		{Username: "@alice", TS: time.Now().Format(time.RFC3339), Note: "stuck", Blocked: true, Task: strPtr("#impl")},
+	}
+	m := updateModel{phase: phaseUnblockTeammate, unblockSub: unblockPicking}
+	m, _ = m.Update(blockedFromOthersLoadedMsg{entries: entries})
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.unblockSub != unblockNote {
+		t.Errorf("expected unblockNote after Enter, got %v", m.unblockSub)
+	}
+	if m.unblockSelected.Username != "@alice" {
+		t.Errorf("expected selected entry from @alice, got %+v", m.unblockSelected)
+	}
+}
+
+func TestSubmitUnblockGoesToMenu(t *testing.T) {
+	m := updateModel{
+		phase:      phaseUnblockTeammate,
+		unblockSub: unblockNote,
+		unblockSelected: journal.Entry{
+			Username: "@alice", Blocked: true, Task: strPtr("#impl"),
+		},
+		unblockNoteInput: newNoteInput("looks fine now"),
+		ctx:              &cli.AppContext{},
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.phase != phaseMenu {
+		t.Errorf("expected phaseMenu after submit, got %v", m.phase)
+	}
+}
+
+func TestSubmitUnblockAppendsEntryWithUnblocksField(t *testing.T) {
+	dataDir := t.TempDir()
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := &cli.AppContext{
+		DataDir:       dataDir,
+		Git:           &git.FakeRunner{},
+		Username:      "@bob",
+		EncryptionKey: key,
+	}
+	m := updateModel{
+		phase:      phaseUnblockTeammate,
+		unblockSub: unblockNote,
+		username:   "@bob",
+		ctx:        ctx,
+		unblockSelected: journal.Entry{
+			Username: "@alice", Blocked: true, Goal: strPtr("ROUTING"), Task: strPtr("#impl"),
+		},
+		unblockNoteInput: newNoteInput("looks fine now"),
+	}
+	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("expected a cmd to append the entry")
+	}
+	msg := cmd()
+	if done, ok := msg.(appendDoneMsg); !ok || done.err != nil {
+		t.Fatalf("expected successful appendDoneMsg, got %+v", msg)
+	}
+
+	entries, err := journal.Collect(dataDir, ctx.Git, 7, "@bob", key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry from @bob, got %d", len(entries))
+	}
+	e := entries[0]
+	if e.Unblocks == nil || *e.Unblocks != "@alice" {
+		t.Errorf("expected Unblocks=@alice, got %v", e.Unblocks)
+	}
+	if e.Note != "looks fine now" {
+		t.Errorf("expected note preserved, got %q", e.Note)
+	}
+	if e.Goal == nil || *e.Goal != "ROUTING" || e.Task == nil || *e.Task != "#impl" {
+		t.Errorf("expected goal/task copied from target, got goal=%v task=%v", e.Goal, e.Task)
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"goalie/internal/cli"
+	"goalie/internal/clock"
 	"goalie/internal/config"
 	"goalie/internal/crypto"
 	"goalie/internal/git"
@@ -1056,6 +1057,50 @@ func TestMenuIncludesUnblockOption(t *testing.T) {
 	}
 	if !found {
 		t.Error("expected 'Unblock a teammate' option in menu")
+	}
+}
+
+func TestLoadBlockedFromOthersCmdExcludesAlreadyUnblocked(t *testing.T) {
+	// Regression: an already-unblocked entry stays Blocked=true forever
+	// (append-only, the unblock lives on a different user's row), so the
+	// picker must consult journal.IsUnblocked, not just e.Blocked, or it
+	// would keep listing resolved blockers indefinitely.
+	dataDir := t.TempDir()
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := &cli.AppContext{
+		DataDir:       dataDir,
+		Git:           &git.FakeRunner{},
+		Username:      "@robobario",
+		EncryptionKey: key,
+	}
+	unblockTarget := "@alice"
+	t1 := clock.FakeClock{T: time.Now().Add(-time.Hour)}
+	t2 := clock.FakeClock{T: time.Now()}
+	if err := journal.AppendWithClock(dataDir, ctx.Git, "@alice", journal.Entry{
+		Goal: strPtr("ROUTING"), Task: strPtr("#impl"), Note: "stuck", Blocked: true,
+	}, key, t1); err != nil {
+		t.Fatal(err)
+	}
+	if err := journal.AppendWithClock(dataDir, ctx.Git, "@bob", journal.Entry{
+		Goal: strPtr("ROUTING"), Task: strPtr("#impl"), Note: "reviewed", Unblocks: &unblockTarget,
+	}, key, t2); err != nil {
+		t.Fatal(err)
+	}
+
+	m := updateModel{ctx: ctx, username: "@robobario"}
+	msg := m.loadBlockedFromOthersCmd()()
+	loaded, ok := msg.(blockedFromOthersLoadedMsg)
+	if !ok {
+		t.Fatalf("expected blockedFromOthersLoadedMsg, got %T", msg)
+	}
+	if loaded.err != nil {
+		t.Fatal(loaded.err)
+	}
+	if len(loaded.entries) != 0 {
+		t.Errorf("expected already-unblocked entry to be excluded, got %+v", loaded.entries)
 	}
 }
 

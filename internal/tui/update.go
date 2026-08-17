@@ -999,13 +999,13 @@ func (m updateModel) loadBlockedFromOthersCmd() tea.Cmd {
 	ctx := m.ctx
 	username := m.username
 	return func() tea.Msg {
-		entries, err := journal.CollectLatest(ctx.DataDir, ctx.Git, unblockTeammateLookupDays, ctx.EncryptionKey)
+		entries, unblockedTargets, err := journal.CollectLatestAndUnblocked(ctx.DataDir, ctx.Git, unblockTeammateLookupDays, ctx.EncryptionKey)
 		if err != nil {
 			return blockedFromOthersLoadedMsg{err: err}
 		}
 		var blocked []journal.Entry
 		for _, e := range entries {
-			if e.Blocked && e.Username != username {
+			if e.Blocked && e.Username != username && !journal.IsUnblocked(e, unblockedTargets) {
 				blocked = append(blocked, e)
 			}
 		}

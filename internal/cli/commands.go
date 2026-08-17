@@ -160,7 +160,7 @@ func Unblock(ctx AppContext, targetUsername, goalID, task, note string) error {
 		return &ExitError{Code: 1}
 	}
 
-	entries, err := journal.CollectLatest(ctx.DataDir, ctx.Git, unblockLookupDays, ctx.EncryptionKey)
+	entries, unblockedTargets, err := journal.CollectLatestAndUnblocked(ctx.DataDir, ctx.Git, unblockLookupDays, ctx.EncryptionKey)
 	if err != nil {
 		return err
 	}
@@ -178,7 +178,7 @@ func Unblock(ctx AppContext, targetUsername, goalID, task, note string) error {
 		fmt.Fprintf(ctx.Stderr, "No entry found for %s on %s\n", targetUsername, targetLabel(goalID, task))
 		return &ExitError{Code: 1}
 	}
-	if !found.Blocked {
+	if !found.Blocked || journal.IsUnblocked(found, unblockedTargets) {
 		fmt.Fprintf(ctx.Stderr, "The latest entry for %s on %s is not blocked\n", targetUsername, targetLabel(goalID, task))
 		return &ExitError{Code: 1}
 	}

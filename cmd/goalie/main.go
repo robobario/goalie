@@ -82,6 +82,8 @@ func main() {
 	var statusDays int
 	var summaryDays int
 	var summaryUser string
+	var unblockGoal string
+	var unblockTask string
 
 	root := &cobra.Command{
 		Use:           "goalie",
@@ -149,6 +151,21 @@ func main() {
 	logCmd.Flags().BoolVar(&logBlocked, "blocked", false, "Mark this entry as blocked")
 	logCmd.Flags().BoolVar(&logDone, "done", false, "Mark the task as done")
 	logCmd.Flags().StringVar(&logTask, "task", "", "Task tag to associate with this entry")
+
+	unblockCmd := &cobra.Command{
+		Use:   "unblock <username> [note]",
+		Short: "Mark another user's blocked entry for a goal/task as unblocked",
+		Args:  cobra.RangeArgs(1, 2),
+		RunE: requireKey(keyErr, func(cmd *cobra.Command, args []string) error {
+			note := ""
+			if len(args) > 1 {
+				note = args[1]
+			}
+			return cli.Unblock(ctx, args[0], unblockGoal, unblockTask, note)
+		}),
+	}
+	unblockCmd.Flags().StringVar(&unblockGoal, "goal", "", "Goal ID of the entry to unblock")
+	unblockCmd.Flags().StringVar(&unblockTask, "task", "", "Task tag of the entry to unblock")
 
 	statusCmd := &cobra.Command{
 		Use:   "status",
@@ -305,7 +322,7 @@ func main() {
 		}),
 	}
 
-	root.AddCommand(initCmd, logCmd, statusCmd, summaryCmd, updateCmd, goalCmd, keyCmd, motdCmd, skillsCmd, exportCmd)
+	root.AddCommand(initCmd, logCmd, unblockCmd, statusCmd, summaryCmd, updateCmd, goalCmd, keyCmd, motdCmd, skillsCmd, exportCmd)
 
 	if err := root.Execute(); err != nil {
 		var exitErr *cli.ExitError

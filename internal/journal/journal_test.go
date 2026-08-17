@@ -951,3 +951,48 @@ func TestSortForDisplay(t *testing.T) {
 		}
 	})
 }
+
+func TestUnblockedTargets(t *testing.T) {
+	t.Run("entry with Unblocks marks the target's (username, goal, task) as unblocked", func(t *testing.T) {
+		username := "@alice"
+		entries := []journal.Entry{
+			{ID: "unblock-1", Username: "@bob", Goal: strPtr("ROUTING"), Task: strPtr("#impl"), Unblocks: &username},
+		}
+		targets := journal.UnblockedTargets(entries)
+		want := journal.UnblockTarget{Username: "@alice", Goal: "ROUTING", Task: "#impl"}
+		if !targets[want] {
+			t.Errorf("expected %v in targets, got %v", want, targets)
+		}
+	})
+
+	t.Run("entries without Unblocks are ignored", func(t *testing.T) {
+		entries := []journal.Entry{
+			{ID: "normal", Username: "@bob", Goal: strPtr("ROUTING"), Task: strPtr("#impl")},
+		}
+		targets := journal.UnblockedTargets(entries)
+		if len(targets) != 0 {
+			t.Errorf("expected no targets, got %v", targets)
+		}
+	})
+
+	t.Run("nil goal and task normalize to empty string", func(t *testing.T) {
+		username := "@alice"
+		entries := []journal.Entry{
+			{ID: "unblock-1", Username: "@bob", Unblocks: &username},
+		}
+		targets := journal.UnblockedTargets(entries)
+		want := journal.UnblockTarget{Username: "@alice", Goal: "", Task: ""}
+		if !targets[want] {
+			t.Errorf("expected %v in targets, got %v", want, targets)
+		}
+	})
+}
+
+func TestTargetOf(t *testing.T) {
+	e := journal.Entry{Username: "@alice", Goal: strPtr("ROUTING"), Task: strPtr("#impl")}
+	got := journal.TargetOf(e)
+	want := journal.UnblockTarget{Username: "@alice", Goal: "ROUTING", Task: "#impl"}
+	if got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}

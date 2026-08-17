@@ -953,15 +953,15 @@ func TestSortForDisplay(t *testing.T) {
 }
 
 func TestUnblockedTargets(t *testing.T) {
-	t.Run("entry with Unblocks marks the target's (username, goal, task) as unblocked", func(t *testing.T) {
+	t.Run("entry with Unblocks records the target's (username, goal, task) timestamp", func(t *testing.T) {
 		username := "@alice"
 		entries := []journal.Entry{
-			{ID: "unblock-1", Username: "@bob", Goal: strPtr("ROUTING"), Task: strPtr("#impl"), Unblocks: &username},
+			{ID: "unblock-1", TS: "2024-01-02T00:00:00Z", Username: "@bob", Goal: strPtr("ROUTING"), Task: strPtr("#impl"), Unblocks: &username},
 		}
 		targets := journal.UnblockedTargets(entries)
 		want := journal.UnblockTarget{Username: "@alice", Goal: "ROUTING", Task: "#impl"}
-		if !targets[want] {
-			t.Errorf("expected %v in targets, got %v", want, targets)
+		if targets[want] != "2024-01-02T00:00:00Z" {
+			t.Errorf("expected %v to map to the entry's TS, got %v", want, targets)
 		}
 	})
 
@@ -978,12 +978,57 @@ func TestUnblockedTargets(t *testing.T) {
 	t.Run("nil goal and task normalize to empty string", func(t *testing.T) {
 		username := "@alice"
 		entries := []journal.Entry{
-			{ID: "unblock-1", Username: "@bob", Unblocks: &username},
+			{ID: "unblock-1", TS: "2024-01-02T00:00:00Z", Username: "@bob", Unblocks: &username},
 		}
 		targets := journal.UnblockedTargets(entries)
 		want := journal.UnblockTarget{Username: "@alice", Goal: "", Task: ""}
-		if !targets[want] {
-			t.Errorf("expected %v in targets, got %v", want, targets)
+		if targets[want] != "2024-01-02T00:00:00Z" {
+			t.Errorf("expected %v to map to the entry's TS, got %v", want, targets)
+		}
+	})
+
+	t.Run("keeps the most recent timestamp when multiple entries unblock the same target", func(t *testing.T) {
+		username := "@alice"
+		entries := []journal.Entry{
+			{ID: "unblock-1", TS: "2024-01-01T00:00:00Z", Username: "@bob", Task: strPtr("#impl"), Unblocks: &username},
+			{ID: "unblock-2", TS: "2024-01-05T00:00:00Z", Username: "@carol", Task: strPtr("#impl"), Unblocks: &username},
+		}
+		targets := journal.UnblockedTargets(entries)
+		want := journal.UnblockTarget{Username: "@alice", Goal: "", Task: "#impl"}
+		if targets[want] != "2024-01-05T00:00:00Z" {
+			t.Errorf("expected the most recent unblock TS, got %v", targets[want])
+		}
+	})
+}
+
+func TestIsUnblocked(t *testing.T) {
+	t.Run("blocked entry with a later unblock entry is unblocked", func(t *testing.T) {
+		e := journal.Entry{Username: "@alice", TS: "2024-01-01T00:00:00Z", Task: strPtr("#impl"), Blocked: true}
+		targets := map[journal.UnblockTarget]string{
+			{Username: "@alice", Task: "#impl"}: "2024-01-02T00:00:00Z",
+		}
+		if !journal.IsUnblocked(e, targets) {
+			t.Error("expected entry to be unblocked")
+		}
+	})
+
+	t.Run("a new block after the most recent unblock is not unblocked", func(t *testing.T) {
+		// Regression for issue #153: Alice's task was unblocked, then blocked
+		// again later for an unrelated reason. The stale unblock entry must
+		// not hide the genuinely new block.
+		e := journal.Entry{Username: "@alice", TS: "2024-01-03T00:00:00Z", Task: strPtr("#impl"), Blocked: true}
+		targets := map[journal.UnblockTarget]string{
+			{Username: "@alice", Task: "#impl"}: "2024-01-02T00:00:00Z",
+		}
+		if journal.IsUnblocked(e, targets) {
+			t.Error("expected a block newer than the unblock to remain blocked")
+		}
+	})
+
+	t.Run("no matching target is not unblocked", func(t *testing.T) {
+		e := journal.Entry{Username: "@alice", TS: "2024-01-01T00:00:00Z", Task: strPtr("#impl"), Blocked: true}
+		if journal.IsUnblocked(e, map[journal.UnblockTarget]string{}) {
+			t.Error("expected no target match to mean not unblocked")
 		}
 	})
 }

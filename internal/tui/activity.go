@@ -323,10 +323,10 @@ func wrapWords(text string, maxWidth int) []string {
 
 // renderActivityEntry formats an entry as "• PREFIX - AGE - note..." with the
 // note wrapping to indented continuation lines. A blocked entry renders as
-// [UNBLOCKED] instead of [BLOCKED] when unblockedTargets marks its
-// (username, goal, task) as unblocked by someone else's entry (see
-// journal.UnblockedTargets).
-func renderActivityEntry(e journal.Entry, now time.Time, selfUsername string, hyperLinks bool, availableWidth int, unblockedTargets map[journal.UnblockTarget]bool) string {
+// [UNBLOCKED] instead of [BLOCKED] when journal.IsUnblocked reports it's
+// been superseded by a later entry naming its (username, goal, task) in
+// Unblocks.
+func renderActivityEntry(e journal.Entry, now time.Time, selfUsername string, hyperLinks bool, availableWidth int, unblockedTargets map[journal.UnblockTarget]string) string {
 	const bullet = "•"
 	const contIndent = "  "
 
@@ -334,7 +334,7 @@ func renderActivityEntry(e journal.Entry, now time.Time, selfUsername string, hy
 	switch {
 	case e.Done:
 		prefixParts = append(prefixParts, doneStyle.Render("[done]"))
-	case e.Blocked && unblockedTargets[journal.TargetOf(e)]:
+	case e.Blocked && journal.IsUnblocked(e, unblockedTargets):
 		prefixParts = append(prefixParts, unblockedStyle.Render("[UNBLOCKED]"))
 	case e.Blocked:
 		prefixParts = append(prefixParts, blockedStyle.Render("[BLOCKED]"))

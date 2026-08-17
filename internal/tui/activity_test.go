@@ -444,8 +444,8 @@ func TestRenderActivityEntryUnblockedTargetShowsGreenTag(t *testing.T) {
 		Goal:     strPtr("ROUTING"),
 		Task:     strPtr("#impl"),
 	}
-	targets := map[journal.UnblockTarget]bool{
-		{Username: "@alice", Goal: "ROUTING", Task: "#impl"}: true,
+	targets := map[journal.UnblockTarget]string{
+		{Username: "@alice", Goal: "ROUTING", Task: "#impl"}: time.Now().Add(time.Hour).Format(time.RFC3339),
 	}
 	got := renderActivityEntry(e, time.Now(), "", false, 0, targets)
 	if !strings.Contains(got, "[UNBLOCKED]") {
@@ -453,6 +453,30 @@ func TestRenderActivityEntryUnblockedTargetShowsGreenTag(t *testing.T) {
 	}
 	if strings.Contains(got, "[BLOCKED]") {
 		t.Errorf("expected no '[BLOCKED]' once unblocked, got %q", got)
+	}
+}
+
+func TestRenderActivityEntryReblockedAfterUnblockShowsBlockedTag(t *testing.T) {
+	// Regression for issue #153: a stale unblock entry must not hide a
+	// genuinely new block on the same (username, goal, task) that comes
+	// after it.
+	e := journal.Entry{
+		TS:       time.Now().Format(time.RFC3339),
+		Note:     "blocked again",
+		Username: "@alice",
+		Blocked:  true,
+		Goal:     strPtr("ROUTING"),
+		Task:     strPtr("#impl"),
+	}
+	targets := map[journal.UnblockTarget]string{
+		{Username: "@alice", Goal: "ROUTING", Task: "#impl"}: time.Now().Add(-time.Hour).Format(time.RFC3339),
+	}
+	got := renderActivityEntry(e, time.Now(), "", false, 0, targets)
+	if !strings.Contains(got, "[BLOCKED]") {
+		t.Errorf("expected '[BLOCKED]' for a block newer than the unblock, got %q", got)
+	}
+	if strings.Contains(got, "[UNBLOCKED]") {
+		t.Errorf("expected no '[UNBLOCKED]' tag, got %q", got)
 	}
 }
 
@@ -466,8 +490,8 @@ func TestRenderActivityEntryDoneTakesPrecedenceOverUnblocked(t *testing.T) {
 		Goal:     strPtr("ROUTING"),
 		Task:     strPtr("#impl"),
 	}
-	targets := map[journal.UnblockTarget]bool{
-		{Username: "@alice", Goal: "ROUTING", Task: "#impl"}: true,
+	targets := map[journal.UnblockTarget]string{
+		{Username: "@alice", Goal: "ROUTING", Task: "#impl"}: time.Now().Add(time.Hour).Format(time.RFC3339),
 	}
 	got := renderActivityEntry(e, time.Now(), "", false, 0, targets)
 	if !strings.Contains(got, "[done]") {

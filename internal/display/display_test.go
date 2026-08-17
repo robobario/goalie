@@ -197,6 +197,40 @@ func TestFormatStatusEntryBlockedWithGoal(t *testing.T) {
 	}
 }
 
+func TestFormatStatusEntryDoneWithGoal(t *testing.T) {
+	e := journal.Entry{
+		TS:   fixedTS,
+		Note: "note",
+		Done: true,
+		Goal: ptr("GOAL"),
+	}
+	got := FormatStatusEntry(e, "", fixedNow, Context{})
+	want := "[done] GOAL note - yesterday"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestFormatStatusEntryDoneNoGoal(t *testing.T) {
+	e := journal.Entry{TS: fixedTS, Note: "note", Done: true}
+	got := FormatStatusEntry(e, "", fixedNow, Context{})
+	want := "[done] note - yesterday"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestFormatStatusEntryDoneTakesPrecedenceOverBlocked(t *testing.T) {
+	e := journal.Entry{TS: fixedTS, Note: "note", Done: true, Blocked: true}
+	got := FormatStatusEntry(e, "", fixedNow, Context{})
+	if !strings.HasPrefix(got, "[done]") {
+		t.Errorf("expected [done] to take precedence over [BLOCKED], got %q", got)
+	}
+	if strings.Contains(got, "[BLOCKED]") {
+		t.Errorf("expected no [BLOCKED] tag when Done is set, got %q", got)
+	}
+}
+
 func TestFormatSummaryHeader(t *testing.T) {
 	got := FormatSummaryHeader("ROUTING", "#impl", "@alice", Context{})
 	want := "= ROUTING#impl@alice"
@@ -371,6 +405,22 @@ func TestWrapStatusEntryBlockedPrefix(t *testing.T) {
 	got := WrapStatusEntry(e, "", fixedNow, Context{}, 50)
 	if !strings.HasPrefix(got, "[BLOCKED]") {
 		t.Errorf("expected [BLOCKED] prefix, got %q", got)
+	}
+}
+
+func TestWrapStatusEntryDonePrefix(t *testing.T) {
+	e := journal.Entry{TS: fixedTS, Note: "shipped", Done: true}
+	got := WrapStatusEntry(e, "", fixedNow, Context{}, 50)
+	if !strings.HasPrefix(got, "[done]") {
+		t.Errorf("expected [done] prefix, got %q", got)
+	}
+}
+
+func TestWrapStatusEntryDoneTakesPrecedenceOverBlocked(t *testing.T) {
+	e := journal.Entry{TS: fixedTS, Note: "shipped", Done: true, Blocked: true}
+	got := WrapStatusEntry(e, "", fixedNow, Context{}, 50)
+	if !strings.HasPrefix(got, "[done]") {
+		t.Errorf("expected [done] prefix to take precedence over [BLOCKED], got %q", got)
 	}
 }
 

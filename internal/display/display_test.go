@@ -455,6 +455,17 @@ func TestFormatStatusEntryTTYBlockedPreservesContent(t *testing.T) {
 	}
 }
 
+func TestFormatStatusEntryTTYDonePreservesContent(t *testing.T) {
+	e := journal.Entry{TS: fixedTS, Note: "shipped", Done: true}
+	got := FormatStatusEntry(e, "", fixedNow, Context{IsTTY: true})
+	if !strings.Contains(got, "[done]") {
+		t.Errorf("expected [done] text in TTY output, got %q", got)
+	}
+	if !strings.Contains(got, "shipped") {
+		t.Errorf("expected note in TTY output, got %q", got)
+	}
+}
+
 func TestHighlightStatusNoteTokensURLPreserved(t *testing.T) {
 	got := highlightStatusNoteTokens("see https://example.com for details", "", Context{IsTTY: true})
 	if !strings.Contains(got, "https://example.com") {

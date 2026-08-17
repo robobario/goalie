@@ -138,7 +138,7 @@ func targetLabel(goal, task string) string {
 // Unblock records a new entry, as the current user, marking another user's
 // blocked entry for the same (goal, task) as unblocked. It does not mutate
 // the target entry — display code renders the target's [BLOCKED] tag as
-// [UNBLOCKED] once an entry referencing it exists (see journal.UnblockedTargets).
+// [UNBLOCKED] once an entry referencing it exists (see journal.CollectLatestAndUnblocked).
 func Unblock(ctx AppContext, targetUsername, goalID, task, note string) error {
 	if err := requireDataDir(ctx); err != nil {
 		return err
@@ -209,7 +209,7 @@ func Status(ctx AppContext, days int) error {
 	if motdText, ok, err := motd.Latest(ctx.DataDir, ctx.EncryptionKey); err == nil && ok {
 		fmt.Fprintln(ctx.Stdout, display.FormatMotd(motdText, ctx.DisplayCtx(), ctx.EffectiveWrapWidth()))
 	}
-	entries, err := journal.CollectLatest(ctx.DataDir, ctx.Git, days, ctx.EncryptionKey)
+	entries, unblockedTargets, err := journal.CollectLatestAndUnblocked(ctx.DataDir, ctx.Git, days, ctx.EncryptionKey)
 	if err != nil {
 		return err
 	}
@@ -220,7 +220,6 @@ func Status(ctx AppContext, days int) error {
 
 	now := time.Now()
 	doneHideCutoff := journal.PriorBusinessDayStart(now)
-	unblockedTargets := journal.UnblockedTargets(entries)
 
 	byUser := make(map[string][]journal.Entry)
 	for _, e := range entries {

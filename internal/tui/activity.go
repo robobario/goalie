@@ -34,14 +34,16 @@ var mentionStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Adapti
 var selfMentionStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "22", Dark: "82"})
 
 type entriesLoadedMsg struct {
-	entries  []journal.Entry
-	err      error
-	pulledAt time.Time // non-zero when a git pull was performed
+	entries          []journal.Entry
+	unblockedTargets map[journal.UnblockTarget]journal.Entry
+	err              error
+	pulledAt         time.Time // non-zero when a git pull was performed
 }
 
 type activityModel struct {
 	entries              []journal.Entry
 	filtered             []journal.Entry
+	unblockedTargets     map[journal.UnblockTarget]journal.Entry
 	search               string
 	searchMode           bool
 	err                  error
@@ -60,11 +62,11 @@ type activityModel struct {
 func loadActivityCmd(ctx *cli.AppContext, doPull bool) tea.Cmd {
 	return func() tea.Msg {
 		if doPull {
-			entries, err := journal.CollectLatest(ctx.DataDir, ctx.Git, 30, ctx.EncryptionKey)
-			return entriesLoadedMsg{entries: entries, err: err, pulledAt: time.Now()}
+			entries, unblockedTargets, err := journal.CollectLatestAndUnblocked(ctx.DataDir, ctx.Git, 30, ctx.EncryptionKey)
+			return entriesLoadedMsg{entries: entries, unblockedTargets: unblockedTargets, err: err, pulledAt: time.Now()}
 		}
-		entries, err := journal.CollectLatestLocal(ctx.DataDir, 30, ctx.EncryptionKey)
-		return entriesLoadedMsg{entries: entries, err: err}
+		entries, unblockedTargets, err := journal.CollectLatestAndUnblockedLocal(ctx.DataDir, 30, ctx.EncryptionKey)
+		return entriesLoadedMsg{entries: entries, unblockedTargets: unblockedTargets, err: err}
 	}
 }
 
@@ -106,6 +108,7 @@ func (m activityModel) Update(msg tea.Msg) (activityModel, tea.Cmd) {
 		m.everLoaded = true
 		m.err = msg.err
 		m.entries = msg.entries
+		m.unblockedTargets = msg.unblockedTargets
 		m.filtered = FilterEntries(m.entries, m.search)
 		if !msg.pulledAt.IsZero() {
 			m.lastPulledAt = msg.pulledAt
@@ -252,7 +255,7 @@ func (m activityModel) View() string {
 
 	now := time.Now()
 	doneHideCutoff := journal.PriorBusinessDayStart(now)
-	unblockedTargets := journal.UnblockedTargets(m.filtered)
+	unblockedTargets := m.unblockedTargets
 
 	const entryIndent = "  "
 

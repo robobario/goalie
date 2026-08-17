@@ -256,12 +256,7 @@ func (m activityModel) View() string {
 
 	for _, username := range usernames {
 		entries := groups[username]
-		sort.Slice(entries, func(i, j int) bool {
-			if entries[i].Blocked != entries[j].Blocked {
-				return entries[i].Blocked
-			}
-			return entries[i].TS > entries[j].TS
-		})
+		journal.SortForDisplay(entries)
 
 		sb.WriteString(usernameStyle.Render(username) + ":\n")
 		for _, e := range entries {

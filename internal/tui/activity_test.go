@@ -708,6 +708,28 @@ func TestActivityViewShowsRecentDoneEntry(t *testing.T) {
 	}
 }
 
+func TestActivityViewOrdersDoneEntriesAfterLivingEntries(t *testing.T) {
+	recentTS := time.Now().UTC().Format(time.RFC3339)
+	m := activityModel{
+		loaded: true,
+		width:  120,
+		entries: []journal.Entry{
+			{Note: "just finished", Username: "@alice", TS: recentTS, Done: true},
+			{Note: "still going", Username: "@alice", TS: recentTS, Done: false},
+		},
+	}
+	m.filtered = m.entries
+	view := m.View()
+	livingIdx := strings.Index(view, "still going")
+	doneIdx := strings.Index(view, "just finished")
+	if livingIdx == -1 || doneIdx == -1 {
+		t.Fatalf("expected both entries in view:\n%s", view)
+	}
+	if doneIdx < livingIdx {
+		t.Errorf("expected done entry after living entry, got view:\n%s", view)
+	}
+}
+
 func TestActivityViewWrapWidthCapsAtConfiguredWidth(t *testing.T) {
 	// Terminal is 200 wide, wrapWidth set to 40. Lines should wrap at 40, not 200.
 	longNote := strings.Repeat("word ", 30)

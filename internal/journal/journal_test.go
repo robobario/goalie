@@ -910,3 +910,44 @@ func TestPriorBusinessDayStart_BoundaryIsInclusive(t *testing.T) {
 		t.Errorf("entry exactly at cutoff (%v) should not be considered before it", ts)
 	}
 }
+
+func TestSortForDisplay(t *testing.T) {
+	t.Run("blocked before living before done, most recent first within tier", func(t *testing.T) {
+		entries := []journal.Entry{
+			{ID: "done-old", TS: "2026-01-01T00:00:00Z", Done: true},
+			{ID: "living-old", TS: "2026-01-02T00:00:00Z"},
+			{ID: "blocked-old", TS: "2026-01-03T00:00:00Z", Blocked: true},
+			{ID: "done-new", TS: "2026-01-04T00:00:00Z", Done: true},
+			{ID: "living-new", TS: "2026-01-05T00:00:00Z"},
+			{ID: "blocked-new", TS: "2026-01-06T00:00:00Z", Blocked: true},
+		}
+		journal.SortForDisplay(entries)
+
+		var ids []string
+		for _, e := range entries {
+			ids = append(ids, e.ID)
+		}
+		want := []string{"blocked-new", "blocked-old", "living-new", "living-old", "done-new", "done-old"}
+		if len(ids) != len(want) {
+			t.Fatalf("got %v, want %v", ids, want)
+		}
+		for i := range want {
+			if ids[i] != want[i] {
+				t.Errorf("got %v, want %v", ids, want)
+				break
+			}
+		}
+	})
+
+	t.Run("blocked and done entry sorts as blocked", func(t *testing.T) {
+		entries := []journal.Entry{
+			{ID: "done", TS: "2026-01-01T00:00:00Z", Done: true},
+			{ID: "blocked-and-done", TS: "2026-01-01T00:00:00Z", Blocked: true, Done: true},
+		}
+		journal.SortForDisplay(entries)
+
+		if entries[0].ID != "blocked-and-done" {
+			t.Errorf("expected blocked-and-done first, got %v", entries)
+		}
+	})
+}

@@ -178,12 +178,7 @@ func Status(ctx AppContext, days int) error {
 	for _, u := range users {
 		display.Section(u, ctx.Stdout, ctx.DisplayCtx())
 		ues := byUser[u]
-		sort.Slice(ues, func(i, j int) bool {
-			if ues[i].Blocked != ues[j].Blocked {
-				return ues[i].Blocked
-			}
-			return ues[i].TS < ues[j].TS
-		})
+		journal.SortForDisplay(ues)
 		for _, e := range ues {
 			formatted := display.WrapStatusEntry(e, selfUsername, now, ctx.DisplayCtx(), availableWidth)
 			for _, line := range strings.Split(formatted, "\n") {

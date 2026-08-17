@@ -72,3 +72,20 @@ func TestAgeStringTimezone(t *testing.T) {
 		t.Errorf("got %q, want %q", got, "3h ago")
 	}
 }
+
+// TestAgeStringCalendarDaysNotRawDuration guards against issue #152, where
+// a raw elapsed.Hours()/24 truncation undercounted local calendar midnights
+// crossed. In NZST (UTC+12), an entry logged at 13:08 local two calendar days
+// before "now" at 09:16 local only has ~44 raw elapsed hours (44/24 truncates
+// to 1), but two local midnights have passed, so it should read "2d ago".
+func TestAgeStringCalendarDaysNotRawDuration(t *testing.T) {
+	loc := time.FixedZone("NZST", 12*60*60)
+	parsed := time.Date(2026, 8, 12, 13, 8, 48, 0, loc)
+	now := time.Date(2026, 8, 14, 9, 16, 56, 0, loc)
+	ts := parsed.Format(time.RFC3339)
+
+	got := AgeString(ts, now)
+	if got != "2d ago" {
+		t.Errorf("got %q, want %q", got, "2d ago")
+	}
+}

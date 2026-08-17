@@ -28,5 +28,6 @@ func AgeString(ts string, now time.Time) string {
 	if elapsed < 24*time.Hour {
 		return fmt.Sprintf("%dh ago", int(elapsed.Hours()))
 	}
-	return fmt.Sprintf("%dd ago", int(elapsed.Hours()/24))
+	days := int(nowDay.Sub(parsedDay).Hours() / 24)
+	return fmt.Sprintf("%dd ago", days)
 }

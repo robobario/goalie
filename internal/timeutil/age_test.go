@@ -73,6 +73,25 @@ func TestAgeStringTimezone(t *testing.T) {
 	}
 }
 
+// TestAgeStringDSTSpringForwardMultiDay guards against a DST variant of issue
+// #152 in the N-day branch: America/New_York, Mar 8 noon EST to Mar 11 noon
+// EDT is 3 calendar days apart, but the Mar 10 spring-forward day is only 23
+// wall-clock hours, so Sub().Hours() gives 71h. Truncating 71/24 to 2 would
+// report "2d ago" instead of "3d ago". Day counts must come from calendar
+// fields, not from dividing an elapsed duration.
+func TestAgeStringDSTSpringForwardMultiDay(t *testing.T) {
+	loc, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		t.Skip("America/New_York timezone not available")
+	}
+	now := time.Date(2024, 3, 11, 12, 0, 0, 0, loc)
+	parsed := time.Date(2024, 3, 8, 12, 0, 0, 0, loc)
+	got := AgeString(parsed.Format(time.RFC3339), now)
+	if got != "3d ago" {
+		t.Errorf("got %q, want %q", got, "3d ago")
+	}
+}
+
 // TestAgeStringCalendarDaysNotRawDuration guards against issue #152, where
 // a raw elapsed.Hours()/24 truncation undercounted local calendar midnights
 // crossed. In NZST (UTC+12), an entry logged at 13:08 local two calendar days

@@ -9,20 +9,33 @@ import (
 	"testing"
 	"time"
 
+	"goalie/internal/clock"
 	"goalie/internal/crypto"
 	"goalie/internal/git"
 	"goalie/internal/journal"
 )
 
 func relTS(deltaDays float64) string {
+	return relTSFrom(time.Now().UTC(), deltaDays)
+}
+
+// relTSFrom is like relTS but anchored to an explicit base time, so that
+// callers needing multiple relative timestamps to land in the same ISO week
+// file as a fixed base don't race time.Now() across a week boundary.
+func relTSFrom(base time.Time, deltaDays float64) string {
 	d := time.Duration(float64(24*time.Hour) * deltaDays)
-	return time.Now().UTC().Add(d).Format(time.RFC3339)
+	return base.Add(d).Format(time.RFC3339)
 }
 
 func strPtr(s string) *string { return &s }
 
 func currentWeekFile(username string) string {
-	year, week := time.Now().UTC().ISOWeek()
+	return weekFileFrom(time.Now().UTC(), username)
+}
+
+// weekFileFrom is like currentWeekFile but anchored to an explicit base time.
+func weekFileFrom(base time.Time, username string) string {
+	year, week := base.ISOWeek()
 	return fmt.Sprintf("%s-%d-W%02d.jsonl", username, year, week)
 }
 
@@ -688,12 +701,18 @@ func TestCollectLatestLocal(t *testing.T) {
 }
 
 func TestUpdateEntry(t *testing.T) {
+	// fixedNow anchors these fixtures at a literal instant, far from any ISO
+	// week or midnight boundary, so the entries' week file and Collect's
+	// 7-day window are deterministic regardless of when the suite runs.
+	fixedNow := time.Date(2024, 1, 10, 12, 0, 0, 0, time.UTC)
+	fakeClock := clock.FakeClock{T: fixedNow}
+
 	t.Run("replaces note in-place", func(t *testing.T) {
 		dir := t.TempDir()
 		r := &git.FakeRunner{}
 		key := testKey()
-		original := journal.Entry{ID: "id-1", TS: relTS(-1.0 / 24), Note: "tpyo", Task: strPtr("#impl")}
-		writeEntries(t, dir, currentWeekFile("alice"), []journal.Entry{original}, key)
+		original := journal.Entry{ID: "id-1", TS: relTSFrom(fixedNow, -1.0/24), Note: "tpyo", Task: strPtr("#impl")}
+		writeEntries(t, dir, weekFileFrom(fixedNow, "alice"), []journal.Entry{original}, key)
 
 		updated := original
 		updated.Note = "no typo"
@@ -701,7 +720,7 @@ func TestUpdateEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		entries, err := journal.Collect(dir, r, 7, "alice", key)
+		entries, err := journal.CollectWithClock(dir, r, 7, "alice", key, fakeClock)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -717,8 +736,8 @@ func TestUpdateEntry(t *testing.T) {
 		dir := t.TempDir()
 		r := &git.FakeRunner{}
 		key := testKey()
-		ts1, ts2, ts3 := relTS(-3.0/24), relTS(-2.0/24), relTS(-1.0/24)
-		writeEntries(t, dir, currentWeekFile("alice"), []journal.Entry{
+		ts1, ts2, ts3 := relTSFrom(fixedNow, -3.0/24), relTSFrom(fixedNow, -2.0/24), relTSFrom(fixedNow, -1.0/24)
+		writeEntries(t, dir, weekFileFrom(fixedNow, "alice"), []journal.Entry{
 			{ID: "id-a", TS: ts1, Note: "entry one", Task: strPtr("#impl")},
 			{ID: "id-b", TS: ts2, Note: "entry two", Task: strPtr("#impl")},
 			{ID: "id-c", TS: ts3, Note: "entry three", Task: strPtr("#impl")},
@@ -731,7 +750,7 @@ func TestUpdateEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		entries, err := journal.Collect(dir, r, 7, "alice", key)
+		entries, err := journal.CollectWithClock(dir, r, 7, "alice", key, fakeClock)
 		if err != nil {
 			t.Fatal(err)
 		}

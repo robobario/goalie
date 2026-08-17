@@ -1,7 +1,7 @@
 Log progress to goalie for the current session.
 
 Arguments (`$ARGUMENTS`) may include any combination of:
-- A task tag: starts with `#`, lowercase (e.g. `#impl`, `#build-fix`) — use this as `--task`
+- A task tag: starts with `#`, lowercase (e.g. `#impl`, `#build-fix`) — pass it to `--task` including the leading `#`
 - A goal ID: all uppercase letters/digits/underscores (e.g. `MYGOAL`, `Q3_INFRA`) — use this as `--goal`
 - The word `compact` — trigger `/compact` after logging
 
@@ -13,7 +13,8 @@ Arguments (`$ARGUMENTS`) may include any combination of:
 
 4. Run:
    ```
-   goalie log --task <tag> [--goal <goal-id>] "<summary>"
+   goalie log --task '#<tag>' [--goal <goal-id>] "<summary>"
    ```
+   The tag passed to `--task` must include the leading `#` (e.g. `--task '#impl'`), otherwise goalie rejects it as invalid.
 
 5. If `compact` was requested, run `/compact`.

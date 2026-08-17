@@ -373,6 +373,32 @@ func TestStatusOrdersDoneEntriesAfterLivingEntries(t *testing.T) {
 	}
 }
 
+func TestStatusShowsUnblockedTagAfterUnblock(t *testing.T) {
+	ctx, stdout, _ := newCtx(t)
+	writeRoutingGoal(t, ctx)
+
+	journalDir := filepath.Join(ctx.DataDir, "journal")
+	os.MkdirAll(journalDir, 0o755)
+	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("@alice")), []jsonlEntry{
+		{"ts": ts(-1), "note": "stuck", "task": "#impl", "goal": "ROUTING", "blocked": true, "done": false},
+	}, ctx.EncryptionKey)
+
+	if err := cli.Unblock(ctx, "@alice", "ROUTING", "#impl", "looks fine now"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if err := cli.Status(ctx, 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "[UNBLOCKED]") {
+		t.Errorf("expected '[UNBLOCKED]' in output:\n%s", out)
+	}
+	if strings.Contains(out, "[BLOCKED]") {
+		t.Errorf("expected no '[BLOCKED]' once unblocked:\n%s", out)
+	}
+}
+
 func TestStatusNoEntriesPrintsMessage(t *testing.T) {
 	ctx, stdout, _ := newCtx(t)
 

@@ -220,6 +220,7 @@ func Status(ctx AppContext, days int) error {
 
 	now := time.Now()
 	doneHideCutoff := journal.PriorBusinessDayStart(now)
+	unblockedTargets := journal.UnblockedTargets(entries)
 
 	byUser := make(map[string][]journal.Entry)
 	for _, e := range entries {
@@ -255,7 +256,7 @@ func Status(ctx AppContext, days int) error {
 		ues := byUser[u]
 		journal.SortForDisplay(ues)
 		for _, e := range ues {
-			formatted := display.WrapStatusEntry(e, selfUsername, now, ctx.DisplayCtx(), availableWidth)
+			formatted := display.WrapStatusEntry(e, selfUsername, now, ctx.DisplayCtx(), availableWidth, unblockedTargets)
 			for _, line := range strings.Split(formatted, "\n") {
 				fmt.Fprintf(ctx.Stdout, "%s%s\n", entryIndent, line)
 			}

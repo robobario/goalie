@@ -21,6 +21,7 @@ var (
 	statusGoalStyle        = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "27", Dark: "75"})
 	statusTaskTagStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "130", Dark: "208"})
 	statusBlockedStyle     = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "124", Dark: "9"})
+	statusUnblockedStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "28", Dark: "82"})
 	statusDoneStyle        = lipgloss.NewStyle().Faint(true)
 	statusMentionStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "28", Dark: "76"})
 	statusSelfMentionStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "22", Dark: "82"})
@@ -55,14 +56,27 @@ func applyStatusDoneStyle(s string, ctx Context) string {
 	return statusDoneStyle.Render(s)
 }
 
+func applyStatusUnblockedStyle(s string, ctx Context) string {
+	if !ctx.IsTTY {
+		return s
+	}
+	return statusUnblockedStyle.Render(s)
+}
+
 // statusTag returns the styled and plain-text forms of an entry's status
-// tag: "[done] " takes precedence over "[BLOCKED] " when both are set,
-// matching the TUI activity view. Empty when neither applies.
-func statusTag(e journal.Entry, ctx Context) (styled, plain string) {
+// tag: "[done] " takes precedence over "[BLOCKED] "/"[UNBLOCKED] ", matching
+// the TUI activity view. A blocked entry renders as "[UNBLOCKED] " instead
+// of "[BLOCKED] " when unblockedTargets marks its (username, goal, task) as
+// unblocked by someone else's entry (see journal.UnblockedTargets). Empty
+// when none apply.
+func statusTag(e journal.Entry, unblockedTargets map[journal.UnblockTarget]bool, ctx Context) (styled, plain string) {
 	if e.Done {
 		return applyStatusDoneStyle("[done]", ctx) + " ", "[done] "
 	}
 	if e.Blocked {
+		if unblockedTargets[journal.TargetOf(e)] {
+			return applyStatusUnblockedStyle("[UNBLOCKED]", ctx) + " ", "[UNBLOCKED] "
+		}
 		return applyStatusBlockedStyle("[BLOCKED]", ctx) + " ", "[BLOCKED] "
 	}
 	return "", ""
@@ -232,10 +246,10 @@ func goalTaskComboStyled(e journal.Entry, ctx Context) (styled, plain string) {
 	return "", ""
 }
 
-func FormatStatusEntry(e journal.Entry, selfUsername string, now time.Time, ctx Context) string {
+func FormatStatusEntry(e journal.Entry, selfUsername string, now time.Time, ctx Context, unblockedTargets map[journal.UnblockTarget]bool) string {
 	age := timeutil.AgeString(e.TS, now)
 	comboStyled, comboPlain := goalTaskComboStyled(e, ctx)
-	tagStyled, _ := statusTag(e, ctx)
+	tagStyled, _ := statusTag(e, unblockedTargets, ctx)
 	note := highlightStatusNoteTokens(e.Note, selfUsername, ctx)
 	if comboPlain != "" {
 		return tagStyled + comboStyled + " " + note + " - " + age
@@ -280,12 +294,12 @@ func renderNoteWords(words []NoteWord, selfUsername string, ctx Context) string 
 // indent. When availableWidth <= 0 it falls back to the unwrapped format.
 // Width calculations use the compressed form of URLs (when HyperLinks is true)
 // so that compress_hyperlinks users see accurate line breaks.
-func WrapStatusEntry(e journal.Entry, selfUsername string, now time.Time, ctx Context, availableWidth int) string {
+func WrapStatusEntry(e journal.Entry, selfUsername string, now time.Time, ctx Context, availableWidth int, unblockedTargets map[journal.UnblockTarget]bool) string {
 	age := timeutil.AgeString(e.TS, now)
 	suffix := " - " + age
 
 	comboStyled, comboPlain := goalTaskComboStyled(e, ctx)
-	tagStyled, tagPlain := statusTag(e, ctx)
+	tagStyled, tagPlain := statusTag(e, unblockedTargets, ctx)
 
 	// prefix always ends with a space when non-empty so prefix+note renders correctly.
 	// prefixPlain is the unstyled equivalent used for column-width maths.
@@ -301,7 +315,7 @@ func WrapStatusEntry(e journal.Entry, selfUsername string, now time.Time, ctx Co
 	maxFirstLine := availableWidth - len(prefixPlain)
 
 	if availableWidth <= 0 || maxFirstLine <= 0 {
-		return FormatStatusEntry(e, selfUsername, now, ctx)
+		return FormatStatusEntry(e, selfUsername, now, ctx, unblockedTargets)
 	}
 
 	words := TokenizeNoteWords(e.Note, ctx.IsTTY && ctx.HyperLinks)

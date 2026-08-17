@@ -233,8 +233,8 @@ func TestStatusOrdersDoneEntriesAfterLivingEntries(t *testing.T) {
 	journalDir := filepath.Join(ctx.DataDir, "journal")
 	os.MkdirAll(journalDir, 0o755)
 	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("@alice")), []jsonlEntry{
-		{"ts": ts(0), "note": "just finished", "task": "#impl", "goal": "ROUTING", "blocked": false, "done": true},
-		{"ts": ts(-1), "note": "still going", "task": "#docs", "goal": "ROUTING", "blocked": false, "done": false},
+		{"ts": ts(-1), "note": "just finished", "task": "#impl", "goal": "ROUTING", "blocked": false, "done": true},
+		{"ts": ts(0), "note": "still going", "task": "#docs", "goal": "ROUTING", "blocked": false, "done": false},
 	}, ctx.EncryptionKey)
 
 	if err := cli.Status(ctx, 0); err != nil {

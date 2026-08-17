@@ -402,6 +402,42 @@ func TestStatusShowsUnblockedTagAfterUnblock(t *testing.T) {
 	}
 }
 
+func TestStatusStaysUnblockedAfterUnblockerUpdatesSameTask(t *testing.T) {
+	// Regression: an unblocking entry is appended under the acting user's
+	// own identity for the target's (goal, task). If that user later logs
+	// an unrelated update to that same (goal, task), the unblocking entry
+	// must not be lost from the target's [UNBLOCKED] status just because it
+	// no longer survives CollectLatest's per-(username, goal, task) dedup.
+	// Timestamps are explicit (rather than relying on cli.Unblock/cli.Log's
+	// real wall-clock time) so the ordering that triggers the dedup can't
+	// collide with itself down to the second.
+	ctx, stdout, _ := newCtx(t)
+
+	journalDir := filepath.Join(ctx.DataDir, "journal")
+	os.MkdirAll(journalDir, 0o755)
+	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("@alice")), []jsonlEntry{
+		{"ts": ts(-2), "note": "stuck", "task": "#impl", "goal": "ROUTING", "blocked": true, "done": false},
+	}, ctx.EncryptionKey)
+	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile(ctx.Username)), []jsonlEntry{
+		{"ts": ts(-1), "note": "looks fine now", "task": "#impl", "goal": "ROUTING", "blocked": false, "done": false, "unblocks": "@alice"},
+		{"ts": ts(0), "note": "just checking in", "task": "#impl", "goal": "ROUTING", "blocked": false, "done": false},
+	}, ctx.EncryptionKey)
+
+	if err := cli.Status(ctx, 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "[UNBLOCKED]") {
+		t.Errorf("expected '[UNBLOCKED]' to survive the unblocker's own later update:\n%s", out)
+	}
+	if strings.Contains(out, "[BLOCKED]") {
+		t.Errorf("expected no '[BLOCKED]', got:\n%s", out)
+	}
+	if !strings.Contains(out, "└─") || !strings.Contains(out, "looks fine now") {
+		t.Errorf("expected the nested unblocking note to survive, got:\n%s", out)
+	}
+}
+
 func TestStatusNoEntriesPrintsMessage(t *testing.T) {
 	ctx, stdout, _ := newCtx(t)
 

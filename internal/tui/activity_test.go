@@ -527,12 +527,14 @@ func TestRenderActivityEntryDoneTakesPrecedenceOverUnblocked(t *testing.T) {
 func TestActivityViewShowsUnblockedTagAfterUnblock(t *testing.T) {
 	now := time.Now().UTC()
 	targetUsername := "@alice"
+	blocked := journal.Entry{ID: "blocked-1", Note: "stuck", Username: "@alice", TS: now.Add(-time.Hour).Format(time.RFC3339), Blocked: true, Goal: strPtr("ROUTING"), Task: strPtr("#impl")}
+	unblock := journal.Entry{ID: "unblock-1", Note: "looks fine now", Username: "@bob", TS: now.Format(time.RFC3339), Goal: strPtr("ROUTING"), Task: strPtr("#impl"), Unblocks: &targetUsername}
 	m := activityModel{
-		loaded: true,
-		width:  120,
-		entries: []journal.Entry{
-			{ID: "blocked-1", Note: "stuck", Username: "@alice", TS: now.Add(-time.Hour).Format(time.RFC3339), Blocked: true, Goal: strPtr("ROUTING"), Task: strPtr("#impl")},
-			{ID: "unblock-1", Note: "looks fine now", Username: "@bob", TS: now.Format(time.RFC3339), Goal: strPtr("ROUTING"), Task: strPtr("#impl"), Unblocks: &targetUsername},
+		loaded:  true,
+		width:   120,
+		entries: []journal.Entry{blocked, unblock},
+		unblockedTargets: map[journal.UnblockTarget]journal.Entry{
+			{Username: "@alice", Goal: "ROUTING", Task: "#impl"}: unblock,
 		},
 	}
 	m.filtered = m.entries

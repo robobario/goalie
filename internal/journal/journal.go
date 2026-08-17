@@ -411,13 +411,41 @@ func CollectLatestLocal(dataDir string, days int, key []byte) ([]Entry, error) {
 // CollectLatestLocalWithClock is CollectLatestLocal with an injectable Clock,
 // so tests can fix "now" instead of racing the wall clock.
 func CollectLatestLocalWithClock(dataDir string, days int, key []byte, c clock.Clock) ([]Entry, error) {
+	entries, _, err := collectLatestAndUnblockedWithClock(dataDir, days, key, c)
+	return entries, err
+}
+
+// CollectLatestAndUnblocked is CollectLatest plus the set of (username, goal,
+// task) targets marked unblocked by any entry in the same window. It runs
+// git pull before reading.
+//
+// The unblocked-targets set must come from this raw scan rather than from
+// UnblockedTargets(entries) on the already-deduped result: an unblocking
+// entry is appended under the acting user's own identity for the target's
+// (goal, task), so that user's own later, unrelated update to the same
+// (goal, task) supersedes it in the per-(username, goal, task) dedup and
+// would otherwise make the Unblocks signal silently vanish.
+func CollectLatestAndUnblocked(dataDir string, r git.Runner, days int, key []byte) ([]Entry, map[UnblockTarget]Entry, error) {
+	if err := r.Run([]string{"pull"}, dataDir); err != nil {
+		return nil, nil, err
+	}
+	return CollectLatestAndUnblockedLocal(dataDir, days, key)
+}
+
+// CollectLatestAndUnblockedLocal is CollectLatestAndUnblocked reading only
+// from local files without pulling.
+func CollectLatestAndUnblockedLocal(dataDir string, days int, key []byte) ([]Entry, map[UnblockTarget]Entry, error) {
+	return collectLatestAndUnblockedWithClock(dataDir, days, key, clock.RealClock{})
+}
+
+func collectLatestAndUnblockedWithClock(dataDir string, days int, key []byte, c clock.Clock) ([]Entry, map[UnblockTarget]Entry, error) {
 	now := c.Now()
 	cutoff := now.Add(-time.Duration(days) * 24 * time.Hour)
 	journalDir := filepath.Join(dataDir, "journal")
 
 	allFiles, err := filepath.Glob(filepath.Join(journalDir, "*.jsonl"))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	usernameSet := make(map[string]bool)
@@ -435,18 +463,14 @@ func CollectLatestLocalWithClock(dataDir string, days int, key []byte, c clock.C
 	}
 	sort.Strings(usernames)
 
-	type dedupKey struct {
-		username string
-		goal     string
-		task     string
-	}
-	latest := make(map[dedupKey]Entry)
+	latest := make(map[UnblockTarget]Entry)
+	unblockedTargets := make(map[UnblockTarget]Entry)
 
 	for _, username := range usernames {
 		for _, file := range weekFilesForRange(journalDir, username, cutoff, now) {
 			fileEntries, err := readEntries(file, username, key)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			for _, e := range fileEntries {
 				ts, err := time.Parse(time.RFC3339, e.TS)
@@ -456,17 +480,15 @@ func CollectLatestLocalWithClock(dataDir string, days int, key []byte, c clock.C
 				if ts.Before(cutoff) {
 					continue
 				}
-				goalStr := ""
-				if e.Goal != nil {
-					goalStr = *e.Goal
-				}
-				taskStr := ""
-				if e.Task != nil {
-					taskStr = *e.Task
-				}
-				k := dedupKey{username, goalStr, taskStr}
+				k := UnblockTarget{Username: username, Goal: ptrOrEmpty(e.Goal), Task: ptrOrEmpty(e.Task)}
 				if prev, ok := latest[k]; !ok || e.TS > prev.TS {
 					latest[k] = e
+				}
+				if e.Unblocks != nil {
+					target := UnblockTarget{Username: *e.Unblocks, Goal: ptrOrEmpty(e.Goal), Task: ptrOrEmpty(e.Task)}
+					if existing, ok := unblockedTargets[target]; !ok || e.TS > existing.TS {
+						unblockedTargets[target] = e
+					}
 				}
 			}
 		}
@@ -479,7 +501,7 @@ func CollectLatestLocalWithClock(dataDir string, days int, key []byte, c clock.C
 	sort.Slice(result, func(i, j int) bool {
 		return result[i].TS < result[j].TS
 	})
-	return result, nil
+	return result, unblockedTargets, nil
 }
 
 // CurrentTaskStates returns the latest state for each task tag found in

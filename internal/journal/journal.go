@@ -39,6 +39,32 @@ type TaskState struct {
 	TS      string
 }
 
+// SortForDisplay orders entries for a per-user display list: blocked entries
+// first, then non-done "living" entries, then done entries last. An entry
+// that is both Blocked and Done sorts as blocked, since surfacing a blocker
+// outranks burying a stale done note. Within each tier, most recent (by TS)
+// comes first.
+func SortForDisplay(entries []Entry) {
+	sort.SliceStable(entries, func(i, j int) bool {
+		ti, tj := displayTier(entries[i]), displayTier(entries[j])
+		if ti != tj {
+			return ti < tj
+		}
+		return entries[i].TS > entries[j].TS
+	})
+}
+
+func displayTier(e Entry) int {
+	switch {
+	case e.Blocked:
+		return 0
+	case e.Done:
+		return 2
+	default:
+		return 1
+	}
+}
+
 var weekFileSuffix = regexp.MustCompile(`-\d{4}-W\d{2}$`)
 
 func weekFileName(username string, t time.Time) string {

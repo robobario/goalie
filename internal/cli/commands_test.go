@@ -227,6 +227,30 @@ func TestStatusBlockedEntryShowsBlockedPrefix(t *testing.T) {
 	}
 }
 
+func TestStatusOrdersDoneEntriesAfterLivingEntries(t *testing.T) {
+	ctx, stdout, _ := newCtx(t)
+
+	journalDir := filepath.Join(ctx.DataDir, "journal")
+	os.MkdirAll(journalDir, 0o755)
+	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("@alice")), []jsonlEntry{
+		{"ts": ts(0), "note": "just finished", "task": "#impl", "goal": "ROUTING", "blocked": false, "done": true},
+		{"ts": ts(-1), "note": "still going", "task": "#docs", "goal": "ROUTING", "blocked": false, "done": false},
+	}, ctx.EncryptionKey)
+
+	if err := cli.Status(ctx, 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := stdout.String()
+	livingIdx := strings.Index(out, "still going")
+	doneIdx := strings.Index(out, "just finished")
+	if livingIdx == -1 || doneIdx == -1 {
+		t.Fatalf("expected both entries in output:\n%s", out)
+	}
+	if doneIdx < livingIdx {
+		t.Errorf("expected done entry after living entry, got:\n%s", out)
+	}
+}
+
 func TestStatusNoEntriesPrintsMessage(t *testing.T) {
 	ctx, stdout, _ := newCtx(t)
 

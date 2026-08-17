@@ -78,25 +78,9 @@ type UnblockTarget struct {
 }
 
 // TargetOf returns the UnblockTarget matching e's own (Username, Goal, Task),
-// for looking e up in the set returned by UnblockedTargets.
+// for looking e up in the set returned by CollectLatestAndUnblocked.
 func TargetOf(e Entry) UnblockTarget {
 	return UnblockTarget{Username: e.Username, Goal: ptrOrEmpty(e.Goal), Task: ptrOrEmpty(e.Task)}
-}
-
-// UnblockedTargets returns, for each (username, goal, task) triple that some
-// entry's Unblocks field names, the most recent such entry.
-func UnblockedTargets(entries []Entry) map[UnblockTarget]Entry {
-	targets := make(map[UnblockTarget]Entry)
-	for _, e := range entries {
-		if e.Unblocks == nil {
-			continue
-		}
-		key := UnblockTarget{Username: *e.Unblocks, Goal: ptrOrEmpty(e.Goal), Task: ptrOrEmpty(e.Task)}
-		if existing, ok := targets[key]; !ok || e.TS > existing.TS {
-			targets[key] = e
-		}
-	}
-	return targets
 }
 
 // UnblockingEntry returns the entry that superseded blocked entry e, if any.
@@ -419,12 +403,12 @@ func CollectLatestLocalWithClock(dataDir string, days int, key []byte, c clock.C
 // task) targets marked unblocked by any entry in the same window. It runs
 // git pull before reading.
 //
-// The unblocked-targets set must come from this raw scan rather than from
-// UnblockedTargets(entries) on the already-deduped result: an unblocking
-// entry is appended under the acting user's own identity for the target's
-// (goal, task), so that user's own later, unrelated update to the same
-// (goal, task) supersedes it in the per-(username, goal, task) dedup and
-// would otherwise make the Unblocks signal silently vanish.
+// The unblocked-targets set must come from this raw scan rather than a
+// simpler pass over an already-deduped entries slice: an unblocking entry is
+// appended under the acting user's own identity for the target's (goal,
+// task), so that user's own later, unrelated update to the same (goal, task)
+// supersedes it in the per-(username, goal, task) dedup and would otherwise
+// make the Unblocks signal silently vanish.
 func CollectLatestAndUnblocked(dataDir string, r git.Runner, days int, key []byte) ([]Entry, map[UnblockTarget]Entry, error) {
 	if err := r.Run([]string{"pull"}, dataDir); err != nil {
 		return nil, nil, err

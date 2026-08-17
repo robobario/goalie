@@ -237,6 +237,28 @@ func TestUnblockErrorsWhenTargetNotBlocked(t *testing.T) {
 	}
 }
 
+func TestUnblockErrorsWhenTargetAlreadyUnblocked(t *testing.T) {
+	ctx, _, stderr := newCtx(t)
+	writeRoutingGoal(t, ctx)
+
+	journalDir := filepath.Join(ctx.DataDir, "journal")
+	os.MkdirAll(journalDir, 0o755)
+	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("@alice")), []jsonlEntry{
+		{"ts": ts(-2), "note": "stuck", "task": "#impl", "goal": "ROUTING", "blocked": true, "done": false},
+	}, ctx.EncryptionKey)
+	writeJSONL(t, filepath.Join(journalDir, weeklyJournalFile("@carol")), []jsonlEntry{
+		{"ts": ts(-1), "note": "reviewed", "task": "#impl", "goal": "ROUTING", "blocked": false, "done": false, "unblocks": "@alice"},
+	}, ctx.EncryptionKey)
+
+	err := cli.Unblock(ctx, "@alice", "ROUTING", "#impl", "")
+	if !isExitCode(err, 1) {
+		t.Fatalf("expected exit code 1, got %v", err)
+	}
+	if !strings.Contains(stderr.String(), "not blocked") {
+		t.Errorf("expected 'not blocked' in stderr, got %q", stderr.String())
+	}
+}
+
 func TestUnblockRequiresTask(t *testing.T) {
 	ctx, _, stderr := newCtx(t)
 

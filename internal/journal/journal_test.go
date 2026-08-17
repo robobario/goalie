@@ -952,13 +952,19 @@ func TestSortForDisplay(t *testing.T) {
 	})
 }
 
-func TestUnblockedTargets(t *testing.T) {
+func TestCollectLatestAndUnblockedLocal(t *testing.T) {
 	t.Run("entry with Unblocks records itself as the target's (username, goal, task) unblocking entry", func(t *testing.T) {
+		dir := t.TempDir()
+		key := testKey()
 		username := "@alice"
-		entries := []journal.Entry{
-			{ID: "unblock-1", TS: "2024-01-02T00:00:00Z", Username: "@bob", Goal: strPtr("ROUTING"), Task: strPtr("#impl"), Unblocks: &username},
+		writeEntries(t, dir, currentWeekFile("@bob"), []journal.Entry{
+			{ID: "unblock-1", TS: relTS(0), Username: "@bob", Goal: strPtr("ROUTING"), Task: strPtr("#impl"), Unblocks: &username},
+		}, key)
+
+		_, targets, err := journal.CollectLatestAndUnblockedLocal(dir, 7, key)
+		if err != nil {
+			t.Fatal(err)
 		}
-		targets := journal.UnblockedTargets(entries)
 		want := journal.UnblockTarget{Username: "@alice", Goal: "ROUTING", Task: "#impl"}
 		if targets[want].ID != "unblock-1" {
 			t.Errorf("expected %v to map to unblock-1, got %v", want, targets[want])
@@ -966,21 +972,33 @@ func TestUnblockedTargets(t *testing.T) {
 	})
 
 	t.Run("entries without Unblocks are ignored", func(t *testing.T) {
-		entries := []journal.Entry{
-			{ID: "normal", Username: "@bob", Goal: strPtr("ROUTING"), Task: strPtr("#impl")},
+		dir := t.TempDir()
+		key := testKey()
+		writeEntries(t, dir, currentWeekFile("@bob"), []journal.Entry{
+			{ID: "normal", TS: relTS(0), Username: "@bob", Goal: strPtr("ROUTING"), Task: strPtr("#impl")},
+		}, key)
+
+		_, targets, err := journal.CollectLatestAndUnblockedLocal(dir, 7, key)
+		if err != nil {
+			t.Fatal(err)
 		}
-		targets := journal.UnblockedTargets(entries)
 		if len(targets) != 0 {
 			t.Errorf("expected no targets, got %v", targets)
 		}
 	})
 
 	t.Run("nil goal and task normalize to empty string", func(t *testing.T) {
+		dir := t.TempDir()
+		key := testKey()
 		username := "@alice"
-		entries := []journal.Entry{
-			{ID: "unblock-1", TS: "2024-01-02T00:00:00Z", Username: "@bob", Unblocks: &username},
+		writeEntries(t, dir, currentWeekFile("@bob"), []journal.Entry{
+			{ID: "unblock-1", TS: relTS(0), Username: "@bob", Unblocks: &username},
+		}, key)
+
+		_, targets, err := journal.CollectLatestAndUnblockedLocal(dir, 7, key)
+		if err != nil {
+			t.Fatal(err)
 		}
-		targets := journal.UnblockedTargets(entries)
 		want := journal.UnblockTarget{Username: "@alice", Goal: "", Task: ""}
 		if targets[want].ID != "unblock-1" {
 			t.Errorf("expected %v to map to unblock-1, got %v", want, targets[want])
@@ -988,15 +1006,50 @@ func TestUnblockedTargets(t *testing.T) {
 	})
 
 	t.Run("keeps the most recent entry when multiple entries unblock the same target", func(t *testing.T) {
+		dir := t.TempDir()
+		key := testKey()
 		username := "@alice"
-		entries := []journal.Entry{
-			{ID: "unblock-1", TS: "2024-01-01T00:00:00Z", Username: "@bob", Task: strPtr("#impl"), Unblocks: &username},
-			{ID: "unblock-2", TS: "2024-01-05T00:00:00Z", Username: "@carol", Task: strPtr("#impl"), Unblocks: &username},
+		writeEntries(t, dir, currentWeekFile("@bob"), []journal.Entry{
+			{ID: "unblock-1", TS: relTS(-1), Username: "@bob", Task: strPtr("#impl"), Unblocks: &username},
+		}, key)
+		writeEntries(t, dir, currentWeekFile("@carol"), []journal.Entry{
+			{ID: "unblock-2", TS: relTS(0), Username: "@carol", Task: strPtr("#impl"), Unblocks: &username},
+		}, key)
+
+		_, targets, err := journal.CollectLatestAndUnblockedLocal(dir, 7, key)
+		if err != nil {
+			t.Fatal(err)
 		}
-		targets := journal.UnblockedTargets(entries)
 		want := journal.UnblockTarget{Username: "@alice", Goal: "", Task: "#impl"}
 		if targets[want].ID != "unblock-2" {
 			t.Errorf("expected the most recent unblock entry, got %v", targets[want])
+		}
+	})
+
+	t.Run("acting user's own later unrelated update does not drop the unblocking entry", func(t *testing.T) {
+		// Regression for issue #153: an unblocking entry is appended under
+		// the acting user's own identity for the target's (goal, task), so
+		// their own later update to that same (goal, task) must not make
+		// the Unblocks signal vanish just because it no longer survives the
+		// per-(username, goal, task) dedup.
+		dir := t.TempDir()
+		key := testKey()
+		username := "@alice"
+		writeEntries(t, dir, currentWeekFile("@bob"), []journal.Entry{
+			{ID: "unblock-1", TS: relTS(-1), Username: "@bob", Goal: strPtr("ROUTING"), Task: strPtr("#impl"), Unblocks: &username},
+			{ID: "self-update", TS: relTS(0), Username: "@bob", Goal: strPtr("ROUTING"), Task: strPtr("#impl")},
+		}, key)
+
+		entries, targets, err := journal.CollectLatestAndUnblockedLocal(dir, 7, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := journal.UnblockTarget{Username: "@alice", Goal: "ROUTING", Task: "#impl"}
+		if targets[want].ID != "unblock-1" {
+			t.Errorf("expected %v to still map to unblock-1, got %v", want, targets[want])
+		}
+		if len(entries) != 1 || entries[0].ID != "self-update" {
+			t.Errorf("expected @bob's deduped latest entry to be self-update, got %v", entries)
 		}
 	})
 }

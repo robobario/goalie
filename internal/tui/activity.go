@@ -325,8 +325,9 @@ func wrapWords(text string, maxWidth int) []string {
 // note wrapping to indented continuation lines. A blocked entry renders as
 // [UNBLOCKED] instead of [BLOCKED] when journal.IsUnblocked reports it's
 // been superseded by a later entry naming its (username, goal, task) in
-// Unblocks.
-func renderActivityEntry(e journal.Entry, now time.Time, selfUsername string, hyperLinks bool, availableWidth int, unblockedTargets map[journal.UnblockTarget]string) string {
+// Unblocks, and gets a "└─ AGE - @username - note" line appended showing
+// who unblocked it and why (see journal.UnblockingEntry).
+func renderActivityEntry(e journal.Entry, now time.Time, selfUsername string, hyperLinks bool, availableWidth int, unblockedTargets map[journal.UnblockTarget]journal.Entry) string {
 	const bullet = "•"
 	const contIndent = "  "
 
@@ -356,37 +357,45 @@ func renderActivityEntry(e journal.Entry, now time.Time, selfUsername string, hy
 		fixedHeader = bullet + " - " + age
 	}
 
-	if strings.TrimSpace(e.Note) == "" {
-		return fixedHeader
-	}
+	var result string
+	switch {
+	case strings.TrimSpace(e.Note) == "":
+		result = fixedHeader
+	default:
+		lineLeader := fixedHeader + " - "
+		maxNoteOnFirstLine := availableWidth - lipgloss.Width(lineLeader)
+		contWidth := max(1, availableWidth-len(contIndent))
 
-	lineLeader := fixedHeader + " - "
-	maxNoteOnFirstLine := availableWidth - lipgloss.Width(lineLeader)
-	contWidth := max(1, availableWidth-len(contIndent))
+		words := display.TokenizeNoteWords(e.Note, hyperLinks)
 
-	words := display.TokenizeNoteWords(e.Note, hyperLinks)
-
-	var sb strings.Builder
-	if maxNoteOnFirstLine <= 0 {
-		sb.WriteString(fixedHeader)
-		for _, lineWords := range display.WrapNoteWords(words, contWidth) {
-			sb.WriteString("\n" + contIndent + renderNoteWordsTUI(lineWords, selfUsername, hyperLinks))
+		var sb strings.Builder
+		if maxNoteOnFirstLine <= 0 {
+			sb.WriteString(fixedHeader)
+			for _, lineWords := range display.WrapNoteWords(words, contWidth) {
+				sb.WriteString("\n" + contIndent + renderNoteWordsTUI(lineWords, selfUsername, hyperLinks))
+			}
+			result = sb.String()
+		} else {
+			firstWords, remainingWords := display.TakeFirstLineWords(words, maxNoteOnFirstLine)
+			if len(firstWords) > 0 {
+				sb.WriteString(lineLeader + renderNoteWordsTUI(firstWords, selfUsername, hyperLinks))
+			} else {
+				sb.WriteString(fixedHeader)
+			}
+			if len(remainingWords) > 0 {
+				for _, lineWords := range display.WrapNoteWords(remainingWords, contWidth) {
+					sb.WriteString("\n" + contIndent + renderNoteWordsTUI(lineWords, selfUsername, hyperLinks))
+				}
+			}
+			result = sb.String()
 		}
-		return sb.String()
 	}
 
-	firstWords, remainingWords := display.TakeFirstLineWords(words, maxNoteOnFirstLine)
-	if len(firstWords) > 0 {
-		sb.WriteString(lineLeader + renderNoteWordsTUI(firstWords, selfUsername, hyperLinks))
-	} else {
-		sb.WriteString(fixedHeader)
+	if unblock, ok := journal.UnblockingEntry(e, unblockedTargets); ok {
+		unblockAge := timeutil.AgeString(unblock.TS, now)
+		result += "\n└─ " + unblockAge + " - " + usernameStyle.Render(unblock.Username) + " - " + unblock.Note
 	}
-	if len(remainingWords) > 0 {
-		for _, lineWords := range display.WrapNoteWords(remainingWords, contWidth) {
-			sb.WriteString("\n" + contIndent + renderNoteWordsTUI(lineWords, selfUsername, hyperLinks))
-		}
-	}
-	return sb.String()
+	return result
 }
 
 // takeFirstLine consumes as many complete words from text as fit within

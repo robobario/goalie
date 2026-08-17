@@ -397,6 +397,9 @@ func TestStatusShowsUnblockedTagAfterUnblock(t *testing.T) {
 	if strings.Contains(out, "[BLOCKED]") {
 		t.Errorf("expected no '[BLOCKED]' once unblocked:\n%s", out)
 	}
+	if !strings.Contains(out, "└─") || !strings.Contains(out, ctx.Username) || !strings.Contains(out, "looks fine now") {
+		t.Errorf("expected nested unblocking note in output:\n%s", out)
+	}
 }
 
 func TestStatusNoEntriesPrintsMessage(t *testing.T) {

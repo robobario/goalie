@@ -69,7 +69,7 @@ func applyStatusUnblockedStyle(s string, ctx Context) string {
 // of "[BLOCKED] " when journal.IsUnblocked reports it's been superseded by a
 // later entry naming its (username, goal, task) in Unblocks. Empty when none
 // apply.
-func statusTag(e journal.Entry, unblockedTargets map[journal.UnblockTarget]string, ctx Context) (styled, plain string) {
+func statusTag(e journal.Entry, unblockedTargets map[journal.UnblockTarget]journal.Entry, ctx Context) (styled, plain string) {
 	if e.Done {
 		return applyStatusDoneStyle("[done]", ctx) + " ", "[done] "
 	}
@@ -246,15 +246,31 @@ func goalTaskComboStyled(e journal.Entry, ctx Context) (styled, plain string) {
 	return "", ""
 }
 
-func FormatStatusEntry(e journal.Entry, selfUsername string, now time.Time, ctx Context, unblockedTargets map[journal.UnblockTarget]string) string {
+func FormatStatusEntry(e journal.Entry, selfUsername string, now time.Time, ctx Context, unblockedTargets map[journal.UnblockTarget]journal.Entry) string {
 	age := timeutil.AgeString(e.TS, now)
 	comboStyled, comboPlain := goalTaskComboStyled(e, ctx)
 	tagStyled, _ := statusTag(e, unblockedTargets, ctx)
 	note := highlightStatusNoteTokens(e.Note, selfUsername, ctx)
+	var line string
 	if comboPlain != "" {
-		return tagStyled + comboStyled + " " + note + " - " + age
+		line = tagStyled + comboStyled + " " + note + " - " + age
+	} else {
+		line = tagStyled + note + " - " + age
 	}
-	return tagStyled + note + " - " + age
+	return appendUnblockingNote(line, e, now, unblockedTargets, ctx)
+}
+
+// appendUnblockingNote appends a "└─ AGE - @username - note" line beneath
+// line when journal.UnblockingEntry reports e has been superseded, so a
+// blocked entry that shows [UNBLOCKED] also shows who unblocked it and why.
+func appendUnblockingNote(line string, e journal.Entry, now time.Time, unblockedTargets map[journal.UnblockTarget]journal.Entry, ctx Context) string {
+	unblock, ok := journal.UnblockingEntry(e, unblockedTargets)
+	if !ok {
+		return line
+	}
+	age := timeutil.AgeString(unblock.TS, now)
+	note := highlightStatusNoteTokens(unblock.Note, "", ctx)
+	return line + "\n└─ " + age + " - " + Username(unblock.Username, ctx) + " - " + note
 }
 
 // renderNoteWords renders a slice of NoteWord as a string with ANSI styling
@@ -294,7 +310,7 @@ func renderNoteWords(words []NoteWord, selfUsername string, ctx Context) string 
 // indent. When availableWidth <= 0 it falls back to the unwrapped format.
 // Width calculations use the compressed form of URLs (when HyperLinks is true)
 // so that compress_hyperlinks users see accurate line breaks.
-func WrapStatusEntry(e journal.Entry, selfUsername string, now time.Time, ctx Context, availableWidth int, unblockedTargets map[journal.UnblockTarget]string) string {
+func WrapStatusEntry(e journal.Entry, selfUsername string, now time.Time, ctx Context, availableWidth int, unblockedTargets map[journal.UnblockTarget]journal.Entry) string {
 	age := timeutil.AgeString(e.TS, now)
 	suffix := " - " + age
 
@@ -320,7 +336,7 @@ func WrapStatusEntry(e journal.Entry, selfUsername string, now time.Time, ctx Co
 
 	words := TokenizeNoteWords(e.Note, ctx.IsTTY && ctx.HyperLinks)
 	if noteWordsWidth(words)+len(suffix) <= maxFirstLine {
-		return prefix + highlightStatusNoteTokens(e.Note, selfUsername, ctx) + suffix
+		return appendUnblockingNote(prefix+highlightStatusNoteTokens(e.Note, selfUsername, ctx)+suffix, e, now, unblockedTargets, ctx)
 	}
 
 	const contIndent = "  "
@@ -340,7 +356,7 @@ func WrapStatusEntry(e journal.Entry, selfUsername string, now time.Time, ctx Co
 			sb.WriteString(contIndent + rendered)
 		}
 	}
-	return sb.String()
+	return appendUnblockingNote(sb.String(), e, now, unblockedTargets, ctx)
 }
 
 func wrapWords(text string, maxWidth int) []string {

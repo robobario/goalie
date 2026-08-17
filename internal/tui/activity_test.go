@@ -444,8 +444,8 @@ func TestRenderActivityEntryUnblockedTargetShowsGreenTag(t *testing.T) {
 		Goal:     strPtr("ROUTING"),
 		Task:     strPtr("#impl"),
 	}
-	targets := map[journal.UnblockTarget]string{
-		{Username: "@alice", Goal: "ROUTING", Task: "#impl"}: time.Now().Add(time.Hour).Format(time.RFC3339),
+	targets := map[journal.UnblockTarget]journal.Entry{
+		{Username: "@alice", Goal: "ROUTING", Task: "#impl"}: {TS: time.Now().Add(time.Hour).Format(time.RFC3339), Username: "@bob", Note: "reviewed it"},
 	}
 	got := renderActivityEntry(e, time.Now(), "", false, 0, targets)
 	if !strings.Contains(got, "[UNBLOCKED]") {
@@ -453,6 +453,28 @@ func TestRenderActivityEntryUnblockedTargetShowsGreenTag(t *testing.T) {
 	}
 	if strings.Contains(got, "[BLOCKED]") {
 		t.Errorf("expected no '[BLOCKED]' once unblocked, got %q", got)
+	}
+}
+
+func TestRenderActivityEntryUnblockedTargetShowsNestedNote(t *testing.T) {
+	fixedTS := time.Now().Format(time.RFC3339)
+	e := journal.Entry{
+		TS:       fixedTS,
+		Note:     "waiting",
+		Username: "@alice",
+		Blocked:  true,
+		Goal:     strPtr("ROUTING"),
+		Task:     strPtr("#impl"),
+	}
+	targets := map[journal.UnblockTarget]journal.Entry{
+		{Username: "@alice", Goal: "ROUTING", Task: "#impl"}: {TS: time.Now().Add(time.Hour).Format(time.RFC3339), Username: "@bob", Note: "reviewed it"},
+	}
+	got := renderActivityEntry(e, time.Now(), "", false, 40, targets)
+	if !strings.Contains(got, "└─") {
+		t.Errorf("expected nested unblock line, got %q", got)
+	}
+	if !strings.Contains(got, "@bob") || !strings.Contains(got, "reviewed it") {
+		t.Errorf("expected unblocking username and note, got %q", got)
 	}
 }
 
@@ -468,8 +490,8 @@ func TestRenderActivityEntryReblockedAfterUnblockShowsBlockedTag(t *testing.T) {
 		Goal:     strPtr("ROUTING"),
 		Task:     strPtr("#impl"),
 	}
-	targets := map[journal.UnblockTarget]string{
-		{Username: "@alice", Goal: "ROUTING", Task: "#impl"}: time.Now().Add(-time.Hour).Format(time.RFC3339),
+	targets := map[journal.UnblockTarget]journal.Entry{
+		{Username: "@alice", Goal: "ROUTING", Task: "#impl"}: {TS: time.Now().Add(-time.Hour).Format(time.RFC3339), Username: "@bob"},
 	}
 	got := renderActivityEntry(e, time.Now(), "", false, 0, targets)
 	if !strings.Contains(got, "[BLOCKED]") {
@@ -490,8 +512,8 @@ func TestRenderActivityEntryDoneTakesPrecedenceOverUnblocked(t *testing.T) {
 		Goal:     strPtr("ROUTING"),
 		Task:     strPtr("#impl"),
 	}
-	targets := map[journal.UnblockTarget]string{
-		{Username: "@alice", Goal: "ROUTING", Task: "#impl"}: time.Now().Add(time.Hour).Format(time.RFC3339),
+	targets := map[journal.UnblockTarget]journal.Entry{
+		{Username: "@alice", Goal: "ROUTING", Task: "#impl"}: {TS: time.Now().Add(time.Hour).Format(time.RFC3339), Username: "@bob", Note: "reviewed it"},
 	}
 	got := renderActivityEntry(e, time.Now(), "", false, 0, targets)
 	if !strings.Contains(got, "[done]") {
@@ -520,6 +542,9 @@ func TestActivityViewShowsUnblockedTagAfterUnblock(t *testing.T) {
 	}
 	if strings.Contains(view, "[BLOCKED]") {
 		t.Errorf("expected no '[BLOCKED]' once unblocked:\n%s", view)
+	}
+	if !strings.Contains(view, "└─") || !strings.Contains(view, "@bob") || !strings.Contains(view, "looks fine now") {
+		t.Errorf("expected nested unblocking note in view:\n%s", view)
 	}
 }
 

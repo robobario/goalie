@@ -84,28 +84,37 @@ func TargetOf(e Entry) UnblockTarget {
 }
 
 // UnblockedTargets returns, for each (username, goal, task) triple that some
-// entry's Unblocks field names, the timestamp of the most recent such entry.
-func UnblockedTargets(entries []Entry) map[UnblockTarget]string {
-	targets := make(map[UnblockTarget]string)
+// entry's Unblocks field names, the most recent such entry.
+func UnblockedTargets(entries []Entry) map[UnblockTarget]Entry {
+	targets := make(map[UnblockTarget]Entry)
 	for _, e := range entries {
 		if e.Unblocks == nil {
 			continue
 		}
 		key := UnblockTarget{Username: *e.Unblocks, Goal: ptrOrEmpty(e.Goal), Task: ptrOrEmpty(e.Task)}
-		if e.TS > targets[key] {
-			targets[key] = e.TS
+		if existing, ok := targets[key]; !ok || e.TS > existing.TS {
+			targets[key] = e
 		}
 	}
 	return targets
 }
 
+// UnblockingEntry returns the entry that superseded blocked entry e, if any.
+// A block that comes after the most recent unblock — e.g. the same task was
+// blocked again — is not considered superseded.
+func UnblockingEntry(e Entry, unblockedTargets map[UnblockTarget]Entry) (Entry, bool) {
+	unblock, ok := unblockedTargets[TargetOf(e)]
+	if !ok || !(unblock.TS > e.TS) {
+		return Entry{}, false
+	}
+	return unblock, true
+}
+
 // IsUnblocked reports whether a blocked entry e has been superseded by a
-// later entry naming its (username, goal, task) in Unblocks. A block that
-// comes after the most recent unblock — e.g. the same task was blocked again
-// — is not considered unblocked.
-func IsUnblocked(e Entry, unblockedTargets map[UnblockTarget]string) bool {
-	unblockTS, ok := unblockedTargets[TargetOf(e)]
-	return ok && unblockTS > e.TS
+// later entry naming its (username, goal, task) in Unblocks.
+func IsUnblocked(e Entry, unblockedTargets map[UnblockTarget]Entry) bool {
+	_, ok := UnblockingEntry(e, unblockedTargets)
+	return ok
 }
 
 func ptrOrEmpty(s *string) string {

@@ -78,6 +78,12 @@ func usernameFromWeeklyFile(file string) (string, bool) {
 
 // Append pulls, appends an entry to journal/<username>-YYYY-Www.jsonl, commits, and pushes.
 func Append(dataDir string, r git.Runner, username string, e Entry, key []byte) error {
+	return AppendWithClock(dataDir, r, username, e, key, clock.RealClock{})
+}
+
+// AppendWithClock is Append with an injectable Clock, so tests can fix "now"
+// instead of racing the wall clock.
+func AppendWithClock(dataDir string, r git.Runner, username string, e Entry, key []byte, c clock.Clock) error {
 	if err := r.Run([]string{"pull"}, dataDir); err != nil {
 		return err
 	}
@@ -87,7 +93,7 @@ func Append(dataDir string, r git.Runner, username string, e Entry, key []byte) 
 		return err
 	}
 
-	now := clock.Now()
+	now := c.Now()
 	e.ID = uuid.New().String()
 	e.TS = now.Format(time.RFC3339)
 
@@ -207,11 +213,17 @@ func UpdateEntry(dataDir string, r git.Runner, username string, original, update
 // Collect returns all entries within the last `days` days, optionally filtered
 // by a glob pattern on username. An empty userPattern includes all users.
 func Collect(dataDir string, r git.Runner, days int, userPattern string, key []byte) ([]Entry, error) {
+	return CollectWithClock(dataDir, r, days, userPattern, key, clock.RealClock{})
+}
+
+// CollectWithClock is Collect with an injectable Clock, so tests can fix "now"
+// instead of racing the wall clock.
+func CollectWithClock(dataDir string, r git.Runner, days int, userPattern string, key []byte, c clock.Clock) ([]Entry, error) {
 	if err := r.Run([]string{"pull"}, dataDir); err != nil {
 		return nil, err
 	}
 
-	now := time.Now().UTC()
+	now := c.Now()
 	cutoff := now.Add(-time.Duration(days) * 24 * time.Hour)
 	journalDir := filepath.Join(dataDir, "journal")
 
@@ -308,7 +320,13 @@ func CollectLatest(dataDir string, r git.Runner, days int, key []byte) ([]Entry,
 // CollectLatestLocal returns the latest entry per (username, goal, task) key
 // within the last `days` days, reading only from local files without pulling.
 func CollectLatestLocal(dataDir string, days int, key []byte) ([]Entry, error) {
-	now := time.Now().UTC()
+	return CollectLatestLocalWithClock(dataDir, days, key, clock.RealClock{})
+}
+
+// CollectLatestLocalWithClock is CollectLatestLocal with an injectable Clock,
+// so tests can fix "now" instead of racing the wall clock.
+func CollectLatestLocalWithClock(dataDir string, days int, key []byte, c clock.Clock) ([]Entry, error) {
+	now := c.Now()
 	cutoff := now.Add(-time.Duration(days) * 24 * time.Hour)
 	journalDir := filepath.Join(dataDir, "journal")
 
@@ -383,7 +401,13 @@ func CollectLatestLocal(dataDir string, days int, key []byte) ([]Entry, error) {
 // weekly journal files for the given username over the past 4 weeks.
 // Entries with nil Task are ignored. Returns an empty map if no files exist.
 func CurrentTaskStates(journalDir, username string, key []byte) (map[string]TaskState, error) {
-	now := time.Now().UTC()
+	return CurrentTaskStatesWithClock(journalDir, username, key, clock.RealClock{})
+}
+
+// CurrentTaskStatesWithClock is CurrentTaskStates with an injectable Clock,
+// so tests can fix "now" instead of racing the wall clock.
+func CurrentTaskStatesWithClock(journalDir, username string, key []byte, c clock.Clock) (map[string]TaskState, error) {
+	now := c.Now()
 	from := now.Add(-4 * 7 * 24 * time.Hour)
 	files := weekFilesForRange(journalDir, username, from, now)
 

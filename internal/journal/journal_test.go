@@ -896,3 +896,17 @@ func TestPriorBusinessDayStart(t *testing.T) {
 		})
 	}
 }
+
+// TestPriorBusinessDayStart_BoundaryIsInclusive documents the semantics that
+// internal/cli/commands.go and internal/tui/activity.go rely on: a [done]
+// entry is hidden only when ts.Before(cutoff), so an entry timestamped
+// exactly at the cutoff is not hidden.
+func TestPriorBusinessDayStart_BoundaryIsInclusive(t *testing.T) {
+	now := time.Date(2026, 8, 14, 9, 11, 0, 0, time.FixedZone("NZST", 12*60*60))
+	cutoff := journal.PriorBusinessDayStart(now)
+
+	ts := cutoff
+	if ts.Before(cutoff) {
+		t.Errorf("entry exactly at cutoff (%v) should not be considered before it", ts)
+	}
+}

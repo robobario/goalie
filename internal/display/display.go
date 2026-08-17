@@ -66,15 +66,15 @@ func applyStatusUnblockedStyle(s string, ctx Context) string {
 // statusTag returns the styled and plain-text forms of an entry's status
 // tag: "[done] " takes precedence over "[BLOCKED] "/"[UNBLOCKED] ", matching
 // the TUI activity view. A blocked entry renders as "[UNBLOCKED] " instead
-// of "[BLOCKED] " when unblockedTargets marks its (username, goal, task) as
-// unblocked by someone else's entry (see journal.UnblockedTargets). Empty
-// when none apply.
-func statusTag(e journal.Entry, unblockedTargets map[journal.UnblockTarget]bool, ctx Context) (styled, plain string) {
+// of "[BLOCKED] " when journal.IsUnblocked reports it's been superseded by a
+// later entry naming its (username, goal, task) in Unblocks. Empty when none
+// apply.
+func statusTag(e journal.Entry, unblockedTargets map[journal.UnblockTarget]string, ctx Context) (styled, plain string) {
 	if e.Done {
 		return applyStatusDoneStyle("[done]", ctx) + " ", "[done] "
 	}
 	if e.Blocked {
-		if unblockedTargets[journal.TargetOf(e)] {
+		if journal.IsUnblocked(e, unblockedTargets) {
 			return applyStatusUnblockedStyle("[UNBLOCKED]", ctx) + " ", "[UNBLOCKED] "
 		}
 		return applyStatusBlockedStyle("[BLOCKED]", ctx) + " ", "[BLOCKED] "
@@ -246,7 +246,7 @@ func goalTaskComboStyled(e journal.Entry, ctx Context) (styled, plain string) {
 	return "", ""
 }
 
-func FormatStatusEntry(e journal.Entry, selfUsername string, now time.Time, ctx Context, unblockedTargets map[journal.UnblockTarget]bool) string {
+func FormatStatusEntry(e journal.Entry, selfUsername string, now time.Time, ctx Context, unblockedTargets map[journal.UnblockTarget]string) string {
 	age := timeutil.AgeString(e.TS, now)
 	comboStyled, comboPlain := goalTaskComboStyled(e, ctx)
 	tagStyled, _ := statusTag(e, unblockedTargets, ctx)
@@ -294,7 +294,7 @@ func renderNoteWords(words []NoteWord, selfUsername string, ctx Context) string 
 // indent. When availableWidth <= 0 it falls back to the unwrapped format.
 // Width calculations use the compressed form of URLs (when HyperLinks is true)
 // so that compress_hyperlinks users see accurate line breaks.
-func WrapStatusEntry(e journal.Entry, selfUsername string, now time.Time, ctx Context, availableWidth int, unblockedTargets map[journal.UnblockTarget]bool) string {
+func WrapStatusEntry(e journal.Entry, selfUsername string, now time.Time, ctx Context, availableWidth int, unblockedTargets map[journal.UnblockTarget]string) string {
 	age := timeutil.AgeString(e.TS, now)
 	suffix := " - " + age
 

@@ -233,8 +233,8 @@ func TestFormatStatusEntryDoneTakesPrecedenceOverBlocked(t *testing.T) {
 
 func TestFormatStatusEntryUnblockedTargetShowsGreenTag(t *testing.T) {
 	e := journal.Entry{TS: fixedTS, Note: "note", Username: "@alice", Blocked: true, Goal: ptr("ROUTING"), Task: ptr("#impl")}
-	targets := map[journal.UnblockTarget]bool{
-		{Username: "@alice", Goal: "ROUTING", Task: "#impl"}: true,
+	targets := map[journal.UnblockTarget]string{
+		{Username: "@alice", Goal: "ROUTING", Task: "#impl"}: "2024-01-16T10:00:00Z",
 	}
 	got := FormatStatusEntry(e, "", fixedNow, Context{}, targets)
 	if !strings.HasPrefix(got, "[UNBLOCKED]") {
@@ -247,8 +247,8 @@ func TestFormatStatusEntryUnblockedTargetShowsGreenTag(t *testing.T) {
 
 func TestFormatStatusEntryBlockedNotInTargetsShowsBlockedTag(t *testing.T) {
 	e := journal.Entry{TS: fixedTS, Note: "note", Username: "@alice", Blocked: true, Goal: ptr("ROUTING"), Task: ptr("#impl")}
-	targets := map[journal.UnblockTarget]bool{
-		{Username: "@bob", Goal: "ROUTING", Task: "#impl"}: true,
+	targets := map[journal.UnblockTarget]string{
+		{Username: "@bob", Goal: "ROUTING", Task: "#impl"}: "2024-01-16T10:00:00Z",
 	}
 	got := FormatStatusEntry(e, "", fixedNow, Context{}, targets)
 	if !strings.HasPrefix(got, "[BLOCKED]") {
@@ -256,10 +256,27 @@ func TestFormatStatusEntryBlockedNotInTargetsShowsBlockedTag(t *testing.T) {
 	}
 }
 
+func TestFormatStatusEntryReblockedAfterUnblockShowsBlockedTag(t *testing.T) {
+	// Regression for issue #153: a stale unblock entry must not hide a
+	// genuinely new block on the same (username, goal, task) that comes
+	// after it.
+	e := journal.Entry{TS: fixedTS, Note: "note", Username: "@alice", Blocked: true, Goal: ptr("ROUTING"), Task: ptr("#impl")}
+	targets := map[journal.UnblockTarget]string{
+		{Username: "@alice", Goal: "ROUTING", Task: "#impl"}: "2024-01-10T00:00:00Z", // before fixedTS
+	}
+	got := FormatStatusEntry(e, "", fixedNow, Context{}, targets)
+	if !strings.HasPrefix(got, "[BLOCKED]") {
+		t.Errorf("expected [BLOCKED] for a block newer than the unblock, got %q", got)
+	}
+	if strings.Contains(got, "[UNBLOCKED]") {
+		t.Errorf("expected no [UNBLOCKED] tag, got %q", got)
+	}
+}
+
 func TestFormatStatusEntryDoneTakesPrecedenceOverUnblocked(t *testing.T) {
 	e := journal.Entry{TS: fixedTS, Note: "note", Username: "@alice", Done: true, Blocked: true, Goal: ptr("ROUTING"), Task: ptr("#impl")}
-	targets := map[journal.UnblockTarget]bool{
-		{Username: "@alice", Goal: "ROUTING", Task: "#impl"}: true,
+	targets := map[journal.UnblockTarget]string{
+		{Username: "@alice", Goal: "ROUTING", Task: "#impl"}: "2024-01-16T10:00:00Z",
 	}
 	got := FormatStatusEntry(e, "", fixedNow, Context{}, targets)
 	if !strings.HasPrefix(got, "[done]") {
@@ -269,8 +286,8 @@ func TestFormatStatusEntryDoneTakesPrecedenceOverUnblocked(t *testing.T) {
 
 func TestWrapStatusEntryUnblockedTargetShowsGreenTag(t *testing.T) {
 	e := journal.Entry{TS: fixedTS, Note: "note", Username: "@alice", Blocked: true, Goal: ptr("ROUTING"), Task: ptr("#impl")}
-	targets := map[journal.UnblockTarget]bool{
-		{Username: "@alice", Goal: "ROUTING", Task: "#impl"}: true,
+	targets := map[journal.UnblockTarget]string{
+		{Username: "@alice", Goal: "ROUTING", Task: "#impl"}: "2024-01-16T10:00:00Z",
 	}
 	got := WrapStatusEntry(e, "", fixedNow, Context{}, 50, targets)
 	if !strings.HasPrefix(got, "[UNBLOCKED]") {

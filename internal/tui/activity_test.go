@@ -435,13 +435,77 @@ func TestWrapWordsEmptyString(t *testing.T) {
 	}
 }
 
+func TestRenderActivityEntryUnblockedTargetShowsGreenTag(t *testing.T) {
+	e := journal.Entry{
+		TS:       time.Now().Format(time.RFC3339),
+		Note:     "waiting",
+		Username: "@alice",
+		Blocked:  true,
+		Goal:     strPtr("ROUTING"),
+		Task:     strPtr("#impl"),
+	}
+	targets := map[journal.UnblockTarget]bool{
+		{Username: "@alice", Goal: "ROUTING", Task: "#impl"}: true,
+	}
+	got := renderActivityEntry(e, time.Now(), "", false, 0, targets)
+	if !strings.Contains(got, "[UNBLOCKED]") {
+		t.Errorf("expected '[UNBLOCKED]' in output, got %q", got)
+	}
+	if strings.Contains(got, "[BLOCKED]") {
+		t.Errorf("expected no '[BLOCKED]' once unblocked, got %q", got)
+	}
+}
+
+func TestRenderActivityEntryDoneTakesPrecedenceOverUnblocked(t *testing.T) {
+	e := journal.Entry{
+		TS:       time.Now().Format(time.RFC3339),
+		Note:     "waiting",
+		Username: "@alice",
+		Done:     true,
+		Blocked:  true,
+		Goal:     strPtr("ROUTING"),
+		Task:     strPtr("#impl"),
+	}
+	targets := map[journal.UnblockTarget]bool{
+		{Username: "@alice", Goal: "ROUTING", Task: "#impl"}: true,
+	}
+	got := renderActivityEntry(e, time.Now(), "", false, 0, targets)
+	if !strings.Contains(got, "[done]") {
+		t.Errorf("expected '[done]' to take precedence, got %q", got)
+	}
+	if strings.Contains(got, "[UNBLOCKED]") {
+		t.Errorf("expected no '[UNBLOCKED]' when Done is set, got %q", got)
+	}
+}
+
+func TestActivityViewShowsUnblockedTagAfterUnblock(t *testing.T) {
+	now := time.Now().UTC()
+	targetUsername := "@alice"
+	m := activityModel{
+		loaded: true,
+		width:  120,
+		entries: []journal.Entry{
+			{ID: "blocked-1", Note: "stuck", Username: "@alice", TS: now.Add(-time.Hour).Format(time.RFC3339), Blocked: true, Goal: strPtr("ROUTING"), Task: strPtr("#impl")},
+			{ID: "unblock-1", Note: "looks fine now", Username: "@bob", TS: now.Format(time.RFC3339), Goal: strPtr("ROUTING"), Task: strPtr("#impl"), Unblocks: &targetUsername},
+		},
+	}
+	m.filtered = m.entries
+	view := m.View()
+	if !strings.Contains(view, "[UNBLOCKED]") {
+		t.Errorf("expected '[UNBLOCKED]' in view:\n%s", view)
+	}
+	if strings.Contains(view, "[BLOCKED]") {
+		t.Errorf("expected no '[BLOCKED]' once unblocked:\n%s", view)
+	}
+}
+
 func TestRenderActivityEntryHeaderContainsAge(t *testing.T) {
 	e := journal.Entry{
 		TS:   time.Now().Format(time.RFC3339),
 		Note: "some note",
 		Goal: strPtr("PROJ"),
 	}
-	got := renderActivityEntry(e, time.Now(), "", false, 0)
+	got := renderActivityEntry(e, time.Now(), "", false, 0, nil)
 	lines := strings.Split(got, "\n")
 	// Header is always the first line and must contain the age.
 	if !strings.Contains(lines[0], "ago") {
@@ -460,7 +524,7 @@ func TestRenderActivityEntryShortNoteNoBlankLine(t *testing.T) {
 		Note: "short note",
 		Goal: strPtr("PROJ"),
 	}
-	got := renderActivityEntry(e, time.Now(), "", false, 120)
+	got := renderActivityEntry(e, time.Now(), "", false, 120, nil)
 	if strings.Contains(got, "\n") {
 		t.Errorf("expected single line when note fits, got %q", got)
 	}
@@ -472,7 +536,7 @@ func TestRenderActivityEntryEmptyNoteNoBlankLine(t *testing.T) {
 		Note: "",
 		Goal: strPtr("PROJ"),
 	}
-	got := renderActivityEntry(e, time.Now(), "", false, 80)
+	got := renderActivityEntry(e, time.Now(), "", false, 80, nil)
 	if strings.Contains(got, "\n") {
 		t.Errorf("expected single header line for empty note, got %q", got)
 	}
@@ -485,7 +549,7 @@ func TestRenderActivityEntryWrapsLongNote(t *testing.T) {
 		TS:   time.Now().Format(time.RFC3339),
 		Note: longNote,
 	}
-	got := renderActivityEntry(e, time.Now(), "", false, 40)
+	got := renderActivityEntry(e, time.Now(), "", false, 40, nil)
 	if !strings.Contains(got, "\n") {
 		t.Errorf("expected multi-line output for long note at width 40, got %q", got)
 	}
@@ -498,7 +562,7 @@ func TestRenderActivityEntryAgeOnFirstLine(t *testing.T) {
 		TS:   time.Now().Format(time.RFC3339),
 		Note: longNote,
 	}
-	got := renderActivityEntry(e, time.Now(), "", false, 40)
+	got := renderActivityEntry(e, time.Now(), "", false, 40, nil)
 	lines := strings.Split(got, "\n")
 	if len(lines) < 2 {
 		t.Fatalf("expected header + note lines, got %q", got)
@@ -824,7 +888,7 @@ func TestRenderActivityEntryURLCompressedFitsOnFirstLine(t *testing.T) {
 		TS:   time.Now().Format(time.RFC3339),
 		Note: url,
 	}
-	got := renderActivityEntry(e, time.Now(), "", true, 40)
+	got := renderActivityEntry(e, time.Now(), "", true, 40, nil)
 	lines := strings.Split(got, "\n")
 	if len(lines) > 1 {
 		t.Errorf("expected single line with hyperLinks=true at width 40, got %d lines: %q", len(lines), got)

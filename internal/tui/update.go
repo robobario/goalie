@@ -21,10 +21,24 @@ const (
 	phaseLoading    updatePhase = iota
 	phaseMenu                   // top-level action menu
 	phaseNewTask
-	phaseEditEntry  // editing an existing journal entry
-	phaseTaskUpdate // combined active-task picker + log form
+	phaseEditEntry       // editing an existing journal entry
+	phaseTaskUpdate      // combined active-task picker + log form
+	phaseUnblockTeammate // pick another user's blocked entry, log a note marking it unblocked
 	phaseDone
 )
+
+type unblockSub int
+
+const (
+	unblockPicking unblockSub = iota // picker over other users' blocked entries
+	unblockNote                      // typing the note
+)
+
+// unblockTeammateLookupDays bounds how far back the "Unblock a teammate"
+// picker searches for other users' blocked entries. Wider than the
+// status/summary default window since a blocker can sit untouched for a
+// while before someone notices it's cleared.
+const unblockTeammateLookupDays = 30
 
 type taskUpdateSub int
 
@@ -94,6 +108,11 @@ type editEntriesLoadedMsg struct {
 	err     error
 }
 
+type blockedFromOthersLoadedMsg struct {
+	entries []journal.Entry
+	err     error
+}
+
 type updateEntryDoneMsg struct {
 	err error
 }
@@ -146,6 +165,13 @@ type updateModel struct {
 	taskUpdateSelected  activeTask
 	taskUpdateNote      noteInput
 	taskUpdateState     entryState
+
+	// phaseUnblockTeammate
+	unblockSub       unblockSub
+	unblockPicker    pickerModel
+	unblockByDisplay map[string]journal.Entry
+	unblockSelected  journal.Entry
+	unblockNoteInput noteInput
 
 	editSub       editSub
 	editEntries   []journal.Entry
@@ -265,6 +291,22 @@ func (m updateModel) Update(msg tea.Msg) (updateModel, tea.Cmd) {
 		m.editEntries = msg.entries
 		m.editCursor = 0
 
+	case blockedFromOthersLoadedMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		now := time.Now()
+		displays := make([]string, 0, len(msg.entries))
+		byDisplay := make(map[string]journal.Entry, len(msg.entries))
+		for _, e := range msg.entries {
+			d := formatBlockedFromOther(e, now)
+			displays = append(displays, d)
+			byDisplay[d] = e
+		}
+		m.unblockPicker = newPicker(displays)
+		m.unblockByDisplay = byDisplay
+
 	case updateEntryDoneMsg:
 		if msg.err != nil {
 			m.err = msg.err
@@ -309,6 +351,8 @@ func (m updateModel) Update(msg tea.Msg) (updateModel, tea.Cmd) {
 			return m.handleEditKey(msg)
 		case phaseTaskUpdate:
 			return m.handleTaskUpdateKey(msg)
+		case phaseUnblockTeammate:
+			return m.handleUnblockTeammateKey(msg)
 		}
 	}
 	return m, nil
@@ -332,6 +376,10 @@ func (m updateModel) menuOptions() []menuOption {
 	opts = append(opts, menuOption{
 		label: "Edit a recent entry",
 		phase: phaseEditEntry,
+	})
+	opts = append(opts, menuOption{
+		label: "Unblock a teammate",
+		phase: phaseUnblockTeammate,
 	})
 	return opts
 }
@@ -366,6 +414,8 @@ func (m updateModel) handleMenuKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
 			m.editSub = editPicking
 			m.editCursor = 0
 			return m, m.loadEditEntriesCmd()
+		case phaseUnblockTeammate:
+			return m.enterPhaseUnblockTeammate()
 		}
 	}
 	return m, nil
@@ -404,6 +454,8 @@ func (m updateModel) View() string {
 		return m.viewEdit()
 	case phaseTaskUpdate:
 		return m.viewTaskUpdate()
+	case phaseUnblockTeammate:
+		return m.viewUnblockTeammate()
 	case phaseDone:
 		return "All done. Press q to exit."
 	}
@@ -918,6 +970,150 @@ func (m updateModel) submitTaskUpdate() (updateModel, tea.Cmd) {
 	return m, cmd
 }
 
+// ── phaseUnblockTeammate ─────────────────────────────────────────────────────
+
+func (m updateModel) enterPhaseUnblockTeammate() (updateModel, tea.Cmd) {
+	m.phase = phaseUnblockTeammate
+	m.unblockSub = unblockPicking
+	m.unblockPicker = pickerModel{}
+	m.unblockNoteInput = noteInput{}
+	return m, m.loadBlockedFromOthersCmd()
+}
+
+// formatBlockedFromOther formats another user's blocked entry for the picker
+// list, e.g. "@alice GOALS#impl waiting on review — 2h ago".
+func formatBlockedFromOther(e journal.Entry, now time.Time) string {
+	goal := ""
+	if e.Goal != nil {
+		goal = *e.Goal
+	}
+	task := ""
+	if e.Task != nil {
+		task = *e.Task
+	}
+	age := timeutil.AgeString(e.TS, now)
+	return fmt.Sprintf("%s %s%s %s — %s", e.Username, goal, task, e.Note, age)
+}
+
+func (m updateModel) loadBlockedFromOthersCmd() tea.Cmd {
+	ctx := m.ctx
+	username := m.username
+	return func() tea.Msg {
+		entries, err := journal.CollectLatest(ctx.DataDir, ctx.Git, unblockTeammateLookupDays, ctx.EncryptionKey)
+		if err != nil {
+			return blockedFromOthersLoadedMsg{err: err}
+		}
+		var blocked []journal.Entry
+		for _, e := range entries {
+			if e.Blocked && e.Username != username {
+				blocked = append(blocked, e)
+			}
+		}
+		sort.Slice(blocked, func(i, j int) bool {
+			return blocked[i].TS > blocked[j].TS
+		})
+		return blockedFromOthersLoadedMsg{entries: blocked}
+	}
+}
+
+func (m updateModel) handleUnblockTeammateKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
+	switch msg.String() {
+	case "ctrl+c":
+		return m, tea.Quit
+	case "esc":
+		if m.unblockSub == unblockPicking {
+			m.phase = phaseMenu
+			return m, nil
+		}
+		m.unblockSub = unblockPicking
+		return m, nil
+	}
+	switch m.unblockSub {
+	case unblockPicking:
+		return m.handleUnblockPickingKey(msg)
+	case unblockNote:
+		return m.handleUnblockNoteKey(msg)
+	}
+	return m, nil
+}
+
+func (m updateModel) handleUnblockPickingKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
+	updated, cmd, selected, wasSelected := m.unblockPicker.Update(msg)
+	m.unblockPicker = updated
+	if wasSelected && selected != "" {
+		if entry, ok := m.unblockByDisplay[selected]; ok {
+			m.unblockSelected = entry
+			m.unblockNoteInput = noteInput{}
+			m.unblockSub = unblockNote
+		}
+	}
+	return m, cmd
+}
+
+func (m updateModel) handleUnblockNoteKey(msg tea.KeyMsg) (updateModel, tea.Cmd) {
+	if msg.Paste {
+		m.unblockNoteInput = m.unblockNoteInput.appendStr(string(msg.Runes))
+		m.mentionCompletion = mentionCompletion{}
+		return m, nil
+	}
+	switch msg.String() {
+	case "enter":
+		m.mentionCompletion = mentionCompletion{}
+		return m.submitUnblock()
+	case "tab":
+		if m.unblockNoteInput.atEnd() {
+			note, mc := m.advanceMention(m.unblockNoteInput.value)
+			m.unblockNoteInput.value = note
+			m.unblockNoteInput.cursor = len(note)
+			m.mentionCompletion = mc
+		}
+	case "left":
+		m.mentionCompletion = mentionCompletion{}
+		m.unblockNoteInput = m.unblockNoteInput.left()
+	case "right":
+		m.mentionCompletion = mentionCompletion{}
+		m.unblockNoteInput = m.unblockNoteInput.right()
+	case "backspace":
+		m.mentionCompletion = mentionCompletion{}
+		m.unblockNoteInput = m.unblockNoteInput.backspace()
+	default:
+		m.mentionCompletion = mentionCompletion{}
+		if len(msg.Runes) == 1 {
+			m.unblockNoteInput = m.unblockNoteInput.insert(msg.Runes[0])
+		}
+	}
+	return m, nil
+}
+
+func (m updateModel) submitUnblock() (updateModel, tea.Cmd) {
+	target := m.unblockSelected
+	targetUsername := target.Username
+	note := strings.TrimSpace(m.unblockNoteInput.value)
+	if note == "" {
+		note = "unblocked"
+	}
+
+	ctx := m.ctx
+	username := m.username
+	var schemaVersion string
+	if ctx != nil {
+		schemaVersion = ctx.SchemaVersion
+	}
+	entry := journal.Entry{
+		Goal:          target.Goal,
+		Task:          target.Task,
+		Note:          note,
+		Unblocks:      &targetUsername,
+		SchemaVersion: schemaVersion,
+	}
+	cmd := func() tea.Msg {
+		err := journal.Append(ctx.DataDir, ctx.Git, username, entry, ctx.EncryptionKey)
+		return appendDoneMsg{err: err}
+	}
+	m.phase = phaseMenu
+	return m, cmd
+}
+
 func (m updateModel) viewTaskUpdate() string {
 	switch m.taskUpdateSub {
 	case taskUpdatePicking:
@@ -1012,6 +1208,70 @@ func (m updateModel) viewTaskUpdateForm() string {
 	} else {
 		sb.WriteString("←/→ to change state, Enter to submit, ↑ to edit note")
 	}
+	return sb.String()
+}
+
+func (m updateModel) viewUnblockTeammate() string {
+	switch m.unblockSub {
+	case unblockPicking:
+		return m.viewUnblockPicking()
+	case unblockNote:
+		return m.viewUnblockForm()
+	}
+	return ""
+}
+
+func (m updateModel) viewUnblockPicking() string {
+	if len(m.unblockPicker.items) == 0 {
+		return "No blocked entries from other teammates.\n\nPress Esc to go back."
+	}
+	var sb strings.Builder
+	sb.WriteString("Select a blocked entry to unblock (type to filter, Enter to select, Esc to go back)\n\n")
+	items := m.unblockPicker.matches
+	if len(items) == 0 {
+		items = m.unblockPicker.items
+	}
+	cursor := m.unblockPicker.cursor
+	for i, item := range items {
+		prefix := "  "
+		if i == cursor {
+			prefix = "> "
+			item = selectedItemStyle.Render(item)
+		}
+		sb.WriteString(prefix + item + "\n")
+	}
+	if m.unblockPicker.query != "" {
+		sb.WriteString("\nFilter: " + m.unblockPicker.query + "_")
+	}
+	return sb.String()
+}
+
+func (m updateModel) viewUnblockForm() string {
+	target := m.unblockSelected
+	goal := ""
+	if target.Goal != nil {
+		goal = *target.Goal
+	}
+	task := ""
+	if target.Task != nil {
+		task = *target.Task
+	}
+
+	var sb strings.Builder
+	header := taskTagStyle.Render(task)
+	if goal != "" {
+		header = goalStyle.Render(goal) + header
+	}
+	sb.WriteString(usernameStyle.Render(target.Username) + " " + header + "\n")
+	sb.WriteString(blockedStyle.Render("[BLOCKED]") + " " + target.Note + "\n\n")
+
+	const notePrefix = "Note: "
+	const noteIndent = "      "
+	noteWidth := m.noteContentWidth(len(notePrefix))
+	noteView := strings.ReplaceAll(m.unblockNoteInput.viewWrapped(m.username, noteWidth), "\n", "\n"+noteIndent)
+	sb.WriteString(notePrefix + noteView + "\n\n")
+
+	sb.WriteString("Enter to submit as unblocked, Esc to go back to list")
 	return sb.String()
 }
 

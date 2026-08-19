@@ -1,2 +1,2 @@
-{"type":"goal","id":"ROUTING","state":"open","description":"Implement the routing layer","created":"2024-01-08T10:00:00Z"}
-{"type":"entry","id":"b0000000-0000-0000-0000-000000000001","ts":"2024-01-08T10:00:00Z","username":"@alice","goal":"ROUTING","task":"#impl","blocked":false,"done":false,"note":"started the work","schema_version":""}
+{"type":"create_goal","id":"ROUTING","description":"Implement the routing layer","created":"2024-01-08T10:00:00Z"}
+{"type":"log_entry","id":"b0000000-0000-0000-0000-000000000001","ts":"2024-01-08T10:00:00Z","username":"@alice","goal":"ROUTING","task":"#impl","blocked":false,"done":false,"note":"started the work","schema_version":""}

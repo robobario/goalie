@@ -43,12 +43,12 @@ func Import(ctx AppContext) error {
 			if err := json.Unmarshal(line, &ev); err != nil {
 				return fmt.Errorf("line %d: malformed create_goal event: %w", lineNum, err)
 			}
-			if ev.ID == "" || ev.Created == "" {
+			if ev.ID == "" || ev.Timestamp == "" {
 				return fmt.Errorf("line %d: create_goal missing required fields", lineNum)
 			}
-			createdAt, err := time.Parse(time.RFC3339, ev.Created)
+			createdAt, err := time.Parse(time.RFC3339, ev.Timestamp)
 			if err != nil {
-				return fmt.Errorf("line %d: create_goal invalid created timestamp %q: %w", lineNum, ev.Created, err)
+				return fmt.Errorf("line %d: create_goal invalid timestamp %q: %w", lineNum, ev.Timestamp, err)
 			}
 			if err := goals.AddAt(ctx.DataDir, ctx.Git, ev.ID, ev.Description, ctx.EncryptionKey, createdAt); err != nil {
 				return fmt.Errorf("line %d: create_goal %q: %w", lineNum, ev.ID, err)
@@ -71,12 +71,12 @@ func Import(ctx AppContext) error {
 			if err := json.Unmarshal(line, &ev); err != nil {
 				return fmt.Errorf("line %d: malformed log_entry event: %w", lineNum, err)
 			}
-			if ev.ID == "" || ev.TS == "" || ev.Username == "" {
+			if ev.ID == "" || ev.Timestamp == "" || ev.Username == "" {
 				return fmt.Errorf("line %d: log_entry missing required fields", lineNum)
 			}
-			ts, err := time.Parse(time.RFC3339, ev.TS)
+			ts, err := time.Parse(time.RFC3339, ev.Timestamp)
 			if err != nil {
-				return fmt.Errorf("line %d: log_entry invalid ts %q: %w", lineNum, ev.TS, err)
+				return fmt.Errorf("line %d: log_entry invalid timestamp %q: %w", lineNum, ev.Timestamp, err)
 			}
 			e := journal.Entry{
 				ID:            ev.ID,
@@ -97,12 +97,12 @@ func Import(ctx AppContext) error {
 			if err := json.Unmarshal(line, &ev); err != nil {
 				return fmt.Errorf("line %d: malformed set_motd event: %w", lineNum, err)
 			}
-			if ev.TS == "" || ev.Content == "" {
+			if ev.Timestamp == "" || ev.Content == "" {
 				return fmt.Errorf("line %d: set_motd missing required fields", lineNum)
 			}
-			ts, err := time.Parse(time.RFC3339, ev.TS)
+			ts, err := time.Parse(time.RFC3339, ev.Timestamp)
 			if err != nil {
-				return fmt.Errorf("line %d: set_motd invalid ts %q: %w", lineNum, ev.TS, err)
+				return fmt.Errorf("line %d: set_motd invalid timestamp %q: %w", lineNum, ev.Timestamp, err)
 			}
 			if err := motd.SaveAt(ctx.DataDir, ctx.Git, ev.Content, ctx.EncryptionKey, ts); err != nil {
 				return fmt.Errorf("line %d: set_motd: %w", lineNum, err)

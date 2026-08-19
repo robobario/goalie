@@ -89,3 +89,49 @@ fixtures using `GOALIE_FIXED_TIME_OVERRIDE` for deterministic timestamps.
 5. Coordinate with all users: everyone must run the migration before any of
    them upgrades their binary, because the old binary will refuse to start
    once any peer has recorded the new major version.
+
+## Export/import format
+
+`goalie export` serialises the data repo to JSONL and `goalie import` replays
+it into a fresh repo. The format is an interchange and archival surface, so it
+holds to stricter rules than the on-disk layout.
+
+### Gestures, not storage
+
+Each line is a **user gesture**, not a snapshot of a storage file. An event
+describes an action a user took — create a goal, close a goal, log a journal
+entry, post an MOTD — expressed independently of how that action is persisted
+on disk. Import replays the gestures to reconstruct equivalent state. This
+decouples the interchange format from the data-repo layout: the two can evolve
+on separate schedules.
+
+### Ordering: dependencies before dependents
+
+The stream is ordered so that replaying it top-to-bottom never references state
+that does not yet exist. A dependency always appears before anything that
+depends on it:
+
+- `create_goal` precedes any `log_entry` or `close_goal` that names the goal.
+- A journal entry precedes any later entry that unblocks it. Entries are
+  emitted oldest-first (ascending timestamp) for this reason; see
+  `internal/cli/export.go`.
+
+An importer may therefore apply events in file order with no lookahead or
+deferral. Do not reorder the stream in a way that places a dependent before its
+dependency.
+
+### Backward and forward compatibility
+
+The format must survive version skew in both directions, because an export
+written by one binary may be imported by an older or a newer one:
+
+- **Backward** — a newer importer reads an older export. Never require a field
+  that older exports did not emit; treat absent fields as their zero value.
+- **Forward** — an older importer reads a newer export. Unknown event `type`
+  values and unknown fields within a known event must be ignored, not rejected.
+  Add capability with new optional fields or new event types; do not repurpose
+  or remove existing ones.
+
+Any change that would break either direction — removing a field, renaming one,
+changing a field's meaning, or making an optional field required — is a MAJOR
+schema bump and follows the migration process above.

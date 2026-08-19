@@ -126,6 +126,13 @@ func parseFilenameTimestamp(filename string) (string, error) {
 
 // Save pulls, writes a new timestamped MOTD file, commits, and pushes with rebase-retry on conflict.
 func Save(dataDir string, r git.Runner, text string, key []byte) error {
+	return SaveAt(dataDir, r, text, key, clock.Now())
+}
+
+// SaveAt saves a MOTD with an explicit timestamp. Use this when replaying
+// historical events (e.g. during import) where the timestamp comes from outside
+// the system.
+func SaveAt(dataDir string, r git.Runner, text string, key []byte, ts time.Time) error {
 	if err := r.Run([]string{"pull"}, dataDir); err != nil {
 		return err
 	}
@@ -139,7 +146,7 @@ func Save(dataDir string, r git.Runner, text string, key []byte) error {
 	if err != nil {
 		return err
 	}
-	timestamp := clock.Now().Format("2006-01-02T150405Z")
+	timestamp := ts.UTC().Format("2006-01-02T150405Z")
 	filename := fmt.Sprintf("%s-%s.txt", timestamp, id)
 	path := filepath.Join(dir, filename)
 

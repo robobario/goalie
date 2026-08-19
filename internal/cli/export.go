@@ -81,17 +81,16 @@ func Export(ctx AppContext) error {
 	})
 	for _, e := range entries {
 		if err := emit(exportfmt.LogEntryEvent{
-			Type:          exportfmt.TypeLogEntry,
-			ID:            e.ID,
-			Timestamp:     e.TS,
-			Username:      e.Username,
-			Goal:          e.Goal,
-			Task:          e.Task,
-			Blocked:       e.Blocked,
-			Done:          e.Done,
-			Note:          e.Note,
-			SchemaVersion: e.SchemaVersion,
-			Unblocks:      e.Unblocks,
+			Type:      exportfmt.TypeLogEntry,
+			ID:        e.ID,
+			Timestamp: e.TS,
+			Username:  e.Username,
+			Goal:      e.Goal,
+			Task:      e.Task,
+			Blocked:   e.Blocked,
+			Done:      e.Done,
+			Note:      e.Note,
+			Unblocks:  e.Unblocks,
 		}); err != nil {
 			return err
 		}

@@ -85,7 +85,7 @@ func Import(ctx AppContext) error {
 				Blocked:       ev.Blocked,
 				Done:          ev.Done,
 				Note:          ev.Note,
-				SchemaVersion: ev.SchemaVersion,
+				SchemaVersion: ctx.SchemaVersion,
 				Unblocks:      ev.Unblocks,
 			}
 			if err := journal.AppendAt(ctx.DataDir, ctx.Git, ev.Username, e, ctx.EncryptionKey, ts); err != nil {

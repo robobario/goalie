@@ -30,17 +30,16 @@ type CloseGoalEvent struct {
 
 // LogEntryEvent records the user gesture of logging a journal entry.
 type LogEntryEvent struct {
-	Type          string  `json:"type"`
-	ID            string  `json:"id"`
-	Timestamp     string  `json:"timestamp"`
-	Username      string  `json:"username"`
-	Goal          *string `json:"goal"`
-	Task          *string `json:"task"`
-	Blocked       bool    `json:"blocked"`
-	Done          bool    `json:"done"`
-	Note          string  `json:"note"`
-	SchemaVersion string  `json:"schema_version"`
-	Unblocks      *string `json:"unblocks,omitempty"`
+	Type      string  `json:"type"`
+	ID        string  `json:"id"`
+	Timestamp string  `json:"timestamp"`
+	Username  string  `json:"username"`
+	Goal      *string `json:"goal"`
+	Task      *string `json:"task"`
+	Blocked   bool    `json:"blocked"`
+	Done      bool    `json:"done"`
+	Note      string  `json:"note"`
+	Unblocks  *string `json:"unblocks,omitempty"`
 }
 
 // SetMotdEvent records the user gesture of publishing a message of the day.

@@ -32,20 +32,19 @@
       "title": "log_entry",
       "description": "Records the user gesture of logging a journal entry.",
       "type": "object",
-      "required": ["type", "id", "timestamp", "username", "blocked", "done", "note", "schema_version"],
+      "required": ["type", "id", "timestamp", "username", "blocked", "done", "note"],
       "additionalProperties": false,
       "properties": {
-        "type":           { "type": "string", "const": "log_entry" },
-        "id":             { "type": "string", "minLength": 1 },
-        "timestamp":      { "type": "string", "format": "date-time" },
-        "username":       { "type": "string", "minLength": 1 },
-        "goal":           { "type": ["string", "null"] },
-        "task":           { "type": ["string", "null"] },
-        "blocked":        { "type": "boolean" },
-        "done":           { "type": "boolean" },
-        "note":           { "type": "string" },
-        "schema_version": { "type": "string" },
-        "unblocks":       { "type": ["string", "null"] }
+        "type":      { "type": "string", "const": "log_entry" },
+        "id":        { "type": "string", "minLength": 1 },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "username":  { "type": "string", "minLength": 1 },
+        "goal":      { "type": ["string", "null"] },
+        "task":      { "type": ["string", "null"] },
+        "blocked":   { "type": "boolean" },
+        "done":      { "type": "boolean" },
+        "note":      { "type": "string" },
+        "unblocks":  { "type": ["string", "null"] }
       }
     },
     {

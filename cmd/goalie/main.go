@@ -315,14 +315,26 @@ func main() {
 
 	exportCmd := &cobra.Command{
 		Use:   "export",
-		Short: "Dump all data as JSONL for debugging and schema compatibility testing",
+		Short: "Dump all data as JSONL gesture events",
 		Args:  cobra.NoArgs,
 		RunE: requireKey(keyErr, func(cmd *cobra.Command, args []string) error {
 			return cli.Export(ctx)
 		}),
 	}
 
-	root.AddCommand(initCmd, logCmd, unblockCmd, statusCmd, summaryCmd, updateCmd, goalCmd, keyCmd, motdCmd, skillsCmd, exportCmd)
+	importCmd := &cobra.Command{
+		Use:   "import",
+		Short: "Replay a JSONL export into an initialised data repository",
+		Long: `Reads a goalie JSONL export from stdin and replays each gesture event into
+the data repository. The repository must already be initialised with 'goalie init'
+before running import. Unknown event types are silently skipped.`,
+		Args: cobra.NoArgs,
+		RunE: requireKey(keyErr, func(cmd *cobra.Command, args []string) error {
+			return cli.Import(ctx)
+		}),
+	}
+
+	root.AddCommand(initCmd, logCmd, unblockCmd, statusCmd, summaryCmd, updateCmd, goalCmd, keyCmd, motdCmd, skillsCmd, exportCmd, importCmd)
 
 	if err := root.Execute(); err != nil {
 		var exitErr *cli.ExitError

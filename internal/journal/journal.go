@@ -170,7 +170,9 @@ func AppendAt(dataDir string, r git.Runner, username string, e Entry, key []byte
 	}
 
 	now := ts.UTC()
-	e.ID = uuid.New().String()
+	if e.ID == "" {
+		e.ID = uuid.New().String()
+	}
 	e.TS = now.Format(time.RFC3339)
 
 	fname := weekFileName(username, now)

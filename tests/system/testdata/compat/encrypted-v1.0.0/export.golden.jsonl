@@ -1,5 +1,5 @@
-{"type":"create_goal","id":"ROUTING","description":"Implement the routing layer","created":"2024-01-08T10:00:00Z"}
-{"type":"create_goal","id":"SCALING","description":"Improve scaling","created":"2024-01-08T10:01:00Z"}
+{"type":"create_goal","id":"ROUTING","description":"Implement the routing layer","timestamp":"2024-01-08T10:00:00Z"}
+{"type":"create_goal","id":"SCALING","description":"Improve scaling","timestamp":"2024-01-08T10:01:00Z"}
 {"type":"close_goal","id":"SCALING"}
-{"type":"log_entry","id":"1195a07c-746f-4ce5-b868-391e82605342","ts":"2024-01-08T11:00:00Z","username":"@alice","goal":"ROUTING","task":"#impl","blocked":true,"done":false,"note":"blocked on code review","schema_version":"1.0.0"}
-{"type":"log_entry","id":"da63f240-6d2e-4f52-9623-bb4239bbb81c","ts":"2024-01-08T10:00:00Z","username":"@alice","goal":"ROUTING","task":"#impl","blocked":false,"done":false,"note":"started the work","schema_version":"1.0.0"}
+{"type":"log_entry","id":"1195a07c-746f-4ce5-b868-391e82605342","timestamp":"2024-01-08T11:00:00Z","username":"@alice","goal":"ROUTING","task":"#impl","blocked":true,"done":false,"note":"blocked on code review","schema_version":"1.0.0"}
+{"type":"log_entry","id":"da63f240-6d2e-4f52-9623-bb4239bbb81c","timestamp":"2024-01-08T10:00:00Z","username":"@alice","goal":"ROUTING","task":"#impl","blocked":false,"done":false,"note":"started the work","schema_version":"1.0.0"}

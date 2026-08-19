@@ -19,7 +19,7 @@ type CreateGoalEvent struct {
 	Type        string `json:"type"`
 	ID          string `json:"id"`
 	Description string `json:"description"`
-	Created     string `json:"created"`
+	Timestamp   string `json:"timestamp"`
 }
 
 // CloseGoalEvent records the user gesture of closing a goal.
@@ -32,7 +32,7 @@ type CloseGoalEvent struct {
 type LogEntryEvent struct {
 	Type          string  `json:"type"`
 	ID            string  `json:"id"`
-	TS            string  `json:"ts"`
+	Timestamp     string  `json:"timestamp"`
 	Username      string  `json:"username"`
 	Goal          *string `json:"goal"`
 	Task          *string `json:"task"`
@@ -45,7 +45,7 @@ type LogEntryEvent struct {
 
 // SetMotdEvent records the user gesture of publishing a message of the day.
 type SetMotdEvent struct {
-	Type    string `json:"type"`
-	TS      string `json:"ts"`
-	Content string `json:"content"`
+	Type      string `json:"type"`
+	Timestamp string `json:"timestamp"`
+	Content   string `json:"content"`
 }

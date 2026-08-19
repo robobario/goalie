@@ -8,13 +8,13 @@
       "title": "create_goal",
       "description": "Records the user gesture of creating a goal.",
       "type": "object",
-      "required": ["type", "id", "description", "created"],
+      "required": ["type", "id", "description", "timestamp"],
       "additionalProperties": false,
       "properties": {
         "type":        { "type": "string", "const": "create_goal" },
         "id":          { "type": "string", "minLength": 1 },
         "description": { "type": "string" },
-        "created":     { "type": "string", "format": "date-time" }
+        "timestamp":   { "type": "string", "format": "date-time" }
       }
     },
     {
@@ -32,12 +32,12 @@
       "title": "log_entry",
       "description": "Records the user gesture of logging a journal entry.",
       "type": "object",
-      "required": ["type", "id", "ts", "username", "blocked", "done", "note", "schema_version"],
+      "required": ["type", "id", "timestamp", "username", "blocked", "done", "note", "schema_version"],
       "additionalProperties": false,
       "properties": {
         "type":           { "type": "string", "const": "log_entry" },
         "id":             { "type": "string", "minLength": 1 },
-        "ts":             { "type": "string", "format": "date-time" },
+        "timestamp":      { "type": "string", "format": "date-time" },
         "username":       { "type": "string", "minLength": 1 },
         "goal":           { "type": ["string", "null"] },
         "task":           { "type": ["string", "null"] },
@@ -52,12 +52,12 @@
       "title": "set_motd",
       "description": "Records the user gesture of publishing a message of the day.",
       "type": "object",
-      "required": ["type", "ts", "content"],
+      "required": ["type", "timestamp", "content"],
       "additionalProperties": false,
       "properties": {
-        "type":    { "type": "string", "const": "set_motd" },
-        "ts":      { "type": "string", "format": "date-time" },
-        "content": { "type": "string", "minLength": 1 }
+        "type":      { "type": "string", "const": "set_motd" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "content":   { "type": "string", "minLength": 1 }
       }
     }
   ]

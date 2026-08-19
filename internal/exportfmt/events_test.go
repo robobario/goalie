@@ -29,7 +29,7 @@ func TestEventRoundTrip(t *testing.T) {
 				Type:        exportfmt.TypeCreateGoal,
 				ID:          "ROUTING",
 				Description: "Implement the routing layer",
-				Created:     "2024-01-08T10:00:00Z",
+				Timestamp:   "2024-01-08T10:00:00Z",
 			},
 		},
 		{
@@ -44,7 +44,7 @@ func TestEventRoundTrip(t *testing.T) {
 			v: exportfmt.LogEntryEvent{
 				Type:          exportfmt.TypeLogEntry,
 				ID:            "550e8400-e29b-41d4-a716-446655440000",
-				TS:            "2024-01-08T11:00:00Z",
+				Timestamp:     "2024-01-08T11:00:00Z",
 				Username:      "@alice",
 				Goal:          &goal,
 				Task:          &task,
@@ -60,7 +60,7 @@ func TestEventRoundTrip(t *testing.T) {
 			v: exportfmt.LogEntryEvent{
 				Type:          exportfmt.TypeLogEntry,
 				ID:            "550e8400-e29b-41d4-a716-446655440001",
-				TS:            "2024-01-08T11:00:00Z",
+				Timestamp:     "2024-01-08T11:00:00Z",
 				Username:      "@bob",
 				Goal:          nil,
 				Task:          nil,
@@ -73,9 +73,9 @@ func TestEventRoundTrip(t *testing.T) {
 		{
 			name: "set_motd",
 			v: exportfmt.SetMotdEvent{
-				Type:    exportfmt.TypeSetMotd,
-				TS:      "2024-01-08T10:00:00Z",
-				Content: "hello team",
+				Type:      exportfmt.TypeSetMotd,
+				Timestamp: "2024-01-08T10:00:00Z",
+				Content:   "hello team",
 			},
 		},
 	}

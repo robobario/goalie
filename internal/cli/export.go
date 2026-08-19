@@ -46,7 +46,7 @@ func Export(ctx AppContext) error {
 			Type:        exportfmt.TypeCreateGoal,
 			ID:          g.ID,
 			Description: g.Description,
-			Created:     g.Created,
+			Timestamp:   g.Created,
 		}); err != nil {
 			return err
 		}
@@ -83,7 +83,7 @@ func Export(ctx AppContext) error {
 		if err := emit(exportfmt.LogEntryEvent{
 			Type:          exportfmt.TypeLogEntry,
 			ID:            e.ID,
-			TS:            e.TS,
+			Timestamp:     e.TS,
 			Username:      e.Username,
 			Goal:          e.Goal,
 			Task:          e.Task,
@@ -104,9 +104,9 @@ func Export(ctx AppContext) error {
 	}
 	for _, m := range motdEntries {
 		if err := emit(exportfmt.SetMotdEvent{
-			Type:    exportfmt.TypeSetMotd,
-			TS:      m.TS,
-			Content: m.Content,
+			Type:      exportfmt.TypeSetMotd,
+			Timestamp: m.TS,
+			Content:   m.Content,
 		}); err != nil {
 			return err
 		}

@@ -1,5 +1,5 @@
 {"type":"create_goal","id":"ROUTING","description":"Implement the routing layer","timestamp":"2024-01-08T10:00:00Z"}
 {"type":"create_goal","id":"SCALING","description":"Improve scaling","timestamp":"2024-01-08T10:01:00Z"}
 {"type":"close_goal","id":"SCALING"}
-{"type":"log_entry","id":"a0000000-0000-0000-0000-000000000002","timestamp":"2024-01-08T11:00:00Z","username":"@alice","goal":"ROUTING","task":"#impl","blocked":true,"done":false,"note":"blocked on code review"}
 {"type":"log_entry","id":"a0000000-0000-0000-0000-000000000001","timestamp":"2024-01-08T10:00:00Z","username":"@alice","goal":"ROUTING","task":"#impl","blocked":false,"done":false,"note":"started the work"}
+{"type":"log_entry","id":"a0000000-0000-0000-0000-000000000002","timestamp":"2024-01-08T11:00:00Z","username":"@alice","goal":"ROUTING","task":"#impl","blocked":true,"done":false,"note":"blocked on code review"}

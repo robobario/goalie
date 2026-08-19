@@ -60,7 +60,8 @@ func Export(ctx AppContext) error {
 		}
 	}
 
-	// Entries — sorted descending by ts, then ascending username / goal / task.
+	// Entries — sorted ascending by ts so an unblock replays after the entry it unblocks,
+	// then ascending username / goal / task.
 	entries, err := journal.ReadAll(ctx.DataDir, ctx.EncryptionKey)
 	if err != nil {
 		return err
@@ -68,7 +69,7 @@ func Export(ctx AppContext) error {
 	sort.Slice(entries, func(i, j int) bool {
 		a, b := entries[i], entries[j]
 		if a.TS != b.TS {
-			return a.TS > b.TS
+			return a.TS < b.TS
 		}
 		if a.Username != b.Username {
 			return a.Username < b.Username

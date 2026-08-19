@@ -131,6 +131,33 @@ goalie summary --user "*"             # everyone on the team
 
 **Use the TUI** for end-of-day updates — run `goalie` with no arguments.
 
+## Backup and migration
+
+`goalie export` writes the whole data repo to stdout as JSONL — one gesture
+event per line (goals created and closed, journal entries, MOTDs). `goalie
+import` reads that stream from stdin and replays it into a data repo that has
+already been set up with `goalie init`.
+
+```sh
+goalie export > backup.jsonl                              # snapshot the current data repo
+goalie import < backup.jsonl                             # replay it into an initialised repo
+goalie export | GOALIE_HOME=~/.goalie-copy goalie import  # pipe into a different repo
+```
+
+Export is encryption-agnostic: the output is always plaintext JSONL regardless
+of whether the data repo is encrypted. Import writes using whatever encryption
+the target repo was initialised with, so export/import doubles as the way to
+move data between a plaintext and an encrypted repo, or to rotate to a new key.
+
+Events are ordered so dependencies come before dependents — a goal is created
+before any entry references it, and an entry appears before the later entry that
+unblocks it — so import can replay the stream in a single top-to-bottom pass.
+The format is forward-compatible: an older `goalie import` silently skips event
+types it does not recognise, so a newer export still loads. See
+[ARCHITECTURE.md](ARCHITECTURE.md) for the full format contract.
+
+Import fails fast — the first malformed line or replay error stops the run.
+
 ## Usage
 
 ```
@@ -147,7 +174,8 @@ goalie summary [--days N] [--user NAME|GLOB]
                                     # Entries grouped as stories per goal/task/user, last N days (default 7)
 goalie status                       # Morning standup view: latest entry per user×goal×task, last 7 days
 goalie update                       # Interactive end-of-day review: update tasks, log new activity
-goalie export                       # Dump all data as JSONL (one entity per line) for debugging and schema compatibility testing
+goalie export                       # Dump all data as JSONL gesture events on stdout (backup, migration, debugging)
+goalie import                       # Replay a JSONL export from stdin into an initialised data repo
 goalie --version                    # Print version and exit
 ```
 

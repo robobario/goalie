@@ -153,6 +153,13 @@ func Append(dataDir string, r git.Runner, username string, e Entry, key []byte) 
 // AppendWithClock is Append with an injectable Clock, so tests can fix "now"
 // instead of racing the wall clock.
 func AppendWithClock(dataDir string, r git.Runner, username string, e Entry, key []byte, c clock.Clock) error {
+	return AppendAt(dataDir, r, username, e, key, c.Now())
+}
+
+// AppendAt appends an entry with an explicit timestamp. Use this when replaying
+// historical events (e.g. during import) where the timestamp comes from outside
+// the system.
+func AppendAt(dataDir string, r git.Runner, username string, e Entry, key []byte, ts time.Time) error {
 	if err := r.Run([]string{"pull"}, dataDir); err != nil {
 		return err
 	}
@@ -162,7 +169,7 @@ func AppendWithClock(dataDir string, r git.Runner, username string, e Entry, key
 		return err
 	}
 
-	now := c.Now()
+	now := ts.UTC()
 	e.ID = uuid.New().String()
 	e.TS = now.Format(time.RFC3339)
 

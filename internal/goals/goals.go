@@ -56,6 +56,10 @@ func goalPath(dataDir string, key []byte, id string) string {
 }
 
 func Add(dataDir string, r git.Runner, id, description string, key []byte) error {
+	return AddAt(dataDir, r, id, description, key, clock.Now())
+}
+
+func AddAt(dataDir string, r git.Runner, id, description string, key []byte, createdAt time.Time) error {
 	if err := r.Run([]string{"pull"}, dataDir); err != nil {
 		return err
 	}
@@ -73,7 +77,7 @@ func Add(dataDir string, r git.Runner, id, description string, key []byte) error
 		ID:          id,
 		Description: description,
 		State:       "open",
-		Created:     clock.Now().Format(time.RFC3339),
+		Created:     createdAt.UTC().Format(time.RFC3339),
 	}
 	data, err := json.MarshalIndent(g, "", "  ")
 	if err != nil {

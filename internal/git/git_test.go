@@ -2,10 +2,48 @@ package git
 
 import (
 	"errors"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
+
+// TestRealRunner_DisablesInteractivePrompts asserts every git invocation carries
+// the env vars that suppress terminal prompts, GUI askpass helpers, and SSH
+// host-key/passphrase prompts, so a credential problem fails fast instead of
+// hanging or popping a dialog.
+func TestRealRunner_DisablesInteractivePrompts(t *testing.T) {
+	dir := t.TempDir()
+	script := "#!/bin/sh\necho \"$GIT_TERMINAL_PROMPT|$GIT_ASKPASS|$SSH_ASKPASS|$GIT_SSH_COMMAND\"\n"
+	if err := os.WriteFile(filepath.Join(dir, "git"), []byte(script), 0755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+
+	r := &RealRunner{}
+	out, err := r.Output([]string{"whatever"}, dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	parts := strings.Split(out, "|")
+	if len(parts) != 4 {
+		t.Fatalf("unexpected output: %q", out)
+	}
+	if parts[0] != "0" {
+		t.Errorf("GIT_TERMINAL_PROMPT = %q, want 0", parts[0])
+	}
+	if parts[1] != "" {
+		t.Errorf("GIT_ASKPASS = %q, want empty", parts[1])
+	}
+	if parts[2] != "" {
+		t.Errorf("SSH_ASKPASS = %q, want empty", parts[2])
+	}
+	if !strings.Contains(parts[3], "BatchMode=yes") {
+		t.Errorf("GIT_SSH_COMMAND = %q, want BatchMode=yes", parts[3])
+	}
+}
 
 func TestPushSucceedsFirstAttempt(t *testing.T) {
 	r := &FakeRunner{}

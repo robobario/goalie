@@ -612,6 +612,54 @@ func TestInit_PushFailure_CleansUpDataDir(t *testing.T) {
 	}
 }
 
+func TestInit_CloneSucceeds_WriteAccessFails_SuggestsSSH(t *testing.T) {
+	t.Setenv("GOALIE_HOME", t.TempDir())
+	dataDir := filepath.Join(t.TempDir(), "data")
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	pushErr := errors.New("fatal: permission denied")
+	runner := &git.FakeRunner{
+		Outputs: map[string][]string{"ls-remote": {"abc123\trefs/heads/data\n"}},
+		Errors:  map[string][]error{"push": {pushErr, pushErr}},
+	}
+
+	err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, AppContext{Stdin: strings.NewReader(""), Stdout: os.Stdout})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "SSH") {
+		t.Errorf("expected SSH suggestion in error; got %q", err.Error())
+	}
+	if _, statErr := os.Stat(dataDir); !os.IsNotExist(statErr) {
+		t.Errorf("expected dataDir to be cleaned up; stat err = %v", statErr)
+	}
+}
+
+func TestInit_NewBranch_WriteAccessFails_SuggestsSSHAndCleansUp(t *testing.T) {
+	t.Setenv("GOALIE_HOME", t.TempDir())
+	dataDir := filepath.Join(t.TempDir(), "data")
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	pushErr := errors.New("fatal: permission denied")
+	runner := &git.FakeRunner{
+		Outputs: map[string][]string{"ls-remote": {""}},
+		Errors:  map[string][]error{"push": {pushErr, pushErr}},
+	}
+
+	err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, AppContext{Stdin: strings.NewReader(""), Stdout: os.Stdout})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "SSH") {
+		t.Errorf("expected SSH suggestion in error; got %q", err.Error())
+	}
+	// the encryption prompt must never be reached — write access is checked first.
+	if hasCall(runner.Calls, "commit", "-m", "chore: initialise goalie data branch") {
+		t.Errorf("expected init to fail before the real commit; got %v", runner.Calls)
+	}
+	if _, statErr := os.Stat(dataDir); !os.IsNotExist(statErr) {
+		t.Errorf("expected dataDir to be cleaned up; stat err = %v", statErr)
+	}
+}
+
 func TestInit_ConfigNotOverwritten(t *testing.T) {
 	t.Setenv("GOALIE_HOME", t.TempDir())
 	dataDir := t.TempDir()

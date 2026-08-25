@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 type Runner interface {
@@ -104,11 +107,52 @@ func (f *FakeRunner) Output(args []string, cwd string) (string, error) {
 // Push attempts git push in cwd. On failure, it pulls with rebase then retries.
 // Returns an error only if the retry also fails.
 func Push(r Runner, cwd string) error {
-	if err := r.Run([]string{"push"}, cwd); err == nil {
+	return PushArgs(r, cwd, []string{"push"})
+}
+
+// PushArgs runs the given push command in cwd. On failure, it pulls with
+// rebase then retries the same push command. Returns an error only if the
+// retry also fails.
+func PushArgs(r Runner, cwd string, args []string) error {
+	if err := r.Run(args, cwd); err == nil {
 		return nil
 	}
 	if err := r.Run([]string{"pull", "--rebase"}, cwd); err != nil {
 		return err
 	}
-	return r.Run([]string{"push"}, cwd)
+	return r.Run(args, cwd)
+}
+
+// VerifyWriteAccess proves the caller can push to origin/branch before any
+// real content is committed. It writes a uniquely-named throwaway file,
+// commits and pushes it, then removes it with a second commit and push.
+// setUpstream should be true the first time a freshly created branch is
+// pushed; false when cwd already tracks an upstream (e.g. after a clone).
+// The caller is responsible for cleaning up cwd if this returns an error.
+func VerifyWriteAccess(r Runner, cwd, branch string, setUpstream bool) error {
+	name := ".goalie-write-check-" + uuid.New().String()
+	path := filepath.Join(cwd, name)
+	if err := os.WriteFile(path, nil, 0644); err != nil {
+		return err
+	}
+	if err := r.Run([]string{"add", name}, cwd); err != nil {
+		return err
+	}
+	if err := r.Run([]string{"commit", "-m", "chore: verify write access"}, cwd); err != nil {
+		return err
+	}
+	pushArgs := []string{"push"}
+	if setUpstream {
+		pushArgs = []string{"push", "--set-upstream", "origin", branch}
+	}
+	if err := PushArgs(r, cwd, pushArgs); err != nil {
+		return err
+	}
+	if err := r.Run([]string{"rm", name}, cwd); err != nil {
+		return err
+	}
+	if err := r.Run([]string{"commit", "-m", "chore: remove write access check"}, cwd); err != nil {
+		return err
+	}
+	return PushArgs(r, cwd, []string{"push"})
 }

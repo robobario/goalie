@@ -148,6 +148,79 @@ func TestRealRunner_Output_Succeeds(t *testing.T) {
 	}
 }
 
+func TestVerifyWriteAccess_Success(t *testing.T) {
+	dir := t.TempDir()
+	r := &FakeRunner{}
+
+	if err := VerifyWriteAccess(r, dir, "data", true); err != nil {
+		t.Fatalf("expected nil, got %v", err)
+	}
+
+	if len(r.Calls) != 6 {
+		t.Fatalf("expected 6 calls, got %d: %v", len(r.Calls), r.Calls)
+	}
+	if len(r.Calls[0]) != 2 || r.Calls[0][0] != "add" {
+		t.Fatalf("expected add <file>, got %v", r.Calls[0])
+	}
+	file := r.Calls[0][1]
+	if !strings.HasPrefix(file, ".goalie-write-check-") {
+		t.Errorf("unexpected file name %q", file)
+	}
+	expectArgs(t, r.Calls[1], []string{"commit", "-m", "chore: verify write access"})
+	expectArgs(t, r.Calls[2], []string{"push", "--set-upstream", "origin", "data"})
+	expectArgs(t, r.Calls[3], []string{"rm", file})
+	expectArgs(t, r.Calls[4], []string{"commit", "-m", "chore: remove write access check"})
+	expectArgs(t, r.Calls[5], []string{"push"})
+}
+
+func TestVerifyWriteAccess_NoSetUpstream(t *testing.T) {
+	dir := t.TempDir()
+	r := &FakeRunner{}
+
+	if err := VerifyWriteAccess(r, dir, "data", false); err != nil {
+		t.Fatalf("expected nil, got %v", err)
+	}
+
+	expectArgs(t, r.Calls[2], []string{"push"})
+}
+
+func TestVerifyWriteAccess_RetriesPushOnFailure(t *testing.T) {
+	dir := t.TempDir()
+	pushErr := errors.New("push failed")
+	r := &FakeRunner{Errors: map[string][]error{"push": {pushErr, nil}}}
+
+	if err := VerifyWriteAccess(r, dir, "data", false); err != nil {
+		t.Fatalf("expected nil, got %v", err)
+	}
+
+	if len(r.Calls) != 8 {
+		t.Fatalf("expected 8 calls (extra pull --rebase), got %d: %v", len(r.Calls), r.Calls)
+	}
+	expectArgs(t, r.Calls[3], []string{"pull", "--rebase"})
+	expectArgs(t, r.Calls[4], []string{"push"})
+}
+
+func TestVerifyWriteAccess_PermanentPushFailureStopsEarly(t *testing.T) {
+	dir := t.TempDir()
+	pushErr := errors.New("push failed")
+	r := &FakeRunner{Errors: map[string][]error{"push": {pushErr, pushErr}}}
+
+	if err := VerifyWriteAccess(r, dir, "data", false); err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	// add, commit, then push/pull-rebase/push all fail out — never gets to
+	// removing the write-check file.
+	if len(r.Calls) != 5 {
+		t.Fatalf("expected 5 calls, got %d: %v", len(r.Calls), r.Calls)
+	}
+	for _, call := range r.Calls {
+		if len(call) > 0 && call[0] == "rm" {
+			t.Errorf("expected no rm call after permanent push failure; got %v", r.Calls)
+		}
+	}
+}
+
 func expectArgs(t *testing.T, got, want []string) {
 	t.Helper()
 	if len(got) != len(want) {

@@ -5,8 +5,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-if [[ ! -f dist/goalie-linux-amd64 ]]; then
-    echo "dist/goalie-linux-amd64 not found — run ./build.sh first" >&2
+if [[ ! -f dist/goalie_linux_amd64_v1/goalie ]]; then
+    echo "dist/goalie_linux_amd64_v1/goalie not found — run ./build.sh first" >&2
     exit 1
 fi
 

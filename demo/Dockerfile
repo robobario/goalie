@@ -4,7 +4,7 @@ RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-COPY dist/goalie-linux-amd64 /usr/local/bin/goalie
+COPY dist/goalie_linux_amd64_v1/goalie /usr/local/bin/goalie
 RUN chmod +x /usr/local/bin/goalie
 
 RUN git config --global user.email "demo@example.com" \

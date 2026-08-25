@@ -87,4 +87,24 @@ Enter
 # Switch back to Activity tab — the updated entries are visible after the pull
 
 Ctrl+Shift+Left
+Sleep 2s
+
+# Switch back to Update tab and unblock dan
+
+Ctrl+Shift+Right
+Sleep 1s
+
+Down
+Sleep 50ms
+Down
+Sleep 50ms
+Down
+Sleep 50ms
+Enter
+Sleep 1s
+Enter
+Type "I've reviewed and the alert is a false positive"
+Sleep 200ms
+Enter
+Ctrl+Shift+Left
 Sleep 4s

@@ -22,7 +22,7 @@ goalie goal add INCIDENTS "Reduce mean time to resolution"
 goalie motd set "Sprint planning Thursday 2pm — ping @alice if you need to reschedule"
 
 # Alice's entries
-goalie log "Finished Helm charts for the auth service" --goal PLATFORM --task "#k8s-migration"
+goalie log "Finished Helm charts for the auth service in https://github.com/robobario/goalie/pull/162" --goal PLATFORM --task "#k8s-migration"
 goalie log "Updated README with local dev environment steps" --goal ONBOARDING --task "#docs"
 
 export GOALIE_HOME="$HOME_BOB"
@@ -45,3 +45,4 @@ goalie log "Fixed false positive on memory alert, need bob to confirm in prod" -
 # Pull so that alice's local checkout has everyone's journal entries before the TUI starts.
 # CollectLatest also pulls on startup, but having it ready avoids a slow first-render.
 git -C "$HOME_ALICE/data" pull
+echo '{"name":"@alice","compress_hyperlinks":true}' > $HOME_ALICE/config.json

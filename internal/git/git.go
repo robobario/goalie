@@ -3,6 +3,7 @@ package git
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -14,9 +15,23 @@ type Runner interface {
 
 type RealRunner struct{}
 
+// noPromptEnv disables every interactive credential path git might try:
+// terminal prompts, GUI askpass helpers, and SSH passphrase/host-key prompts.
+// A user with misconfigured or missing credentials must see a fast error,
+// never a hang or an unexpected GUI popup.
+func noPromptEnv() []string {
+	return append(os.Environ(),
+		"GIT_TERMINAL_PROMPT=0",
+		"GIT_ASKPASS=",
+		"SSH_ASKPASS=",
+		"GIT_SSH_COMMAND=ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new",
+	)
+}
+
 func (r *RealRunner) Run(args []string, cwd string) error {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = cwd
+	cmd.Env = noPromptEnv()
 	var buf bytes.Buffer
 	cmd.Stderr = &buf
 	if err := cmd.Run(); err != nil {
@@ -31,6 +46,7 @@ func (r *RealRunner) Run(args []string, cwd string) error {
 func (r *RealRunner) Output(args []string, cwd string) (string, error) {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = cwd
+	cmd.Env = noPromptEnv()
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()

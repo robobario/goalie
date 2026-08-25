@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -548,6 +549,66 @@ func TestInit_UsernameInvalidThenValid(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "must start with a letter") {
 		t.Errorf("expected validation error message in output; got %q", out.String())
+	}
+}
+
+func TestInit_LsRemoteFailure_FriendlyErrorAndCleanup(t *testing.T) {
+	t.Setenv("GOALIE_HOME", t.TempDir())
+	dataDir := filepath.Join(t.TempDir(), "data")
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	lsRemoteErr := errors.New("fatal: repository 'https://example.com/typo.git' not found")
+	runner := &git.FakeRunner{Errors: map[string][]error{"ls-remote": {lsRemoteErr}}}
+
+	err := Init("https://example.com/typo.git", dataDir, configPath, "data", runner, AppContext{Stdin: strings.NewReader(""), Stdout: os.Stdout})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "https://example.com/typo.git") || !strings.Contains(err.Error(), "verify the URL") {
+		t.Errorf("expected friendly URL guidance in error; got %q", err.Error())
+	}
+	if _, statErr := os.Stat(dataDir); !os.IsNotExist(statErr) {
+		t.Errorf("expected dataDir to be cleaned up; stat err = %v", statErr)
+	}
+}
+
+func TestInit_CloneFailure_FriendlyErrorAndCleanup(t *testing.T) {
+	t.Setenv("GOALIE_HOME", t.TempDir())
+	dataDir := filepath.Join(t.TempDir(), "data")
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	cloneErr := errors.New("fatal: could not read Username")
+	runner := &git.FakeRunner{
+		Outputs: map[string][]string{"ls-remote": {"abc123\trefs/heads/data\n"}},
+		Errors:  map[string][]error{"clone": {cloneErr}},
+	}
+
+	err := Init("https://example.com/private.git", dataDir, configPath, "data", runner, AppContext{Stdin: strings.NewReader(""), Stdout: os.Stdout})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "read access") {
+		t.Errorf("expected read-access guidance in error; got %q", err.Error())
+	}
+	if _, statErr := os.Stat(dataDir); !os.IsNotExist(statErr) {
+		t.Errorf("expected dataDir to be cleaned up; stat err = %v", statErr)
+	}
+}
+
+func TestInit_PushFailure_CleansUpDataDir(t *testing.T) {
+	t.Setenv("GOALIE_HOME", t.TempDir())
+	dataDir := filepath.Join(t.TempDir(), "data")
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	pushErr := errors.New("fatal: permission denied")
+	runner := &git.FakeRunner{
+		Outputs: map[string][]string{"ls-remote": {""}},
+		Errors:  map[string][]error{"push": {pushErr, pushErr}},
+	}
+
+	err := Init("https://example.com/repo.git", dataDir, configPath, "data", runner, AppContext{Stdin: strings.NewReader("n\n"), Stdout: os.Stdout})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if _, statErr := os.Stat(dataDir); !os.IsNotExist(statErr) {
+		t.Errorf("expected dataDir to be cleaned up; stat err = %v", statErr)
 	}
 }
 

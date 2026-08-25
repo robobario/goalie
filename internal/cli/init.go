@@ -23,70 +23,9 @@ func Init(repoURL string, dataDir string, configPath string, branch string, r gi
 	if _, err := os.Stat(dataDir); err == nil {
 		fmt.Fprint(ctx.Stdout, "Goalie data directory already exists.\n")
 	} else {
-		out, err := r.Output([]string{"ls-remote", "--heads", repoURL, branch}, "")
-		if err != nil {
+		if err := setupDataDir(repoURL, dataDir, branch, r, ctx, sr); err != nil {
+			os.RemoveAll(dataDir)
 			return err
-		}
-		if out != "" {
-			if err := r.Run([]string{"clone", "--branch", branch, repoURL, dataDir}, ""); err != nil {
-				return err
-			}
-		} else {
-			if err := r.Run([]string{"init", dataDir}, ""); err != nil {
-				return err
-			}
-			if err := r.Run([]string{"symbolic-ref", "HEAD", "refs/heads/" + branch}, dataDir); err != nil {
-				return err
-			}
-			if err := r.Run([]string{"remote", "add", "origin", repoURL}, dataDir); err != nil {
-				return err
-			}
-			for _, dir := range []string{"goals", "journal"} {
-				d := filepath.Join(dataDir, dir)
-				if err := os.MkdirAll(d, 0755); err != nil {
-					return err
-				}
-				if err := os.WriteFile(filepath.Join(d, ".gitkeep"), nil, 0644); err != nil {
-					return err
-				}
-			}
-			encrypt, err := ynPrompt("Enable client-side encryption? (y/n) ", sr, ctx)
-			if err != nil {
-				return err
-			}
-			if err := meta.Save(dataDir, meta.Meta{Encrypt: encrypt}); err != nil {
-				return err
-			}
-
-			addArgs := []string{"add", "goals/.gitkeep", "journal/.gitkeep", "meta.json"}
-			var freshKey []byte
-			if encrypt {
-				freshKey, err = setupEncryptionKey(sr, ctx)
-				if err != nil {
-					return err
-				}
-				keyCheckPath := filepath.Join(dataDir, "key-check.enc")
-				if err := crypto.WriteKeyCheck(keyCheckPath, freshKey); err != nil {
-					return err
-				}
-				addArgs = append(addArgs, "key-check.enc")
-			}
-
-			if err := r.Run(addArgs, dataDir); err != nil {
-				return err
-			}
-			if err := r.Run([]string{"commit", "-m", "chore: initialise goalie data branch"}, dataDir); err != nil {
-				return err
-			}
-			if err := r.Run([]string{"push", "--set-upstream", "origin", branch}, dataDir); err != nil {
-				return err
-			}
-
-			if encrypt {
-				fmt.Fprintf(ctx.Stdout, "Encryption key: %s\nShare with teammates: goalie key import <key>\nkey-check.enc committed to the data branch — teammates must import the same key.\n", hex.EncodeToString(freshKey))
-			} else {
-				fmt.Fprint(ctx.Stdout, "Data will be stored in plaintext — no encryption key required.\n")
-			}
 		}
 	}
 
@@ -120,6 +59,78 @@ func Init(repoURL string, dataDir string, configPath string, branch string, r gi
 		}
 	}
 
+	return nil
+}
+
+// setupDataDir clones the data branch if it already exists on the remote, or
+// creates it from scratch otherwise. Any error it returns means dataDir is
+// not in a usable state; the caller must remove it before returning.
+func setupDataDir(repoURL, dataDir, branch string, r git.Runner, ctx AppContext, sr *bufio.Reader) error {
+	out, err := r.Output([]string{"ls-remote", "--heads", repoURL, branch}, "")
+	if err != nil {
+		return fmt.Errorf("could not reach %s to check for branch %q — verify the URL and your network access:\n%w", repoURL, branch, err)
+	}
+	if out != "" {
+		if err := r.Run([]string{"clone", "--branch", branch, repoURL, dataDir}, ""); err != nil {
+			return fmt.Errorf("failed to clone %s (branch %q) — verify the URL and that you have read access:\n%w", repoURL, branch, err)
+		}
+	} else {
+		if err := r.Run([]string{"init", dataDir}, ""); err != nil {
+			return err
+		}
+		if err := r.Run([]string{"symbolic-ref", "HEAD", "refs/heads/" + branch}, dataDir); err != nil {
+			return err
+		}
+		if err := r.Run([]string{"remote", "add", "origin", repoURL}, dataDir); err != nil {
+			return err
+		}
+		for _, dir := range []string{"goals", "journal"} {
+			d := filepath.Join(dataDir, dir)
+			if err := os.MkdirAll(d, 0755); err != nil {
+				return err
+			}
+			if err := os.WriteFile(filepath.Join(d, ".gitkeep"), nil, 0644); err != nil {
+				return err
+			}
+		}
+		encrypt, err := ynPrompt("Enable client-side encryption? (y/n) ", sr, ctx)
+		if err != nil {
+			return err
+		}
+		if err := meta.Save(dataDir, meta.Meta{Encrypt: encrypt}); err != nil {
+			return err
+		}
+
+		addArgs := []string{"add", "goals/.gitkeep", "journal/.gitkeep", "meta.json"}
+		var freshKey []byte
+		if encrypt {
+			freshKey, err = setupEncryptionKey(sr, ctx)
+			if err != nil {
+				return err
+			}
+			keyCheckPath := filepath.Join(dataDir, "key-check.enc")
+			if err := crypto.WriteKeyCheck(keyCheckPath, freshKey); err != nil {
+				return err
+			}
+			addArgs = append(addArgs, "key-check.enc")
+		}
+
+		if err := r.Run(addArgs, dataDir); err != nil {
+			return err
+		}
+		if err := r.Run([]string{"commit", "-m", "chore: initialise goalie data branch"}, dataDir); err != nil {
+			return err
+		}
+		if err := r.Run([]string{"push", "--set-upstream", "origin", branch}, dataDir); err != nil {
+			return err
+		}
+
+		if encrypt {
+			fmt.Fprintf(ctx.Stdout, "Encryption key: %s\nShare with teammates: goalie key import <key>\nkey-check.enc committed to the data branch — teammates must import the same key.\n", hex.EncodeToString(freshKey))
+		} else {
+			fmt.Fprint(ctx.Stdout, "Data will be stored in plaintext — no encryption key required.\n")
+		}
+	}
 	return nil
 }
 

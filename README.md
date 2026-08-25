@@ -40,6 +40,8 @@ By default goalie stores all data under `~/.goalie`. Set the `GOALIE_HOME` envir
 
 Goalie stores goals and journal entries in a dedicated `data` branch of a shared git repository. You need an existing repo that all team members can push to.
 
+`goalie init` verifies push access before writing any real data: it commits and pushes a throwaway file, then removes it. If that fails — a common issue when the repo URL is HTTPS but your credentials are only configured for SSH — init fails with an error suggesting an SSH remote (e.g. `git@github.com:your-org/your-repo.git`) and cleans up any partial local state, so you can just re-run `goalie init` with the corrected URL.
+
 ### First person on the team
 
 Run `init`, pointing at the shared repo. Goalie creates the `data` branch, asks for your username, and asks whether to enable client-side encryption.

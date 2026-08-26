@@ -88,6 +88,43 @@ func TestPushReturnsErrorWhenRetryFails(t *testing.T) {
 	}
 }
 
+func TestPushNewBranch_SucceedsFirstAttempt(t *testing.T) {
+	r := &FakeRunner{}
+	if err := PushNewBranch(r, "/tmp", "data"); err != nil {
+		t.Fatalf("expected nil, got %v", err)
+	}
+	if len(r.Calls) != 1 {
+		t.Fatalf("expected 1 call, got %d: %v", len(r.Calls), r.Calls)
+	}
+	expectArgs(t, r.Calls[0], []string{"push", "--set-upstream", "origin", "data"})
+}
+
+func TestPushNewBranch_RetriesWithExplicitPullTarget(t *testing.T) {
+	pushErr := errors.New("push failed")
+	r := &FakeRunner{
+		Errors: map[string][]error{"push": {pushErr, nil}},
+	}
+	if err := PushNewBranch(r, "/tmp", "data"); err != nil {
+		t.Fatalf("expected nil, got %v", err)
+	}
+	if len(r.Calls) != 3 {
+		t.Fatalf("expected 3 calls, got %d: %v", len(r.Calls), r.Calls)
+	}
+	expectArgs(t, r.Calls[0], []string{"push", "--set-upstream", "origin", "data"})
+	expectArgs(t, r.Calls[1], []string{"pull", "--rebase", "origin", "data"})
+	expectArgs(t, r.Calls[2], []string{"push", "--set-upstream", "origin", "data"})
+}
+
+func TestPushNewBranch_ReturnsErrorWhenRetryFails(t *testing.T) {
+	pushErr := errors.New("push failed")
+	r := &FakeRunner{
+		Errors: map[string][]error{"push": {pushErr, pushErr}},
+	}
+	if err := PushNewBranch(r, "/tmp", "data"); err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
 func TestRealRunner_Run_CapturesStderr(t *testing.T) {
 	dir := t.TempDir()
 	if err := exec.Command("git", "init", dir).Run(); err != nil {
@@ -152,7 +189,7 @@ func TestVerifyWriteAccess_Success(t *testing.T) {
 	dir := t.TempDir()
 	r := &FakeRunner{}
 
-	if err := VerifyWriteAccess(r, dir, "data", true); err != nil {
+	if err := VerifyWriteAccess(r, dir); err != nil {
 		t.Fatalf("expected nil, got %v", err)
 	}
 
@@ -167,21 +204,10 @@ func TestVerifyWriteAccess_Success(t *testing.T) {
 		t.Errorf("unexpected file name %q", file)
 	}
 	expectArgs(t, r.Calls[1], []string{"commit", "-m", "chore: verify write access"})
-	expectArgs(t, r.Calls[2], []string{"push", "--set-upstream", "origin", "data"})
+	expectArgs(t, r.Calls[2], []string{"push"})
 	expectArgs(t, r.Calls[3], []string{"rm", file})
 	expectArgs(t, r.Calls[4], []string{"commit", "-m", "chore: remove write access check"})
 	expectArgs(t, r.Calls[5], []string{"push"})
-}
-
-func TestVerifyWriteAccess_NoSetUpstream(t *testing.T) {
-	dir := t.TempDir()
-	r := &FakeRunner{}
-
-	if err := VerifyWriteAccess(r, dir, "data", false); err != nil {
-		t.Fatalf("expected nil, got %v", err)
-	}
-
-	expectArgs(t, r.Calls[2], []string{"push"})
 }
 
 func TestVerifyWriteAccess_RetriesPushOnFailure(t *testing.T) {
@@ -189,7 +215,7 @@ func TestVerifyWriteAccess_RetriesPushOnFailure(t *testing.T) {
 	pushErr := errors.New("push failed")
 	r := &FakeRunner{Errors: map[string][]error{"push": {pushErr, nil}}}
 
-	if err := VerifyWriteAccess(r, dir, "data", false); err != nil {
+	if err := VerifyWriteAccess(r, dir); err != nil {
 		t.Fatalf("expected nil, got %v", err)
 	}
 
@@ -205,7 +231,7 @@ func TestVerifyWriteAccess_PermanentPushFailureStopsEarly(t *testing.T) {
 	pushErr := errors.New("push failed")
 	r := &FakeRunner{Errors: map[string][]error{"push": {pushErr, pushErr}}}
 
-	if err := VerifyWriteAccess(r, dir, "data", false); err == nil {
+	if err := VerifyWriteAccess(r, dir); err == nil {
 		t.Fatal("expected error, got nil")
 	}
 

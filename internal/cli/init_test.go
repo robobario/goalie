@@ -15,6 +15,37 @@ import (
 	"goalie/internal/meta"
 )
 
+// TestSafeToRemoveDataDir exercises only the predicate, never os.RemoveAll —
+// no test here may delete anything, so dangerous inputs are checked as plain
+// string logic, not by actually attempting removal.
+func TestSafeToRemoveDataDir(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("could not resolve home dir for test: %v", err)
+	}
+
+	cases := []struct {
+		name string
+		dir  string
+		want bool
+	}{
+		{"empty path", "", false},
+		{"unix root", "/", false},
+		{"unix root unclean", "/../..", false},
+		{"real home dir", home, false},
+		{"real home dir with trailing slash", home + string(filepath.Separator), false},
+		{"ordinary nested path", filepath.Join(t.TempDir(), "data"), true},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := safeToRemoveDataDir(c.dir); got != c.want {
+				t.Errorf("safeToRemoveDataDir(%q) = %v, want %v", c.dir, got, c.want)
+			}
+		})
+	}
+}
+
 func TestInit_NoKeyPromptsForKey(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("GOALIE_HOME", home)
@@ -655,6 +686,35 @@ func TestInit_NewBranch_WriteAccessFails_SuggestsSSHAndCleansUp(t *testing.T) {
 	// remotely, so cleanup only needs to remove the local dir.
 	if _, statErr := os.Stat(dataDir); !os.IsNotExist(statErr) {
 		t.Errorf("expected dataDir to be cleaned up; stat err = %v", statErr)
+	}
+}
+
+// TestInit_RefusesToRemoveDataDirMatchingHome proves the safeToRemoveDataDir
+// wiring in Init without ever risking a real path: it points $HOME at a
+// disposable subdirectory of t.TempDir() and uses that same path as dataDir,
+// so even a broken guard could only delete throwaway test data, never a real
+// home directory.
+func TestInit_RefusesToRemoveDataDirMatchingHome(t *testing.T) {
+	fakeHome := filepath.Join(t.TempDir(), "danger-home")
+	t.Setenv("HOME", fakeHome)
+	t.Setenv("GOALIE_HOME", t.TempDir())
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	pushErr := errors.New("fatal: permission denied")
+	runner := &git.FakeRunner{
+		Outputs: map[string][]string{"ls-remote": {""}},
+		Errors:  map[string][]error{"push": {pushErr, pushErr}},
+	}
+	var stderr strings.Builder
+
+	err := Init("https://example.com/repo.git", fakeHome, configPath, "data", runner, AppContext{Stdin: strings.NewReader("n\n"), Stdout: os.Stdout, Stderr: &stderr})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(stderr.String(), "not removing suspicious data directory") {
+		t.Errorf("expected refusal warning on stderr; got %q", stderr.String())
+	}
+	if _, statErr := os.Stat(fakeHome); statErr != nil {
+		t.Errorf("expected dataDir matching $HOME to survive cleanup; stat err = %v", statErr)
 	}
 }
 

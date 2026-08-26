@@ -24,7 +24,11 @@ func Init(repoURL string, dataDir string, configPath string, branch string, r gi
 		fmt.Fprint(ctx.Stdout, "Goalie data directory already exists.\n")
 	} else {
 		if err := setupDataDir(repoURL, dataDir, branch, r, ctx, sr); err != nil {
-			os.RemoveAll(dataDir)
+			if safeToRemoveDataDir(dataDir) {
+				os.RemoveAll(dataDir)
+			} else {
+				fmt.Fprintf(ctx.Stderr, "warning: not removing suspicious data directory %q — remove it manually if needed\n", dataDir)
+			}
 			return err
 		}
 	}
@@ -60,6 +64,31 @@ func Init(repoURL string, dataDir string, configPath string, branch string, r gi
 	}
 
 	return nil
+}
+
+// safeToRemoveDataDir guards os.RemoveAll(dataDir) against a bug elsewhere
+// making dataDir resolve to something catastrophic to delete. In normal
+// operation dataDir is always "<GOALIE_HOME>/data" and the caller only
+// reaches this check when dataDir does not yet exist, so a real filesystem
+// root or home directory could never actually reach here — this is cheap
+// defense-in-depth against a future change breaking that invariant, not a
+// mitigation for a scenario known to be reachable today.
+func safeToRemoveDataDir(dir string) bool {
+	if dir == "" {
+		return false
+	}
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return false
+	}
+	clean := filepath.Clean(abs)
+	if clean == filepath.Dir(clean) {
+		return false // filesystem or drive root
+	}
+	if home, err := os.UserHomeDir(); err == nil && clean == filepath.Clean(home) {
+		return false
+	}
+	return true
 }
 
 // setupDataDir clones the data branch if it already exists on the remote, or

@@ -107,7 +107,7 @@ func setupDataDir(repoURL, dataDir, branch string, r git.Runner, ctx AppContext,
 			return err
 		}
 		if err := git.VerifyWriteAccess(r, dataDir); err != nil {
-			return fmt.Errorf("cloned %s but could not push to it — you may need an SSH remote instead, e.g. git@host:org/repo.git:\n%w", repoURL, err)
+			return fmt.Errorf("cloned %s but write access to it is required — try an SSH or HTTPS remote, whichever your credentials are set up for:\n%w", repoURL, err)
 		}
 	} else {
 		if err := r.Run([]string{"init", dataDir}, ""); err != nil {
@@ -157,7 +157,7 @@ func setupDataDir(repoURL, dataDir, branch string, r git.Runner, ctx AppContext,
 			return err
 		}
 		if err := git.PushNewBranch(r, dataDir, branch); err != nil {
-			return fmt.Errorf("could not push to %s — you may need an SSH remote instead, e.g. git@host:org/repo.git:\n%w", repoURL, err)
+			return fmt.Errorf("write access to %s is required — try an SSH or HTTPS remote, whichever your credentials are set up for:\n%w", repoURL, err)
 		}
 
 		if encrypt {

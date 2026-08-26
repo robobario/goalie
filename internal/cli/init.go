@@ -77,7 +77,7 @@ func setupDataDir(repoURL, dataDir, branch string, r git.Runner, ctx AppContext,
 		if err := os.MkdirAll(dataDir, 0755); err != nil {
 			return err
 		}
-		if err := git.VerifyWriteAccess(r, dataDir, branch, false); err != nil {
+		if err := git.VerifyWriteAccess(r, dataDir); err != nil {
 			return fmt.Errorf("cloned %s but could not push to it — you may need an SSH remote instead, e.g. git@host:org/repo.git:\n%w", repoURL, err)
 		}
 	} else {
@@ -89,12 +89,6 @@ func setupDataDir(repoURL, dataDir, branch string, r git.Runner, ctx AppContext,
 		}
 		if err := r.Run([]string{"remote", "add", "origin", repoURL}, dataDir); err != nil {
 			return err
-		}
-		if err := os.MkdirAll(dataDir, 0755); err != nil {
-			return err
-		}
-		if err := git.VerifyWriteAccess(r, dataDir, branch, true); err != nil {
-			return fmt.Errorf("could not push to %s — you may need an SSH remote instead, e.g. git@host:org/repo.git:\n%w", repoURL, err)
 		}
 		for _, dir := range []string{"goals", "journal"} {
 			d := filepath.Join(dataDir, dir)
@@ -133,8 +127,8 @@ func setupDataDir(repoURL, dataDir, branch string, r git.Runner, ctx AppContext,
 		if err := r.Run([]string{"commit", "-m", "chore: initialise goalie data branch"}, dataDir); err != nil {
 			return err
 		}
-		if err := git.Push(r, dataDir); err != nil {
-			return err
+		if err := git.PushNewBranch(r, dataDir, branch); err != nil {
+			return fmt.Errorf("could not push to %s — you may need an SSH remote instead, e.g. git@host:org/repo.git:\n%w", repoURL, err)
 		}
 
 		if encrypt {

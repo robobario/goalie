@@ -123,13 +123,15 @@ func PushArgs(r Runner, cwd string, args []string) error {
 	return r.Run(args, cwd)
 }
 
-// VerifyWriteAccess proves the caller can push to origin/branch before any
-// real content is committed. It writes a uniquely-named throwaway file,
-// commits and pushes it, then removes it with a second commit and push.
-// setUpstream should be true the first time a freshly created branch is
-// pushed; false when cwd already tracks an upstream (e.g. after a clone).
-// The caller is responsible for cleaning up cwd if this returns an error.
-func VerifyWriteAccess(r Runner, cwd, branch string, setUpstream bool) error {
+// VerifyWriteAccess proves the caller can push to an already-tracked branch
+// (e.g. right after a clone) before trusting cwd as usable. It writes a
+// uniquely-named throwaway file, commits and pushes it, then removes it with
+// a second commit and push. Do not use this on a branch that does not yet
+// exist on the remote: unlike a brand-new branch's first push, a failure
+// partway through here would leave the file committed-but-unpushed at worst,
+// never a remote branch with no real content. The caller is responsible for
+// cleaning up cwd if this returns an error.
+func VerifyWriteAccess(r Runner, cwd string) error {
 	name := ".goalie-write-check-" + uuid.New().String()
 	path := filepath.Join(cwd, name)
 	if err := os.WriteFile(path, nil, 0644); err != nil {
@@ -141,11 +143,7 @@ func VerifyWriteAccess(r Runner, cwd, branch string, setUpstream bool) error {
 	if err := r.Run([]string{"commit", "-m", "chore: verify write access"}, cwd); err != nil {
 		return err
 	}
-	pushArgs := []string{"push"}
-	if setUpstream {
-		pushArgs = []string{"push", "--set-upstream", "origin", branch}
-	}
-	if err := PushArgs(r, cwd, pushArgs); err != nil {
+	if err := Push(r, cwd); err != nil {
 		return err
 	}
 	if err := r.Run([]string{"rm", name}, cwd); err != nil {
@@ -154,5 +152,21 @@ func VerifyWriteAccess(r Runner, cwd, branch string, setUpstream bool) error {
 	if err := r.Run([]string{"commit", "-m", "chore: remove write access check"}, cwd); err != nil {
 		return err
 	}
-	return PushArgs(r, cwd, []string{"push"})
+	return Push(r, cwd)
+}
+
+// PushNewBranch pushes a freshly created local branch to origin for the
+// first time, establishing upstream tracking as it goes. Unlike Push, its
+// retry pulls explicitly from origin/branch: no tracking config exists until
+// this call succeeds, so a bare `git pull --rebase` cannot work if the first
+// attempt fails (e.g. a race where another user just created the branch).
+func PushNewBranch(r Runner, cwd, branch string) error {
+	args := []string{"push", "--set-upstream", "origin", branch}
+	if err := r.Run(args, cwd); err == nil {
+		return nil
+	}
+	if err := r.Run([]string{"pull", "--rebase", "origin", branch}, cwd); err != nil {
+		return err
+	}
+	return r.Run(args, cwd)
 }
